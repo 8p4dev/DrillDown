@@ -153,6 +153,14 @@ export function exportEvents(): Promise<string>                   // JSON 문자
 - `package.json`, `vite.config.ts`, `playwright.config.ts`, `e2e/**`, `src/App.tsx`, `src/router.ts`, `src/core/types.ts`, `src/core/db.ts`, `src/index.css` = 오케스트레이터 소유. 새 의존성이 필요하면 멈추고 보고.
 - `npm run check` = `tsx src/core/grading/grading.check.ts && tsx src/core/srs/srs.check.ts` — A 는 `tsx src/core/outline.check.ts` 를 직접 실행해 확인(통합 시 오케스트레이터가 스크립트에 추가).
 
+### 5.1 Wave 1 결과 반영 (오케스트레이터, Wave 2 시작 전)
+- B·C·A 머지 완료(B→C→A). `npm run check` 에 `outline.check.ts` 추가.
+- Wave 2 에서 D 가 `src/features/editor/TreeListPage.tsx`(트리 생성 시 `tree_created`, 학습 기록 내보내기 버튼)와 `src/features/editor/EditorPage.tsx`(colorClassOf 연결, 가져오기 시 `outline_imported`) 를 소유한다. 나머지 editor 파일(NodeRow.tsx, editor.css)·core/** 는 읽기만.
+- C 결정: 바램 임계 `FADE`(R ≥ 0.8, FSRS-7 곡선이 평평해서), red/none 자식이 있으면 부모 green → lightgreen(A5 보수 해석), misplaced 는 최대 lightgreen + `c-misplaced`. yellow 는 생성되지 않음(A4).
+- B 결정: `reject` = 할당됐지만 유사도 < 0.5, `missing` = 할당 없음, `nodeRecall` 은 ambiguous 도 매칭으로 셈.
+- A 가 넘긴 셀렉터(E2E용): 새 트리 입력 `aria-label="새 트리 제목"`+Enter → 링크 '편집', 아웃라이너 `role=tree`(자동 포커스), 행 `.node-row[data-node-id]`(aria-level), 편집 입력 `aria-label="노드 제목"`, 가져오기 textarea `aria-label="개요 텍스트"` + 버튼 '선택 노드의 자식으로 추가' / '첫 줄을 루트로'. 루트에서 Enter = 첫 자식 생성, 탐색 Tab = 마지막 자식 생성, 편집 Tab = 들여쓰기.
+- 알려진 이슈(A): 삭제 실행취소 시 srs 미복원, 실행취소 후 상세 패널 note 가 재선택 전까지 갱신 안 됨, 실제 OS IME 수동 테스트 미실시.
+
 ## 6. 머지 순서와 통합 검증
 1. Wave 1 머지: **B → C → A** (순수 모듈 먼저, 파일 겹침 없음). 머지마다 `npm run build && npm run lint`.
 2. Wave 2: D 를 머지된 main 에서 시작 → 머지.
