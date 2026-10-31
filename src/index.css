@@ -1,0 +1,11 @@
+:root { font-family: system-ui, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; line-height: 1.5; color-scheme: light dark; }
+body { margin: 0; }
+.topnav { display: flex; gap: 1rem; padding: .5rem 1rem; border-bottom: 1px solid #8884; }
+main { padding: 1rem; max-width: 960px; margin: 0 auto; }
+/* 학습 상태 색 — core/srs 의 NodeColor 와 1:1 (docs/plans/orchestration_core_features.md §4.3) */
+.c-green { background: #2e9e5b33; border-left: 4px solid #2e9e5b; }
+.c-lightgreen { background: #9be27a33; border-left: 4px dashed #7cc35a; }
+.c-yellow { background: #f2c94c33; border-left: 4px solid #e0b020; }
+.c-red { background: #eb575733; border-left: 4px solid #eb5757; }
+.c-none { border-left: 4px solid transparent; }
+.c-misplaced { outline: 2px solid #f2994a; }
