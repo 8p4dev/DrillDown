@@ -29,13 +29,13 @@
 
 ## 단계별 작업
 - [x] plan 작성
-- [ ] `jamo.ts`: `toJamo`, `levenshtein` 
-- [ ] `hungarian.ts`: `assignMax(weights[][])` → 행별 열 인덱스(-1 = 미할당)
-- [ ] `index.ts`: THRESHOLDS, normalize, similarity, splitIdeaUnits
-- [ ] `index.ts`: gradeBlank(2패스 할당·구조·재현율·간선 정확도), resolveGradeSource
-- [ ] `grading.check.ts`: R3 최소 케이스(공백·기호·번호·조사 → exact, 별칭 → alias, 한 글자 오타 → fuzzy, 무관 → reject, 다른 부모 → misplaced, 누락 → missing, 순서 무관 최적 할당) + 반복 제목 구조, resolveGradeSource, splitIdeaUnits
-- [ ] 검증: `npx tsx src/core/grading/grading.check.ts`, `npm run build`, `npm run lint`
-- [ ] 커밋
+- [x] `jamo.ts`: `toJamo`, `levenshtein` 
+- [x] `hungarian.ts`: `assignMax(weights[][])` → 행별 열 인덱스(-1 = 미할당)
+- [x] `index.ts`: THRESHOLDS, normalize, similarity, splitIdeaUnits
+- [x] `index.ts`: gradeBlank(2패스 할당·구조·재현율·간선 정확도), resolveGradeSource
+- [x] `grading.check.ts`: R3 최소 케이스(공백·기호·번호·조사 → exact, 별칭 → alias, 한 글자 오타 → fuzzy, 무관 → reject, 다른 부모 → misplaced, 누락 → missing, 순서 무관 최적 할당) + 반복 제목 구조, resolveGradeSource, splitIdeaUnits
+- [x] 검증: `npx tsx src/core/grading/grading.check.ts`, `npm run build`, `npm run lint`
+- [x] 커밋
 
 ## 검증 방법
 - 각 모듈: `npm run typecheck`.
