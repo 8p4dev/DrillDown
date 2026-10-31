@@ -1,7 +1,9 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { logEvent } from '../../core/events'
 import { nodesToOutline, outlineToNodes, parseOutline, serializeOutline } from '../../core/outline'
 import { childrenOf, deleteNodes, descendantsOf, getTreeNodes, putNodes } from '../../core/repo'
-import type { ID, TreeNode } from '../../core/types'
+import { colorClass, colorMap, getSrsMap } from '../../core/srs'
+import type { ID, NodeSrs, TreeNode } from '../../core/types'
 import { href } from '../../router'
 import NodeRow from './NodeRow'
 import './editor.css'
@@ -36,8 +38,9 @@ const newNode = (treeId: ID, parentId: ID, order: number): TreeNode => ({
 })
 const isComposing = (e: React.KeyboardEvent) => e.nativeEvent.isComposing || e.keyCode === 229
 
-export default function EditorPage({ treeId, colorClassOf }: { treeId: string; colorClassOf?: (nodeId: string) => string }) {
+export default function EditorPage({ treeId }: { treeId: string }) {
   const [nodes, setNodes] = useState<TreeNode[] | null>(null)
+  const [srs, setSrs] = useState<{ map: Map<ID, NodeSrs>; at: Date }>({ map: new Map(), at: new Date(0) })
   const [selId, setSelId] = useState<ID>('')
   const [editId, setEditId] = useState<ID | null>(null)
   const [draft, setDraft] = useState('')
@@ -54,6 +57,10 @@ export default function EditorPage({ treeId, colorClassOf }: { treeId: string; c
   const saveRef = useRef<Promise<unknown>>(Promise.resolve())
   const outlineRef = useRef<HTMLDivElement>(null)
 
+  useEffect(() => void getSrsMap(treeId).then((map) => setSrs({ map, at: new Date() })), [treeId])
+  // 학습 상태 색: 부모 집계 포함 (core/srs). 편집 중 새 노드는 기록이 없어 c-none
+  const colors = useMemo(() => (nodes ? colorMap(nodes, srs.map, srs.at) : new Map()), [nodes, srs])
+  const colorClassOf = (id: ID) => colorClass(colors.get(id) ?? { color: 'none', misplaced: false })
   useEffect(() => {
     let alive = true
     getTreeNodes(treeId).then((ns) => {
@@ -306,6 +313,7 @@ export default function EditorPage({ treeId, colorClassOf }: { treeId: string; c
     const added = outlineToNodes(list, treeId, target.id, nextOrder(ns, target.id))
     const base = patch(ns, target.id, asRoot ? { title: items[0].text, collapsed: false } : { collapsed: false })
     commit([...base, ...added])
+    void logEvent('outline_imported', { nodeCount: added.length + (asRoot ? 1 : 0) }, treeId)
     setImportText('')
     setMsg(`${added.length + (asRoot ? 1 : 0)}개 항목을 가져왔습니다`)
   }

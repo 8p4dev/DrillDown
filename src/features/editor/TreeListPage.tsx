@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { exportEvents, logEvent } from '../../core/events'
 import { createTree, deleteTree, listTrees, renameTree } from '../../core/repo'
 import type { Tree } from '../../core/types'
 import { href } from '../../router'
@@ -14,7 +15,8 @@ export default function TreeListPage() {
     e.preventDefault()
     const t = title.trim()
     if (!t) return
-    await createTree(t)
+    const tree = await createTree(t)
+    await logEvent('tree_created', { title: t }, tree.id)
     setTitle('')
     await reload()
   }
@@ -24,6 +26,13 @@ export default function TreeListPage() {
   }
   const remove = async (t: Tree) => {
     if (confirm(`"${t.title}" 트리를 삭제할까요? 학습 기록도 함께 지워집니다.`)) await deleteTree(t.id).then(reload)
+  }
+
+  const exportLog = async () => {
+    const url = URL.createObjectURL(new Blob([await exportEvents()], { type: 'application/json' }))
+    const a = Object.assign(document.createElement('a'), { href: url, download: `drilldown-events-${new Date().toISOString().slice(0, 10)}.json` })
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   return (
@@ -51,6 +60,9 @@ export default function TreeListPage() {
           ))}
         </ul>
       )}
+      <p>
+        <button type="button" aria-label="학습 기록 내보내기(JSON)" onClick={exportLog}>학습 기록 내보내기(JSON)</button>
+      </p>
     </section>
   )
 }
