@@ -27,9 +27,9 @@
 
 ## 작업 목록
 - [x] 1. plan 문서 작성
-- [ ] 2. `outline.ts` parse/serialize/outlineToNodes/nodesToOutline
-- [ ] 3. `outline.check.ts` (혼합 들여쓰기·번호 제거·빈 줄·왕복·노드 변환) → tsx 실행 통과
-- [ ] 4. `repo.ts` 계약 함수 전부
+- [x] 2. `outline.ts` parse/serialize/outlineToNodes/nodesToOutline
+- [x] 3. `outline.check.ts` (혼합 들여쓰기·번호 제거·빈 줄·왕복·노드 변환) → tsx 실행 통과
+- [x] 4. `repo.ts` 계약 함수 전부
 - [ ] 5. `TreeListPage` — 목록·생성·이름 변경·삭제·편집/학습/백지 퀴즈 링크
 - [ ] 6. `NodeRow` + `EditorPage` 로드·렌더·선택·탐색(↑↓←→, 접힘 건너뜀)
 - [ ] 7. 편집 모드(Space/F2/Enter/Tab/Shift+Tab/Esc, IME 가드, 빈 새 노드 정리)
