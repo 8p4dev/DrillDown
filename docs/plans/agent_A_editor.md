@@ -30,17 +30,29 @@
 - [x] 2. `outline.ts` parse/serialize/outlineToNodes/nodesToOutline
 - [x] 3. `outline.check.ts` (혼합 들여쓰기·번호 제거·빈 줄·왕복·노드 변환) → tsx 실행 통과
 - [x] 4. `repo.ts` 계약 함수 전부
-- [ ] 5. `TreeListPage` — 목록·생성·이름 변경·삭제·편집/학습/백지 퀴즈 링크
-- [ ] 6. `NodeRow` + `EditorPage` 로드·렌더·선택·탐색(↑↓←→, 접힘 건너뜀)
-- [ ] 7. 편집 모드(Space/F2/Enter/Tab/Shift+Tab/Esc, IME 가드, 빈 새 노드 정리)
-- [ ] 8. 구조 편집(Enter 형제, Tab 자식, Shift+Tab, Alt+↑↓, H, Delete 확인)
-- [ ] 9. 잘라내기/붙여넣기(순환 거부) + 실행취소/다시실행 50단계
-- [ ] 10. 메모·허용 표현 패널
-- [ ] 11. 가져오기/내보내기 패널
-- [ ] 12. `npm run build` · `npm run lint` 통과, `npm run build && npx vite preview` 1회 기동 확인
-- [ ] 13. 의미 단위 커밋 + worker_done 보고
+- [x] 5. `TreeListPage` — 목록·생성·이름 변경·삭제·편집/학습/백지 퀴즈 링크
+- [x] 6. `NodeRow` + `EditorPage` 로드·렌더·선택·탐색(↑↓←→, 접힘 건너뜀)
+- [x] 7. 편집 모드(Space/F2/Enter/Tab/Shift+Tab/Esc, IME 가드, 빈 새 노드 정리)
+- [x] 8. 구조 편집(Enter 형제, Tab 자식, Shift+Tab, Alt+↑↓, H, Delete 확인)
+- [x] 9. 잘라내기/붙여넣기(순환 거부) + 실행취소/다시실행 50단계
+- [x] 10. 메모·허용 표현 패널
+- [x] 11. 가져오기/내보내기 패널
+- [x] 12. `npm run build` · `npm run lint` 통과, `npm run build && npx vite preview` 1회 기동 확인
+- [x] 13. 의미 단위 커밋 + worker_done 보고
 
 ## 검증 방법
 - 2~4: `npx tsx src/core/outline.check.ts` 출력 "outline ok", `npm run build`(tsc -b 타입체크)
 - 5~11: `npm run build` · `npm run lint` 통과 + 코드 리뷰로 키 매핑 대조. 브라우저 동작은 12에서 preview 1회 기동 확인(장기 실행·E2E 금지).
 - 완료 기준 매핑: 마우스 없는 3단계 트리 작성(Enter/Tab 흐름), "노동법" Enter 확정(IME 가드 + Enter 시 draft 그대로 저장), 새로고침 유지(IndexedDB 즉시 저장), 잘라내기·붙여넣기·실행취소, 순환 거부(`descendantsOf` 검사).
+
+## 변경 사항
+- 편집 모드에서 `Shift+Tab`(내어쓰기)도 처리한다 — 편집 중 Enter→형제, Tab→들여쓰기, Shift+Tab→내어쓰기만으로 3단계 트리를 끊김 없이 입력하기 위해.
+- 편집 중 빈 제목으로 Enter/Esc 하면 (루트·자식 있는 노드가 아닌) 그 노드를 지우고 편집을 끝낸다 — 빈 노드가 남지 않게.
+- 루트에서 Enter 는 첫 자식을 만든다(루트는 형제를 가질 수 없음). 탐색 모드 Tab 은 마지막 자식을 만든다.
+- 브라우저 확인: preview 1회 기동(임시 포트 4791) 후 scratchpad 의 일회성 Playwright 스크립트(설치된 Edge 채널, 저장소에 커밋하지 않음)로 완료 기준을 자동 점검 — 키보드만으로 3단계 트리, 새로고침 유지, 잘라내기·붙여넣기·실행취소·다시실행, 순환 거부, Alt 이동, 접기 후 ↓ 건너뜀, 삭제·복구, IME 조합 중 Enter(keyCode 229) 무시 후 "노동법" 정확 저장(CDP `Input.imeSetComposition`), 개요 가져오기·내보내기, 메모·허용 표현 저장 — 전부 통과.
+
+## 미해결 / 알려진 한계
+- 노드 삭제 시 srs 도 지우므로, 삭제를 실행취소하면 노드는 돌아오지만 학습 기록은 돌아오지 않는다(미학습 상태).
+- `DetailPanel` 은 선택 노드 id 로만 재마운트 → 패널이 열린 채 실행취소로 메모가 바뀌면 다른 노드를 선택할 때까지 이전 값이 보인다.
+- 실제 OS 한글 IME(Windows/macOS) 수동 테스트는 하지 않았다(CDP 조합 시뮬레이션만).
+- order 중간값 삽입을 반복하면 부동소수 정밀도가 줄어든다(수천 번 같은 자리 삽입 시). 필요 시 형제 재번호.
