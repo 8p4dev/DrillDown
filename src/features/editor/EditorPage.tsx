@@ -1,11 +1,12 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { logEvent } from '../../core/events'
 import { nodesToOutline, outlineToNodes, parseOutline, serializeOutline } from '../../core/outline'
 import { childrenOf, deleteNodes, descendantsOf, getTreeNodes, putNodes } from '../../core/repo'
-import { colorClass, colorMap, getSrsMap } from '../../core/srs'
+import { getSrsMap, missHeat } from '../../core/srs'
 import type { ID, NodeSrs, TreeNode } from '../../core/types'
 import { href } from '../../router'
 import NodeRow from './NodeRow'
+import NoteEditor, { type NoteApi, type NoteOp } from './content/NoteEditor'
 import GraphView from './graph/GraphView'
 import TreeHeader from '../TreeHeader'
 import './editor.css'
@@ -42,10 +43,11 @@ const isComposing = (e: React.KeyboardEvent) => e.nativeEvent.isComposing || e.k
 
 export default function EditorPage({ treeId }: { treeId: string }) {
   const [nodes, setNodes] = useState<TreeNode[] | null>(null)
-  const [srs, setSrs] = useState<{ map: Map<ID, NodeSrs>; at: Date }>({ map: new Map(), at: new Date(0) })
+  const [srs, setSrs] = useState<Map<ID, NodeSrs>>(new Map())
   const [selId, setSelId] = useState<ID>('')
   const [editId, setEditId] = useState<ID | null>(null)
   const [draft, setDraft] = useState('')
+  const [noteEditId, setNoteEditId] = useState<ID | null>(null) // 카드 안에서 내용 편집 중인 노드
   const [cutId, setCutId] = useState<ID | null>(null)
   const [msg, setMsg] = useState('')
   const [importText, setImportText] = useState('')
@@ -58,11 +60,12 @@ export default function EditorPage({ treeId }: { treeId: string }) {
   const redoRef = useRef<TreeNode[][]>([])
   const saveRef = useRef<Promise<unknown>>(Promise.resolve())
   const outlineRef = useRef<HTMLDivElement>(null)
+  const liveBase = useRef<TreeNode[] | null>(null) // 실시간 편집 시작 시점 스냅샷 (끝날 때 실행취소 1단계로)
+  const cardNote = useRef<NoteApi | null>(null)
+  const panelNote = useRef<NoteApi | null>(null)
 
-  useEffect(() => void getSrsMap(treeId).then((map) => setSrs({ map, at: new Date() })), [treeId])
-  // 학습 상태 색: 부모 집계 포함 (core/srs). 편집 중 새 노드는 기록이 없어 c-none
-  const colors = useMemo(() => (nodes ? colorMap(nodes, srs.map, srs.at) : new Map()), [nodes, srs])
-  const colorClassOf = (id: ID) => colorClass(colors.get(id) ?? { color: 'none', misplaced: false })
+  // 오답 농도(붉은색)만 쓴다. 숙련도 색(c-*)은 플래시카드 화면 전용 (plan §0)
+  useEffect(() => void getSrsMap(treeId).then(setSrs), [treeId])
   useEffect(() => {
     let alive = true
     getTreeNodes(treeId).then((ns) => {
@@ -127,6 +130,24 @@ export default function EditorPage({ treeId }: { treeId: string }) {
     if (cutId && !snap.some((n) => n.id === cutId)) setCutId(null)
     setMsg('')
   }
+
+  // ---- 실시간 편집 (패널 제목·내용, 카드 내용): 입력마다 저장, 편집 1회 = 실행취소 1단계 ----
+  function beginLive() {
+    liveBase.current ??= nodesRef.current
+  }
+  function endLive() {
+    const base = liveBase.current
+    liveBase.current = null
+    if (!base || base === nodesRef.current) return
+    undoRef.current = [...undoRef.current.slice(-(UNDO_LIMIT - 1)), base]
+    redoRef.current = []
+  }
+  const live = (id: ID, p: Partial<TreeNode>) => commit(patch(nodesRef.current, id, p), false)
+  function startNoteEdit(id: ID) {
+    setSelId(id)
+    setNoteEditId(id)
+  }
+  const toOutline = () => outlineRef.current?.focus()
 
   // ---- 편집 모드 ----
   function startEdit(id: ID, text = get(id)?.title ?? '') {
@@ -339,11 +360,7 @@ export default function EditorPage({ treeId }: { treeId: string }) {
   const sel = nodes.find((n) => n.id === selId) ?? root
   return (
     <section className="editor">
-      <TreeHeader treeId={treeId} active="edit" title={root.title}>
-        <button type="button" onClick={autoArrange} disabled={!nodes.some((n) => n.offset)} title="드래그로 옮긴 위치를 모두 되돌립니다">
-          자동 정렬
-        </button>
-      </TreeHeader>
+      <TreeHeader treeId={treeId} active="edit" title={root.title} />
       <div className="outline" role="tree" aria-label="아웃라이너" tabIndex={0} ref={outlineRef} onKeyDown={onNavKey}>
         <GraphView
           nodes={nodes}
@@ -362,14 +379,30 @@ export default function EditorPage({ treeId }: { treeId: string }) {
                 hiddenCount={n.collapsed && kids.length ? descendantsOf(nodes, n.id).length : 0}
                 selected={n.id === sel.id}
                 cut={n.id === cutId}
+                heat={missHeat(srs.get(n.id))}
                 draft={n.id === editId ? draft : null}
                 onDraft={(v) => ((draftRef.current = v), setDraft(v))}
                 onEditKey={onEditKey}
                 onBlurEdit={() => onBlurEdit(n.id)}
                 onSelect={() => setSelId(n.id)}
                 onStartEdit={() => startEdit(n.id)}
+                onStartNoteEdit={() => startNoteEdit(n.id)}
                 onToggle={() => toggle(n)}
-                colorClassOf={colorClassOf}
+                onWidth={(width) => commit(patch(nodesRef.current, n.id, { width }))}
+                noteEditor={
+                  n.id === noteEditId && (
+                    <NoteEditor
+                      label="노드 내용"
+                      value={n.note ?? ''}
+                      onChange={(note) => live(n.id, { note })}
+                      ref={cardNote}
+                      autoFocus
+                      onFocus={beginLive}
+                      onBlur={() => (endLive(), setNoteEditId(null))}
+                      onEscape={toOutline}
+                    />
+                  )
+                }
               />
             )
           }}
@@ -377,51 +410,120 @@ export default function EditorPage({ treeId }: { treeId: string }) {
       </div>
       <aside className="side">
         <p className="status" role="status">{msg}</p>
-        <DetailPanel key={sel.id} node={sel} onSave={(p) => commit(patch(nodesRef.current, sel.id, p))} />
-        <p className="help">
-          ↑ 부모 · ↓ 첫 자식 · ←→ 형제 · Alt+←→ 순서 · Space·F2 편집 · Enter 형제 추가 · Tab 자식 추가 · Shift+Tab 내어쓰기 · H 접기 ·
-          Delete 삭제 · Ctrl+X/V 잘라내기·붙여넣기 · Ctrl+Z / Ctrl+Shift+Z 실행취소·다시실행 · 편집 중 Enter 확정+형제, Tab 들여쓰기, Esc 확정 ·
-          노드를 끌어 위치 조정(하위 함께)
-        </p>
-      </aside>
-      <div className="io">
-        <h2>개요 붙여넣기</h2>
-        <textarea
-          aria-label="개요 텍스트"
-          rows={6}
-          value={importText}
-          placeholder={'들여쓰기 목차를 붙여넣으세요 (탭·스페이스, -, 1., 가., ① 등 허용)\n노동법\n  개별적 근로관계법\n    근로계약'}
-          onChange={(e) => setImportText(e.target.value)}
+        <DetailPanel
+          key={sel.id}
+          node={sel}
+          api={panelNote}
+          onLive={(p) => live(sel.id, p)}
+          onBegin={beginLive}
+          onEnd={endLive}
+          onEscape={toOutline}
+          onWidth={(width) => width !== (sel.width ?? 1) && commit(patch(nodesRef.current, sel.id, { width }))}
+          onFormat={(op) => (noteEditId === sel.id ? cardNote : panelNote).current?.apply(op)}
         />
-        <button type="button" onClick={() => importOutline(false)}>선택 노드의 자식으로 추가</button>{' '}
-        <button type="button" onClick={() => importOutline(true)}>첫 줄을 루트로</button>{' '}
-        <button type="button" onClick={exportOutline}>개요 내보내기</button>
-        {exportText && <textarea aria-label="내보낸 개요" readOnly rows={6} value={exportText} />}
-      </div>
+        <button type="button" className="arrange" onClick={autoArrange} disabled={!nodes.some((n) => n.offset)} title="드래그로 옮긴 위치를 모두 되돌립니다">
+          자동 정렬
+        </button>
+        <details className="io" open>
+          <summary>개요 붙여넣기 · 내보내기</summary>
+          <textarea
+            aria-label="개요 텍스트"
+            rows={5}
+            value={importText}
+            placeholder={'들여쓰기 목차를 붙여넣으세요 (탭·스페이스, -, 1., 가., ① 등 허용)\n노동법\n  개별적 근로관계법\n    근로계약'}
+            onChange={(e) => setImportText(e.target.value)}
+          />
+          <div className="io-actions">
+            <button type="button" onClick={() => importOutline(false)}>선택 노드의 자식으로 추가</button>
+            <button type="button" onClick={() => importOutline(true)}>첫 줄을 루트로</button>
+            <button type="button" onClick={exportOutline}>개요 내보내기</button>
+          </div>
+          {exportText && <textarea aria-label="내보낸 개요" readOnly rows={5} value={exportText} />}
+        </details>
+        <details className="help">
+          <summary>단축키</summary>
+          <p>
+            ↑ 부모 · ↓ 첫 자식 · ←→ 형제 · Alt+←→ 순서 · Space·F2·더블클릭 제목 편집 · 내용 더블클릭 내용 편집 · Enter 형제 추가 · Tab 자식 추가 ·
+            Shift+Tab 내어쓰기 · H 접기 · Delete 삭제 · Ctrl+X/V 잘라내기·붙여넣기 · Ctrl+Z / Ctrl+Shift+Z 실행취소·다시실행 ·
+            제목 편집 중 Enter 확정+형제, Tab 들여쓰기, Esc 확정 · 내용 편집 중 줄머리 - + * 불릿, 선택 후 Shift+H 형광펜, Esc 확정 ·
+            노드를 끌어 위치 조정(하위 함께) · 카드 좌우 가장자리를 끌어 너비 3단계
+          </p>
+        </details>
+      </aside>
     </section>
   )
 }
 
-function DetailPanel({ node, onSave }: { node: TreeNode; onSave: (p: Partial<TreeNode>) => void }) {
-  const [note, setNote] = useState(node.note ?? '')
-  const [aliases, setAliases] = useState(node.aliases.join(', '))
-  const saveNote = () => note !== (node.note ?? '') && onSave({ note })
-  const saveAliases = () => {
-    const list = [...new Set(aliases.split(/[,，]/).map((s) => s.trim()).filter(Boolean))]
-    if (list.join('\u0000') !== node.aliases.join('\u0000')) onSave({ aliases: list })
-    setAliases(list.join(', '))
-  }
+const TOOLS: { op: NoteOp; label: string }[] = [
+  { op: 'bullet', label: '불릿' },
+  { op: 'p', label: '형광펜 분홍' },
+  { op: 'y', label: '형광펜 노랑' },
+  { op: 'b', label: '형광펜 하늘' },
+  { op: 'clear', label: '형광펜 지우기' },
+]
+
+function DetailPanel({ api, ...p }: {
+  node: TreeNode
+  api: React.RefObject<NoteApi | null>
+  onLive: (p: Partial<TreeNode>) => void
+  onBegin: () => void
+  onEnd: () => void
+  onEscape: () => void
+  onWidth: (w: 1 | 2 | 3) => void
+  onFormat: (op: NoteOp) => void
+}) {
+  const [title, setTitle] = useState<string | null>(null) // 입력 중일 때만 로컬 값 (빈 제목은 저장하지 않음)
+  const width = p.node.width ?? 1
   return (
     <div className="detail">
-      <h2>{node.title || '(제목 없음)'}</h2>
-      <label>
-        메모
-        <textarea aria-label="메모" rows={5} value={note} onChange={(e) => setNote(e.target.value)} onBlur={saveNote} />
-      </label>
-      <label>
-        허용 표현 (쉼표 구분)
-        <input aria-label="허용 표현" value={aliases} onChange={(e) => setAliases(e.target.value)} onBlur={saveAliases} />
-      </label>
+      <input
+        className="detail-title"
+        aria-label="패널 제목"
+        placeholder="제목"
+        value={title ?? p.node.title}
+        onFocus={() => (setTitle(p.node.title), p.onBegin())}
+        onChange={(e) => {
+          setTitle(e.target.value)
+          const t = e.target.value.trim()
+          if (t && t !== p.node.title) p.onLive({ title: t })
+        }}
+        onBlur={() => (setTitle(null), p.onEnd())}
+        onKeyDown={(e) => {
+          if (e.nativeEvent.isComposing || e.keyCode === 229) return
+          if (e.key === 'Enter') e.currentTarget.blur()
+          else if (e.key === 'Escape') p.onEscape()
+        }}
+      />
+      <div className="toolbar" role="toolbar" aria-label="내용 서식">
+        {TOOLS.map((t) => (
+          <button
+            key={t.op}
+            type="button"
+            className={`tool tool-${t.op}`}
+            aria-label={t.label}
+            title={t.op === 'bullet' ? '불릿 (줄머리 - 입력)' : t.op === 'clear' ? t.label : `${t.label} (선택 후 Shift+H = 마지막 색)`}
+            onMouseDown={(e) => e.preventDefault()} // 편집기의 선택·포커스 유지
+            onClick={() => p.onFormat(t.op)}
+          />
+        ))}
+        <span className="widths" role="group" aria-label="너비">
+          {([1, 2, 3] as const).map((w) => (
+            <button key={w} type="button" aria-label={`너비 ${w}단계`} aria-pressed={width === w} onClick={() => p.onWidth(w)}>
+              {w}
+            </button>
+          ))}
+        </span>
+      </div>
+      <NoteEditor
+        label="패널 내용"
+        placeholder="내용 — 줄머리 - 로 불릿, 선택 후 Shift+H 형광펜"
+        value={p.node.note ?? ''}
+        onChange={(note) => p.onLive({ note })}
+        ref={api}
+        onFocus={p.onBegin}
+        onBlur={p.onEnd}
+        onEscape={p.onEscape}
+      />
     </div>
   )
 }
