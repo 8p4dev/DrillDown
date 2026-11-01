@@ -66,7 +66,7 @@ function Quiz({ treeId, nodes, root, scope }: { treeId: string; nodes: TreeNode[
   if (phase === 'input')
     return (
       <section className="quiz">
-        <label>
+        <label className="scope">
           범위{' '}
           <select aria-label="범위" value={scope.id} onChange={(e) => (location.hash = href.quiz(treeId, e.target.value === root.id ? undefined : e.target.value))}>
             {scopeOptions.map((n) => (
@@ -76,12 +76,14 @@ function Quiz({ treeId, nodes, root, scope }: { treeId: string; nodes: TreeNode[
         </label>
         <h1>{scope.title}</h1>
         {original.length === 0 ? (
-          <p>이 범위에는 하위 항목이 없습니다.</p>
+          <p className="muted">이 범위에는 하위 항목이 없습니다.</p>
         ) : (
           <>
-            <p>"{scope.title}" 아래의 목차를 기억나는 대로 들여쓰기(탭·스페이스)로 적으세요.</p>
+            <div className="card">
+            <p className="prompt">"{scope.title}" 아래의 목차를 기억나는 대로 들여쓰기(탭·스페이스)로 적으세요.</p>
             <textarea aria-label="백지 목차 입력" rows={12} value={text} onChange={(e) => setText(e.target.value)} placeholder={'항목 1\n  하위 항목\n항목 2'} />
-            <div className="actions"><button type="button" onClick={submit}>제출</button></div>
+            <div className="actions"><button type="button" className="primary" onClick={submit}>제출</button></div>
+            </div>
           </>
         )}
       </section>
@@ -140,7 +142,7 @@ function Quiz({ treeId, nodes, root, scope }: { treeId: string; nodes: TreeNode[
                     <IdeaUnits units={m.ideaUnits} onChange={(n) => (touch(o.id), setChecked((c) => ({ ...c, [o.id]: n })))} />
                   )}
                   {canOverride(m) && (
-                    <label>
+                    <label className="override">
                       <input type="checkbox" aria-label={`판정 뒤집기: ${o.title}`} disabled={locked} checked={overridden.has(o.id)} onChange={() => toggleOverride(o.id)} /> 뒤집기
                     </label>
                   )}
@@ -166,7 +168,7 @@ function Quiz({ treeId, nodes, root, scope }: { treeId: string; nodes: TreeNode[
           기록했습니다. <a href={href.edit(treeId)}>편집 화면에서 색 보기</a> · <a href={href.review()}>오늘의 복습</a>
         </p>
       ) : (
-        <button type="button" onClick={confirm} disabled={locked}>확정</button>
+        <div className="actions"><button type="button" className="primary" onClick={confirm} disabled={locked}>확정</button></div>
       )}
     </section>
   )
