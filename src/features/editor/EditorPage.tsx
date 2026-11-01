@@ -9,6 +9,7 @@ import NodeRow from './NodeRow'
 import NoteEditor, { type NoteApi, type NoteOp } from './content/NoteEditor'
 import GraphView from './graph/GraphView'
 import TreeHeader from '../TreeHeader'
+import { toast } from '../Toast'
 import './editor.css'
 
 const UNDO_LIMIT = 50
@@ -50,7 +51,7 @@ export default function EditorPage({ treeId }: { treeId: string }) {
   const [draft, setDraft] = useState('')
   const [noteEditId, setNoteEditId] = useState<ID | null>(null) // 카드 안에서 내용 편집 중인 노드
   const [cutId, setCutId] = useState<ID | null>(null)
-  const [msg, setMsg] = useState('')
+  const [ioOpen, setIoOpen] = useState(false) // 개요 붙여넣기: 빈 트리일 때만 펼친 채 시작
   const [importText, setImportText] = useState('')
   const [exportText, setExportText] = useState('')
   // 핸들러가 같은 이벤트 안에서 여러 번 commit 해도 최신 상태를 보도록 ref 를 기준으로 삼는다
@@ -74,6 +75,7 @@ export default function EditorPage({ treeId }: { treeId: string }) {
       undoRef.current = []
       redoRef.current = []
       setNodes(ns)
+      setIoOpen(ns.length === 1)
       setSelId(ns.find((n) => n.parentId === null)?.id ?? '')
     })
     return () => {
@@ -127,7 +129,7 @@ export default function EditorPage({ treeId }: { treeId: string }) {
     const removed = prev.filter((n) => !ids.has(n.id)).map((n) => n.id)
     // 바로 시작: 겹치는 readwrite 트랜잭션은 IndexedDB 가 생성 순서대로 처리한다.
     // (앞 저장이 끝난 뒤 시작하도록 줄 세우면, 입력 직후 새로고침·닫기 시 뒤쪽 저장이 시작도 못 하고 사라진다)
-    Promise.all([putNodes(changed), deleteNodes(removed)]).catch((e) => setMsg(`저장 실패: ${e}`))
+    Promise.all([putNodes(changed), deleteNodes(removed)]).catch((e) => toast(`저장 실패: ${e}`))
   }
   function commit(next: TreeNode[], undoable = true) {
     const prev = nodesRef.current
@@ -142,14 +144,13 @@ export default function EditorPage({ treeId }: { treeId: string }) {
   }
   function restore(from: React.RefObject<TreeNode[][]>, to: React.RefObject<TreeNode[][]>, label: string) {
     const snap = from.current.pop()
-    if (!snap) return setMsg(`${label}할 것이 없습니다`)
+    if (!snap) return toast(`${label}할 것이 없습니다`)
     to.current.push(nodesRef.current)
     persist(nodesRef.current, snap)
     nodesRef.current = snap
     setNodes(snap)
     if (!snap.some((n) => n.id === selId)) setSelId(root!.id)
     if (cutId && !snap.some((n) => n.id === cutId)) setCutId(null)
-    setMsg('')
   }
 
   // ---- 실시간 편집 (패널 제목·내용, 카드 내용): 입력마다 저장, 편집 1회 = 실행취소 1단계 ----
@@ -253,14 +254,14 @@ export default function EditorPage({ treeId }: { treeId: string }) {
     const ns = nodesRef.current
     const sib = childrenOf(ns, n.parentId)
     const prev = sib[sib.indexOf(n) - 1]
-    if (!prev) return setMsg('위에 형제가 없어 들여쓸 수 없습니다')
+    if (!prev) return toast('위에 형제가 없어 들여쓸 수 없습니다')
     commit(patch(patch(ns, prev.id, { collapsed: false }), n.id, { parentId: prev.id, order: nextOrder(ns, prev.id) }))
   }
   /** 부모 바로 뒤 형제로 */
   function outdent(id: ID) {
     const n = get(id)!
     const parent = n.parentId ? get(n.parentId) : undefined
-    if (!parent || parent.parentId === null) return setMsg('루트 바로 아래 항목은 내어쓸 수 없습니다')
+    if (!parent || parent.parentId === null) return toast('루트 바로 아래 항목은 내어쓸 수 없습니다')
     const ns = nodesRef.current
     commit(patch(ns, n.id, { parentId: parent.parentId, order: orderAfter(ns, parent) }))
   }
@@ -275,27 +276,35 @@ export default function EditorPage({ treeId }: { treeId: string }) {
   }
   function removeSubtree(id: ID) {
     const n = get(id)!
-    if (n.parentId === null) return setMsg('루트는 지울 수 없습니다 (트리 목록에서 트리를 삭제하세요)')
+    if (n.parentId === null) return toast('루트는 지울 수 없습니다 (트리 목록에서 트리를 삭제하세요)')
     const ns = nodesRef.current
     const sub = descendantsOf(ns, id)
-    if (!confirm(`"${n.title}"${sub.length ? ` 와 하위 ${sub.length}개 항목` : ''}을 삭제할까요?`)) return
     const gone = new Set([id, ...sub.map((x) => x.id)])
     const rows = visibleRows(ns, root!)
     const i = rows.findIndex((r) => r.node.id === id)
     commit(ns.filter((x) => !gone.has(x.id)))
     setSelId(rows[i - 1]?.node.id ?? root!.id)
     if (cutId && gone.has(cutId)) setCutId(null)
+    // 확인창 대신 되돌리기. 그 사이 다른 변경이 있으면 엉뚱한 단계를 되돌리지 않는다
+    toast(`"${n.title}" 삭제${sub.length ? ` (하위 ${sub.length}개)` : ''}`, {
+      label: '실행 취소',
+      run: () => {
+        if (undoRef.current.at(-1) !== ns) return toast('이후 변경이 있어요 — Ctrl+Z 로 되돌리세요')
+        restore(undoRef, redoRef, '실행 취소')
+        setSelId(id)
+        toOutline()
+      },
+    })
   }
   /** 잘라낸 서브트리를 선택 노드의 마지막 자식으로 이동 (id 유지 → 학습 기록 보존) */
   function paste(targetId: ID) {
-    if (!cutId) return setMsg('잘라낸 항목이 없습니다 (Ctrl+X)')
+    if (!cutId) return toast('잘라낸 항목이 없습니다 (Ctrl+X)')
     const ns = nodesRef.current
     if (targetId === cutId || descendantsOf(ns, cutId).some((d) => d.id === targetId))
-      return setMsg('자기 자신이나 그 하위 항목 아래에는 붙여넣을 수 없습니다')
+      return toast('자기 자신이나 그 하위 항목 아래에는 붙여넣을 수 없습니다')
     commit(patch(patch(ns, targetId, { collapsed: false }), cutId, { parentId: targetId, order: nextOrder(ns, targetId) }))
     setSelId(cutId)
     setCutId(null)
-    setMsg('')
   }
 
   // ---- 탐색 모드 ----
@@ -312,10 +321,10 @@ export default function EditorPage({ treeId }: { treeId: string }) {
     else if (ctrl && e.code === 'KeyZ') restore(e.shiftKey ? redoRef : undoRef, e.shiftKey ? undoRef : redoRef, e.shiftKey ? '다시 실행' : '실행 취소')
     else if (ctrl && e.code === 'KeyY') restore(redoRef, undoRef, '다시 실행')
     else if (ctrl && e.code === 'KeyX') {
-      if (sel.parentId === null) setMsg('루트는 잘라낼 수 없습니다')
+      if (sel.parentId === null) toast('루트는 잘라낼 수 없습니다')
       else {
         setCutId(sel.id)
-        setMsg(`"${sel.title}" 잘라냄 — 넣을 노드를 선택하고 Ctrl+V`)
+        toast(`"${sel.title}" 잘라냄 — 넣을 노드를 선택하고 Ctrl+V`)
       }
     } else if (ctrl && e.code === 'KeyV') paste(sel.id)
     else if (ctrl) handled = false
@@ -344,8 +353,9 @@ export default function EditorPage({ treeId }: { treeId: string }) {
     else if (e.key === 'Delete') removeSubtree(sel.id)
     else if (e.key === 'Escape') {
       setCutId(null)
-      setMsg('')
+      document.getElementById(KEYS_ID)?.hidePopover()
     }
+    else if (e.key === '?') document.getElementById(KEYS_ID)?.togglePopover()
     else handled = false
     if (handled) e.preventDefault()
   }
@@ -353,7 +363,7 @@ export default function EditorPage({ treeId }: { treeId: string }) {
   // ---- 가져오기 / 내보내기 ----
   function importOutline(asRoot: boolean) {
     const items = parseOutline(importText)
-    if (!items.length) return setMsg('가져올 항목이 없습니다')
+    if (!items.length) return toast('가져올 항목이 없습니다')
     const ns = nodesRef.current
     const target = asRoot ? root! : (get(selId) ?? root!)
     const list = asRoot ? [...items[0].children, ...items.slice(1)] : items
@@ -362,14 +372,14 @@ export default function EditorPage({ treeId }: { treeId: string }) {
     commit([...base, ...added])
     void logEvent('outline_imported', { nodeCount: added.length + (asRoot ? 1 : 0) }, treeId)
     setImportText('')
-    setMsg(`${added.length + (asRoot ? 1 : 0)}개 항목을 가져왔습니다`)
+    toast(`${added.length + (asRoot ? 1 : 0)}개 항목을 가져왔습니다`)
   }
   function exportOutline() {
     const text = serializeOutline(nodesToOutline(nodesRef.current, root!.id, true))
     setExportText(text)
     navigator.clipboard?.writeText(text).then(
-      () => setMsg('개요를 클립보드에 복사했습니다'),
-      () => setMsg('아래 텍스트를 직접 복사하세요'),
+      () => toast('개요를 클립보드에 복사했습니다'),
+      () => toast('아래 텍스트를 직접 복사하세요'),
     )
   }
 
@@ -385,12 +395,19 @@ export default function EditorPage({ treeId }: { treeId: string }) {
   return (
     <section className="editor">
       <TreeHeader treeId={treeId} active="edit" title={root.title}>
-        <div className="zoom-tools" role="group" aria-label="확대·축소">
-          <button type="button" aria-label="축소" title="축소 (-, Ctrl+휠)" onClick={() => zoomBy(1 / 1.2)}>−</button>
-          <output aria-label="배율">{Math.round(zoom * 100)}%</output>
-          <button type="button" aria-label="확대" title="확대 (=, Ctrl+휠)" onClick={() => zoomBy(1.2)}>+</button>
-          <button type="button" title="100% (0)" onClick={() => setZoom(1)}>100%</button>
-          <button type="button" title="트리 전체가 보이게" onClick={fitZoom}>화면 맞춤</button>
+        <div className="zoom-tools">
+          <span className="zoom-group" role="group" aria-label="확대·축소">
+            <button type="button" aria-label="축소" title="축소 (-, Ctrl+휠)" onClick={() => zoomBy(1 / 1.2)}>−</button>
+            <button type="button" className="zoom-reset" title="100%로 (0)" onClick={() => setZoom(1)}>
+              <output aria-label="배율">{Math.round(zoom * 100)}%</output>
+            </button>
+            <button type="button" aria-label="확대" title="확대 (=, Ctrl+휠)" onClick={() => zoomBy(1.2)}>+</button>
+          </span>
+          <button type="button" className="icon" aria-label="화면 맞춤" title="화면 맞춤" onClick={fitZoom}>⤢</button>
+          {nodes.some((n) => n.offset) && (
+            <button type="button" className="icon arrange" aria-label="자동 정렬" title="자동 정렬 (옮긴 위치 되돌리기)" onClick={autoArrange}>⊞</button>
+          )}
+          <button type="button" className="icon" aria-label="단축키" title="단축키 (?)" popoverTarget={KEYS_ID}>?</button>
         </div>
       </TreeHeader>
       <div className="outline" role="tree" aria-label="아웃라이너" tabIndex={0} ref={outlineRef} onKeyDown={onNavKey}>
@@ -399,7 +416,7 @@ export default function EditorPage({ treeId }: { treeId: string }) {
           nodes={nodes}
           rootId={root.id}
           onMove={(id, offset) => commit(patch(nodesRef.current, id, { offset }))}
-          renderNode={(n, box) => {
+          renderNode={(n, box, m) => {
             const kids = childrenOf(nodes, n.id)
             return (
               <NodeRow
@@ -413,6 +430,8 @@ export default function EditorPage({ treeId }: { treeId: string }) {
                 selected={n.id === sel.id}
                 cut={n.id === cutId}
                 heat={missHeat(srs.get(n.id))}
+                still={m.still}
+                lifted={m.lifted}
                 draft={n.id === editId ? draft : null}
                 onDraft={(v) => ((draftRef.current = v), setDraft(v))}
                 onEditKey={onEditKey}
@@ -442,7 +461,6 @@ export default function EditorPage({ treeId }: { treeId: string }) {
         />
       </div>
       <aside className="side">
-        <p className="status" role="status">{msg}</p>
         <DetailPanel
           key={sel.id}
           node={sel}
@@ -455,10 +473,7 @@ export default function EditorPage({ treeId }: { treeId: string }) {
           onWidth={(width) => width !== (sel.width ?? 1) && commit(patch(nodesRef.current, sel.id, { width }))}
           onFormat={(op) => (noteEditId === sel.id ? cardNote : panelNote).current?.apply(op)}
         />
-        <button type="button" className="arrange" onClick={autoArrange} disabled={!nodes.some((n) => n.offset)} title="드래그로 옮긴 위치를 모두 되돌립니다">
-          자동 정렬
-        </button>
-        <details className="io" open>
+        <details className="io" open={ioOpen} onToggle={(e) => setIoOpen(e.currentTarget.open)}>
           <summary>개요 붙여넣기 · 내보내기</summary>
           <textarea
             aria-label="개요 텍스트"
@@ -474,19 +489,40 @@ export default function EditorPage({ treeId }: { treeId: string }) {
           </div>
           {exportText && <textarea aria-label="내보낸 개요" readOnly rows={5} value={exportText} />}
         </details>
-        <details className="help">
-          <summary>단축키</summary>
-          <p>
-            ↑ 부모 · ↓ 첫 자식 · ←→ 형제 · Alt+←→ 순서 · Space·F2·더블클릭 제목 편집 · 내용 더블클릭(빈 카드는 선택 후 + 내용) 내용 편집 · Enter 형제 추가 · Tab 자식 추가 ·
-            Shift+Tab 내어쓰기 · H 접기 · Delete 삭제 · Ctrl+X/V 잘라내기·붙여넣기 · Ctrl+Z / Ctrl+Shift+Z 실행취소·다시실행 ·
-            제목 편집 중 Enter 확정+형제, Tab 들여쓰기, Esc 확정 · 내용 편집 중 줄머리 - + * 불릿, 선택 후 Shift+H 형광펜, Esc 확정 ·
-            노드를 끌어 위치 조정(하위 함께) · 빈 배경을 끌어 화면 이동 · - = 0 또는 Ctrl+휠 확대·축소 · 카드 좌우 가장자리를 끌어 너비 3단계
-          </p>
-        </details>
       </aside>
+      <div id={KEYS_ID} className="keys" popover="auto">
+        <dl>
+          {KEYS.map(([k, v]) => (
+            <div key={v}>
+              <dt>{k.split(' ').map((x) => <kbd key={x}>{x}</kbd>)}</dt>
+              <dd>{v}</dd>
+            </div>
+          ))}
+        </dl>
+      </div>
     </section>
   )
 }
+
+const KEYS_ID = 'editor-keys'
+/** 단축키 팝오버: [키(공백 = 여러 키), 2~3단어 동작] */
+const KEYS: [string, string][] = [
+  ['↑ ↓', '부모 · 첫 자식'],
+  ['← →', '형제 이동'],
+  ['Alt+← Alt+→', '순서 바꾸기'],
+  ['Space F2', '제목 편집'],
+  ['Enter', '형제 추가'],
+  ['Tab', '자식 추가'],
+  ['Shift+Tab', '내어쓰기'],
+  ['H', '접기 · 펼치기'],
+  ['Delete', '삭제'],
+  ['Ctrl+X Ctrl+V', '잘라내기 · 붙여넣기'],
+  ['Ctrl+Z', '실행 취소'],
+  ['Ctrl+Shift+Z', '다시 실행'],
+  ['- = 0', '축소 · 확대 · 100%'],
+  ['Shift+H', '형광펜'],
+  ['Esc', '편집 끝내기'],
+]
 
 const TOOLS: { op: NoteOp; label: string }[] = [
   { op: 'bullet', label: '불릿' },
@@ -552,7 +588,7 @@ function DetailPanel({ api, ...p }: {
       </div>
       <NoteEditor
         label="패널 내용"
-        placeholder="내용 — 줄머리 - 로 불릿, 선택 후 Shift+H 형광펜"
+        placeholder="내용"
         value={p.node.note ?? ''}
         onChange={(note) => p.onLive({ note })}
         ref={api}

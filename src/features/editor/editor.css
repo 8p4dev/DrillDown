@@ -25,11 +25,18 @@ main:has(> .editor) { max-width: none; }
 .graph-zoom { flex: none; }
 .graph { position: relative; transform-origin: 0 0; touch-action: none; user-select: none; }
 
-/* 확대·축소 */
-.zoom-tools { display: flex; align-items: center; gap: .25rem; }
-.zoom-tools output { min-width: 3.2rem; text-align: center; font-size: .85rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+/* 확대·축소: [− 배율 +] 묶음 + 아이콘 버튼. 배율 숫자 = 100%로 */
+.zoom-tools { display: flex; align-items: center; gap: .35rem; }
+.zoom-group { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+.editor .zoom-group button { border: none; background: transparent; padding: .35rem .65rem; }
+.editor .zoom-group .zoom-reset { padding-inline: .2rem; }
+.zoom-tools output { display: inline-block; min-width: 3.2rem; text-align: center; font-size: .85rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.editor .zoom-reset:hover output { color: var(--accent); }
+.editor .zoom-tools .icon { width: 2.1rem; padding: .35rem 0; text-align: center; }
+.editor .zoom-tools .arrange { animation: pop var(--t-med) var(--ease-out); }
 .graph-edges { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
-.graph-edges path { fill: none; stroke: var(--muted); stroke-opacity: .45; stroke-width: 1.5; }
+.graph-edges path { fill: none; stroke: var(--muted); stroke-opacity: .45; stroke-width: 1.5; transition: d var(--t-med) var(--ease-out); }
+.graph-edges path.still { transition: none; }
 
 /* 노드 카드: 제목 + 내용. 폭은 단계(px)로 고정, 오답 농도(--heat 0..1)만큼 붉어짐 */
 .node-row {
@@ -38,8 +45,18 @@ main:has(> .editor) { max-width: none; }
   color: var(--text); background: color-mix(in srgb, var(--danger) calc(var(--heat) * 24%), var(--surface));
   border: 1px solid color-mix(in srgb, var(--danger) calc(var(--heat) * 75%), var(--border));
   border-radius: var(--radius); box-shadow: var(--shadow); cursor: grab;
+  /* 재배치는 미끄러지듯(엣지 d 와 같은 시간), 새 카드는 떠오름. transform·left/top 은 offsetWidth/Height 측정에 영향 없음 */
+  transition: left var(--t-med) var(--ease-out), top var(--t-med) var(--ease-out), width var(--t-med) var(--ease-out),
+    box-shadow var(--t-fast), background-color var(--t-med), border-color var(--t-med), transform var(--t-fast) var(--ease-out);
+  animation: rise var(--t-med) var(--ease-out);
 }
+/* 측정 전·드래그로 따라오는 카드는 즉시 / 너비 핸들 드래그 중엔 폭 즉시 */
+.node-row.still { transition-property: box-shadow, background-color, border-color, transform, width; }
+.node-row.resizing { transition-property: left, top, box-shadow, background-color, border-color, transform; }
+.node-row.still.resizing { transition-property: box-shadow, background-color, border-color, transform; }
 .node-row.selected { box-shadow: 0 0 0 2px var(--accent), var(--shadow); }
+.node-row.lifted { z-index: 2; transform: scale(1.02); box-shadow: var(--shadow-lift); }
+.node-row.lifted.selected { box-shadow: 0 0 0 2px var(--accent), var(--shadow-lift); }
 .node-row.cut { opacity: .45; border-style: dashed; }
 .node-row.resizing { box-shadow: 0 0 0 2px var(--accent-soft), var(--shadow); }
 .graph.dragging .node-row { cursor: grabbing; }
@@ -95,18 +112,18 @@ mark.hl-b, .tool-b::before { background: #6cc8ff66; }
 .badge.folded { color: #fff; background: var(--accent); border-color: var(--accent); }
 .badge:hover { border-color: var(--accent); }
 
-/* 내용 없는 카드: 선택 시 오른쪽 아래에 걸치는 '+ 내용' 버튼 */
+/* 내용 없는 카드: 선택 시 오른쪽 아래에 걸치는 '+ 내용' 버튼. 접기 배지(하단 중앙)가 있으면 모서리 밖으로 비켜 선다 */
 .editor .node-row .add-note {
   position: absolute; right: .5rem; bottom: 0; transform: translateY(50%); z-index: 1;
   padding: 0 .5rem; font-size: .72rem; line-height: 1.3rem; color: var(--accent); border-radius: 999px;
 }
+.editor .node-row:has(> .badge) > .add-note { right: 0; transform: translate(45%, 50%); }
 
 /* ---- 우측 패널 ---- */
 .side {
   grid-area: side; display: flex; flex-direction: column; gap: .75rem; min-width: 0;
   max-height: calc(100vh - 9rem); overflow: auto;
 }
-.status { min-height: 1.4em; margin: 0; color: var(--muted); font-size: .85rem; }
 .detail {
   display: flex; flex-direction: column; background: var(--surface);
   border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden;
@@ -130,14 +147,27 @@ mark.hl-b, .tool-b::before { background: #6cc8ff66; }
 .detail .note-edit { position: relative; min-height: 7.5em; padding: .65rem .85rem; font-size: .9rem; line-height: 1.6; }
 .detail .note-edit:focus { box-shadow: inset 0 0 0 2px var(--accent-soft); }
 
-.arrange { align-self: flex-start; }
 .side details { font-size: .85rem; }
 .side summary { cursor: pointer; color: var(--muted); font-weight: 600; padding: .2rem 0; }
 .io textarea {
   width: 100%; box-sizing: border-box; margin: .4rem 0; font-family: ui-monospace, monospace; font-size: .8rem;
 }
 .io-actions { display: flex; flex-wrap: wrap; gap: .4rem; }
-.help p { margin: .4rem 0 0; font-size: .75rem; color: var(--muted); line-height: 1.6; }
+
+/* 단축키 팝오버 (? 키·버튼) */
+.keys {
+  inset: auto; top: 7.5rem; right: 1.25rem; margin: 0; padding: .6rem .9rem;
+  color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-lift);
+}
+.keys:popover-open { animation: rise var(--t-med) var(--ease-out); }
+.keys dl { margin: 0; display: grid; grid-template-columns: auto auto; gap: .3rem 1rem; font-size: .82rem; }
+.keys dl > div { display: contents; }
+.keys dt { display: flex; gap: .25rem; justify-content: flex-end; }
+.keys dd { margin: 0; color: var(--muted); }
+.keys kbd {
+  font: inherit; font-size: .75rem; padding: 0 .35rem; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 5px;
+  background: color-mix(in srgb, var(--border) 25%, var(--surface));
+}
 
 @media (max-width: 860px) {
   .editor { grid-template-columns: 1fr; grid-template-areas: 'head' 'graph' 'side'; }

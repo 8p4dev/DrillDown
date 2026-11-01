@@ -1,4 +1,5 @@
-import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { descendantsOf } from '../../../core/repo'
 import type { ID, TreeNode } from '../../../core/types'
 import { layout, type Box, type Size } from './layout'
 
@@ -12,7 +13,8 @@ const FALLBACK: Size = { w: 64, h: 34 }
 export default function GraphView(p: {
   nodes: TreeNode[]
   rootId: ID
-  renderNode: (n: TreeNode, box: Box) => ReactNode
+  /** still = 위치 트랜지션 끔(측정 전·드래그로 따라오는 중), lifted = 끌고 있는 카드 */
+  renderNode: (n: TreeNode, box: Box, m: { still: boolean; lifted: boolean }) => ReactNode
   onMove: (id: ID, offset: { x: number; y: number }) => void
   /** 확대 배율 (1 = 100%). 배치·측정은 배율과 무관한 원래 px, 화면에만 scale */
   zoom?: number
@@ -28,25 +30,46 @@ export default function GraphView(p: {
   const g = layout(shown, p.rootId, (n) => sizes.get(n.id) ?? FALLBACK)
   const byId = new Map(shown.map((n) => [n.id, n]))
 
-  // 매 렌더 후 카드 크기를 재서 바뀐 것만 반영 (페인트 전에 재배치되므로 깜빡임 없음).
-  // 의존성 없음이 의도: 제목·편집·접기 등 무엇이 바뀌어도 다시 잰다. 크기가 같으면 setState 안 함 → 무한 갱신 없음
+  // 위치 정착한 카드 id. 처음엔 FALLBACK 크기로 놓였다가 측정 후 옮겨지므로, 정착 전엔 미끄러지지 않게 still
+  const [known, setKnown] = useState<Set<ID>>(new Set())
+  const moving = drag ? new Set([drag.id, ...descendantsOf(p.nodes, drag.id).map((n) => n.id)]) : null
+  const still = (id: ID) => !known.has(id) || !!moving?.has(id)
+
+  // 너비 트랜지션 등 렌더 없이 크기가 바뀌는 동안에도 다시 재서 배치 (transitionend 에 의존하지 않음)
+  const ro = useRef<ResizeObserver | null>(null)
+  // 카드 크기를 재서 바뀐 것만 반영. 크기가 같으면 이전 Map 그대로 → 리렌더 없음
+  function measure() {
+    const els = ref.current?.querySelectorAll<HTMLElement>('[data-node-id]') ?? []
+    const now = [...els].map((el) => [el.dataset.nodeId!, { w: el.offsetWidth, h: el.offsetHeight }] as const)
+    setSizes((prev) => {
+      let changed = false
+      const next = new Map(prev)
+      for (const [id, s] of now) {
+        const old = next.get(id)
+        if (!old || old.w !== s.w || old.h !== s.h) {
+          next.set(id, s)
+          changed = true
+        }
+      }
+      return changed ? next : prev
+    })
+  }
+  // 매 렌더 후 측정 (페인트 전에 재배치되므로 깜빡임 없음). 의존성 없음이 의도: 무엇이 바뀌어도 다시 잰다.
+  // 크기 변화가 없는 패스에서 새 카드를 정착으로 표시 → 위치가 같은 렌더에서 still 이 풀려 미끄러짐이 없다
   // oxlint-disable-next-line react-hooks/exhaustive-deps
   useLayoutEffect(() => {
+    measure()
     const els = ref.current?.querySelectorAll<HTMLElement>('[data-node-id]') ?? []
-    let changed = false
-    const next = new Map(sizes)
-    for (const el of els) {
-      const id = el.dataset.nodeId!
-      const s = { w: el.offsetWidth, h: el.offsetHeight }
-      const old = next.get(id)
-      if (!old || old.w !== s.w || old.h !== s.h) {
-        next.set(id, s)
-        changed = true
-      }
-    }
-    // oxlint-disable-next-line react/set-state-in-effect -- DOM 측정 결과 반영
-    if (changed) setSizes(next)
+    for (const el of els) ro.current?.observe(el)
+    const ids = [...g.boxes.keys()]
+    if ((known.size !== ids.length || ids.some((id) => !known.has(id))) && [...els].every((el) => sizes.has(el.dataset.nodeId!)))
+      // oxlint-disable-next-line react/set-state-in-effect -- 측정 완료 후 정착 표시
+      setKnown(new Set(ids))
   })
+  useEffect(() => {
+    ro.current = new ResizeObserver(measure)
+    return () => ro.current?.disconnect()
+  }, []) // oxlint-disable-line react-hooks/exhaustive-deps
 
   function onPointerDown(e: React.PointerEvent) {
     const t = e.target as HTMLElement
@@ -110,10 +133,10 @@ export default function GraphView(p: {
           const pb = g.boxes.get(b)!
           const [x1, y1, x2, y2] = [pa.x + pa.w / 2, pa.y + pa.h, pb.x + pb.w / 2, pb.y]
           const my = (y1 + y2) / 2
-          return <path key={b} d={`M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}`} />
+          return <path key={b} className={still(a) || still(b) ? 'still' : undefined} d={`M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}`} />
         })}
       </svg>
-      {[...g.boxes].map(([id, box]) => p.renderNode(byId.get(id)!, box))}
+      {[...g.boxes].map(([id, box]) => p.renderNode(byId.get(id)!, box, { still: still(id), lifted: drag?.id === id }))}
     </div>
     </div>
     </div>
