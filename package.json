@@ -9,7 +9,7 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "typecheck": "tsc -b",
-    "check": "tsx src/core/outline.check.ts && tsx src/core/grading/grading.check.ts && tsx src/core/srs/srs.check.ts && tsx src/features/study/study.check.ts",
+    "check": "tsx src/core/outline.check.ts && tsx src/core/grading/grading.check.ts && tsx src/core/srs/srs.check.ts && tsx src/features/study/study.check.ts && tsx src/features/editor/graph/layout.check.ts",
     "e2e": "playwright test"
   },
   "dependencies": {

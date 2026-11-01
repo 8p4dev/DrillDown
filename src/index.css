@@ -76,6 +76,7 @@ tbody tr:last-child td { border-bottom: none; }
   padding: .6rem .85rem; border-radius: 8px; font-size: .9rem;
   color: color-mix(in srgb, #2e9e5b 80%, var(--text)); background: #2e9e5b1a; border: 1px solid #2e9e5b40;
 }
+[role='status']:empty { display: none; }
 
 /* 학습 상태 색 — core/srs 의 NodeColor 와 1:1 (docs/plans/orchestration_core_features.md §4.3). 에디터 그래프는 G 가 덮어씀 */
 .c-green { background: #2e9e5b1f; border-left: 3px solid #2e9e5b; }
