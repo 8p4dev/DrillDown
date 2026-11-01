@@ -56,7 +56,6 @@ export default function Minimap({ nodes, rootId, currentId, colors, onGo }: Prop
           )
         })}
       </svg>
-      <figcaption className="muted">전체 트리 · 강조 = 현재 개념</figcaption>
     </figure>
   )
 }

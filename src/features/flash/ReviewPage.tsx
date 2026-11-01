@@ -40,21 +40,24 @@ export default function ReviewPage() {
   if (session) {
     const id = session.queue[session.i]
     const last = session.i >= session.queue.length - 1
+    const step = () => setSession({ ...session, i: session.i + 1 })
     return (
       <section className="review flash">
         <header className="review-head">
           <h1>{session.tree.title} 복습</h1>
           <span className="muted" aria-label="복습 진행">{session.i + 1} / {session.queue.length}</span>
-          <progress max={session.queue.length} value={session.i + 1} />
+          <div className="review-bar" role="progressbar" aria-valuemin={0} aria-valuemax={session.queue.length} aria-valuenow={session.i + 1}>
+            <span style={{ width: `${((session.i + 1) / session.queue.length) * 100}%` }} />
+          </div>
         </header>
         {id ? (
           <FlashCard key={id} treeId={session.tree.id} nodes={session.nodes} conceptId={id} colors={colors}
-            onRated={(s) => setSrs(({ map }) => ({ map: new Map(map).set(s.nodeId, s), at: new Date() }))} />
+            onRated={(s) => setSrs(({ map }) => ({ map: new Map(map).set(s.nodeId, s), at: new Date() }))} onNext={last ? undefined : step} />
         ) : (
           <p className="muted">복습할 항목이 없습니다.</p>
         )}
         <div className="actions flash-nav">
-          {!last && <button type="button" className="primary" onClick={() => setSession({ ...session, i: session.i + 1 })}>다음 복습 →</button>}
+          {!last && <button type="button" className="primary" title="다음 복습 (→ / Enter)" onClick={step}>다음 복습 →</button>}
           <button type="button" onClick={() => setSession(null)}>{last ? '복습 마치기' : '그만하기'}</button>
         </div>
       </section>

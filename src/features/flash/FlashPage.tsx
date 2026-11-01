@@ -65,12 +65,15 @@ export default function FlashPage({ treeId, rootId }: { treeId: string; rootId?:
     setTally((m) => new Map(m).set(s.nodeId, known))
   }
   const known = [...tally.values()].filter(Boolean).length
+  const kids = nodes.filter((n) => n.parentId === at)
+  const allRated = kids.length > 0 && kids.every((k) => tally.has(k.id)) // → [다음] 한 번 강조
+  const advance = () => (next ? go(next) : setDone(true))
   const unknown = [...tally].filter(([, k]) => !k).map(([id]) => byId.get(id)).filter(Boolean) as TreeNode[]
 
   return (
     <section className="flash">
       <TreeHeader treeId={treeId} active="flash">
-        <span className="flash-tally muted" aria-label="평가 집계">알음 {known} · 모름 {unknown.length}</span>
+        <span className="flash-tally muted" aria-label="평가 집계">알음 <b key={`k${known}`} className="pop-num">{known}</b> · 모름 <b key={`u${unknown.length}`} className="pop-num">{unknown.length}</b></span>
       </TreeHeader>
       <div className="flash-layout">
         <div className="flash-stage">
@@ -94,17 +97,17 @@ export default function FlashPage({ treeId, rootId }: { treeId: string; rootId?:
             </div>
           ) : (
             <>
-              <nav aria-label="현재 위치" className="flash-path">
+              {path.length > 1 && <nav aria-label="현재 위치" className="flash-path">
                 {path.map((n, i) => (
                   <span key={n.id}>
                     {i > 0 && <span className="sep">›</span>}
                     {i < path.length - 1 ? <button type="button" className="link" onClick={() => go(n.id)}>{n.title}</button> : <span aria-current="location">{n.title}</span>}
                   </span>
                 ))}
-              </nav>
-              <FlashCard key={at} treeId={treeId} nodes={nodes} conceptId={at} colors={colors} onRated={onRated} onDive={go} initialRated={tally} />
+              </nav>}
+              <FlashCard key={at} treeId={treeId} nodes={nodes} conceptId={at} colors={colors} onRated={onRated} onDive={go} initialRated={tally} onNext={advance} />
               <div className="actions flash-nav">
-                <button type="button" className="primary" onClick={() => (next ? go(next) : setDone(true))}>
+                <button type="button" className={`primary${allRated ? ' pulse' : ''}`} title={`${next ? '다음 개념' : '요약 보기'} (→ / Enter)`} onClick={advance}>
                   {next ? '다음 개념 →' : '요약 보기'}
                 </button>
                 {next && <button type="button" onClick={() => setDone(true)}>요약</button>}

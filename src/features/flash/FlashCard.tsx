@@ -23,24 +23,50 @@ interface Props {
   onDive?: (id: ID) => void
   /** 이미 평가한 하위(새로고침 후 복원용) */
   initialRated?: Map<ID, boolean>
+  /** →/Enter 키: 다음 카드로 */
+  onNext?: () => void
 }
 
-export default function FlashCard({ treeId, nodes, conceptId, colors, onRated, onDive, initialRated }: Props) {
+/** 입력 중이거나 수정키가 눌렸으면 단축키 무시 */
+const typing = (e: KeyboardEvent) =>
+  e.ctrlKey || e.metaKey || e.altKey || e.isComposing || (e.target as HTMLElement).closest?.('input, textarea, select, [contenteditable]')
+
+export default function FlashCard({ treeId, nodes, conceptId, colors, onRated, onDive, initialRated, onNext }: Props) {
   const concept = nodes.find((n) => n.id === conceptId)
   const kids = childrenOf(nodes, conceptId)
   const [open, setOpen] = useState(false)
   const [rated, setRated] = useState(() => new Map<ID, boolean>(initialRated))
+  const [shook, setShook] = useState<ID | null>(null) // 방금 모름 평가한 하위 — 한 번 흔든다
   const cardRef = useRef<HTMLButtonElement>(null)
   useEffect(() => cardRef.current?.focus({ preventScroll: true }), [])
-  if (!concept) return <p className="muted">개념을 찾을 수 없습니다.</p>
-
   const color = (id: ID) => colors.get(id) ?? NONE
   const rate = async (n: TreeNode, known: boolean) => {
     setRated((m) => new Map(m).set(n.id, known))
+    setShook(known ? null : n.id)
     const s = await recordResult(n.id, treeId, known)
     await logEvent('flash_rated', { nodeId: n.id, known }, treeId)
     onRated(s, known)
   }
+
+  // 키보드: 1=알음 2=모름(첫 미평가 하위), →/Enter=다음. Enter 는 다른 버튼에 포커스가 있으면 그 버튼 몫
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => {
+      if (typing(e)) return
+      const t = e.target as HTMLElement
+      if (e.key === '1' || e.key === '2') {
+        const k = kids.find((c) => !rated.has(c.id))
+        if (k) { e.preventDefault(); rate(k, e.key === '1') }
+      } else if (onNext && (e.key === 'ArrowRight' || (e.key === 'Enter' && (t === document.body || t === cardRef.current)))) {
+        e.preventDefault()
+        onNext()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  })
+  if (!concept) return <p className="muted">개념을 찾을 수 없습니다.</p>
+
   const note = plainNote(concept.note)
 
   return (
@@ -58,12 +84,12 @@ export default function FlashCard({ treeId, nodes, conceptId, colors, onRated, o
         <span className="flash-concept-title">{concept.title}</span>
         {note && <Note note={concept.note!} />}
         <span className="flash-count">
-          {kids.length ? `하위 ${kids.length}개 · ${open ? '접기' : '눌러서 펼치기'}` : '하위 개념 없음'}
+          {kids.length ? <>하위 {kids.length}개<span className="chev" aria-hidden="true">▾</span></> : '하위 개념 없음'}
         </span>
       </button>
 
       {open && kids.length > 0 && (
-        <ul className="flash-kids" aria-label="하위 개념">
+        <div className="flash-kids-wrap"><ul className="flash-kids" aria-label="하위 개념">
           {kids.map((k, i) => {
             const grand = childrenOf(nodes, k.id).length
             const r = rated.get(k.id)
@@ -71,7 +97,7 @@ export default function FlashCard({ treeId, nodes, conceptId, colors, onRated, o
             return (
               <li
                 key={k.id}
-                className={`flash-kid ${colorClass(color(k.id))}`}
+                className={`flash-kid ${colorClass(color(k.id))}${shook === k.id ? ' shake' : ''}`}
                 data-node-id={k.id}
                 data-color={color(k.id).color}
                 data-rated={r === undefined ? undefined : r ? 'known' : 'unknown'}
@@ -81,16 +107,16 @@ export default function FlashCard({ treeId, nodes, conceptId, colors, onRated, o
                   <strong>{k.title}</strong>
                   {kn && <Note note={k.note!} />}
                   {grand > 0 && onDive && (
-                    <button type="button" className="link flash-dive" onClick={() => onDive(k.id)}>
-                      하위 {grand}개 · 더 들어가기 →
+                    <button type="button" className="flash-dive" title="더 들어가기" aria-label={`더 들어가기: 하위 ${grand}개`} onClick={() => onDive(k.id)}>
+                      ↳ {grand}
                     </button>
                   )}
                 </div>
                 <div className="flash-rate">
                   {r === undefined ? (
                     <>
-                      <button type="button" className="known" onClick={() => rate(k, true)}>알음</button>
-                      <button type="button" className="unknown" onClick={() => rate(k, false)}>모름</button>
+                      <button type="button" className="known" title="알음 (1)" onClick={() => rate(k, true)}>알음</button>
+                      <button type="button" className="unknown" title="모름 (2)" onClick={() => rate(k, false)}>모름</button>
                     </>
                   ) : (
                     <button
@@ -98,7 +124,7 @@ export default function FlashCard({ treeId, nodes, conceptId, colors, onRated, o
                       className={`flash-result ${r ? 'known' : 'unknown'}`}
                       title="다시 평가"
                       aria-label={`${r ? '알음' : '모름'} — 다시 평가`}
-                      onClick={() => setRated((m) => { const c = new Map(m); c.delete(k.id); return c })}
+                      onClick={() => { setShook(null); setRated((m) => { const c = new Map(m); c.delete(k.id); return c }) }}
                     >
                       {r ? '✓ 알음' : '✕ 모름'}
                     </button>
@@ -107,7 +133,7 @@ export default function FlashCard({ treeId, nodes, conceptId, colors, onRated, o
               </li>
             )
           })}
-        </ul>
+        </ul></div>
       )}
     </div>
   )
