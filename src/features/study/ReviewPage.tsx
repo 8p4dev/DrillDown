@@ -49,9 +49,9 @@ export default function ReviewPage() {
             <Drill key={node.id} treeId={session.tree.id} nodes={session.nodes} node={node} />
           </>
         ) : (
-          <p>복습할 항목이 없습니다.</p>
+          <p className="muted">복습할 항목이 없습니다.</p>
         )}
-        <div className="actions">
+        <div className="actions review-nav">
           {!last && <button type="button" onClick={() => setSession({ ...session, i: session.i + 1 })}>다음 복습</button>}
           <button type="button" onClick={() => setSession(null)}>{last ? '복습 마치기' : '그만하기'}</button>
         </div>
@@ -65,15 +65,15 @@ export default function ReviewPage() {
       {rows === null ? (
         <p>불러오는 중…</p>
       ) : rows.length === 0 ? (
-        <p>오늘 복습할 항목이 없습니다.</p>
+        <p className="empty muted">오늘 복습할 항목이 없습니다.</p>
       ) : (
         <ul aria-label="복습 대상 트리">
           {rows.map(({ tree, due }) => (
             <li key={tree.id} data-tree-id={tree.id} data-due-count={due.length}>
               <strong>{tree.title}</strong>
-              <span>{due.length}개</span>
+              <span className="due-count">{due.length}개</span>
               <a href={href.study(tree.id)}>학습</a>
-              <button type="button" aria-label={`복습 시작: ${tree.title}`} onClick={() => start(tree, due)}>복습 시작</button>
+              <button type="button" className="primary" aria-label={`복습 시작: ${tree.title}`} onClick={() => start(tree, due)}>복습 시작</button>
             </li>
           ))}
         </ul>

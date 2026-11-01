@@ -44,18 +44,18 @@ export default function Drill({ treeId, nodes, node, onOpen }: {
 
   if (phase === 'input')
     return (
-      <div className="drill">
-        <p>"{node.title}"의 하위 항목을 떠올려 한 줄에 하나씩 적으세요 ({kids.length}개, 모르면 "모름").</p>
+      <div className="drill card">
+        <p className="prompt">"{node.title}"의 하위 항목을 떠올려 한 줄에 하나씩 적으세요 ({kids.length}개, 모르면 "모름").</p>
         <textarea aria-label="하위 항목 입력" rows={Math.max(3, kids.length + 1)} value={text} onChange={(e) => setText(e.target.value)} />
         <div className="actions">
-          <button type="button" onClick={reveal}>공개</button>
+          <button type="button" className="primary" onClick={reveal}>공개</button>
           <button type="button" onClick={() => setPhase('peek')}>그냥 보기</button>
         </div>
       </div>
     )
 
   return (
-    <div className="drill">
+    <div className="drill card">
       <ol className="drill-children" aria-label="하위 항목">
         {kids.map((k, i) => {
           const m = match(k.id)
@@ -81,7 +81,7 @@ export default function Drill({ treeId, nodes, node, onOpen }: {
       {result && result.extraUserNodes.length > 0 && (
         <p className="extra">원본에 없는 항목: {result.extraUserNodes.map((u) => u.text).join(', ')}</p>
       )}
-      {phase === 'graded' && <button type="button" onClick={record}>판정 기록</button>}
+      {phase === 'graded' && <div className="actions"><button type="button" className="primary" onClick={record}>판정 기록</button></div>}
       {phase === 'recorded' && <p role="status">판정을 기록했습니다.</p>}
       {phase === 'peek' && <p className="hint">그냥 보기 — 판정·기록하지 않습니다.</p>}
     </div>

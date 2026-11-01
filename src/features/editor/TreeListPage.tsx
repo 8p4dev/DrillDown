@@ -3,7 +3,7 @@ import { exportEvents, logEvent } from '../../core/events'
 import { createTree, deleteTree, listTrees, renameTree } from '../../core/repo'
 import type { Tree } from '../../core/types'
 import { href } from '../../router'
-import './editor.css'
+import './treelist.css'
 
 export default function TreeListPage() {
   const [trees, setTrees] = useState<Tree[] | null>(null)
@@ -36,33 +36,37 @@ export default function TreeListPage() {
   }
 
   return (
-    <section className="tree-list">
-      <h1>내 트리</h1>
-      <form onSubmit={create} className="row-form">
+    <section className="trees">
+      <header className="trees-head">
+        <h1>내 트리</h1>
+        <button type="button" aria-label="학습 기록 내보내기(JSON)" onClick={exportLog}>학습 기록 내보내기(JSON)</button>
+      </header>
+      <form onSubmit={create} className="trees-form card">
         <input aria-label="새 트리 제목" placeholder="새 트리 제목 (예: 노동법)" value={title} onChange={(e) => setTitle(e.target.value)} />
-        <button type="submit">트리 만들기</button>
+        <button type="submit" className="primary">트리 만들기</button>
       </form>
       {trees === null ? (
-        <p>불러오는 중…</p>
+        <p className="muted">불러오는 중…</p>
       ) : trees.length === 0 ? (
-        <p>아직 트리가 없습니다.</p>
+        <p className="trees-empty muted">아직 트리가 없습니다.</p>
       ) : (
-        <ul>
+        <ul className="tree-cards">
           {trees.map((t) => (
-            <li key={t.id} data-tree-id={t.id}>
+            <li key={t.id} data-tree-id={t.id} className="card">
               <strong>{t.title}</strong>
-              <a href={href.edit(t.id)}>편집</a>
-              <a href={href.study(t.id)}>학습</a>
-              <a href={href.quiz(t.id)}>백지 퀴즈</a>
-              <button type="button" onClick={() => rename(t)}>이름 변경</button>
-              <button type="button" onClick={() => remove(t)}>삭제</button>
+              <div className="tree-links">
+                <a href={href.edit(t.id)}>편집</a>
+                <a href={href.study(t.id)}>학습</a>
+                <a href={href.quiz(t.id)}>백지 퀴즈</a>
+              </div>
+              <div className="tree-tools">
+                <button type="button" onClick={() => rename(t)}>이름 변경</button>
+                <button type="button" className="danger" onClick={() => remove(t)}>삭제</button>
+              </div>
             </li>
           ))}
         </ul>
       )}
-      <p>
-        <button type="button" aria-label="학습 기록 내보내기(JSON)" onClick={exportLog}>학습 기록 내보내기(JSON)</button>
-      </p>
     </section>
   )
 }

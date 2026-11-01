@@ -10,8 +10,9 @@ export default function App() {
   return (
     <>
       <nav className="topnav">
-        <a href={href.trees()}>Drill Down</a>
-        <a href={href.review()}>오늘의 복습</a>
+        <a className="brand" href={href.trees()}>Drill Down</a>
+        <a className={r.name === 'trees' ? 'active' : undefined} href={href.trees()}>내 트리</a>
+        <a className={r.name === 'review' ? 'active' : undefined} href={href.review()}>오늘의 복습</a>
       </nav>
       <main>
         {r.name === 'trees' && <TreeListPage />}
