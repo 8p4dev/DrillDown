@@ -14,11 +14,13 @@ export interface TreeNode {
   parentId: ID | null // null = 루트 (트리당 루트 1개, 루트 title = 트리 중심 개념)
   order: number // 형제 정렬키. 중간 삽입은 두 값의 중간값
   title: string // 짧은 쟁점어 — 백지 퀴즈 채점 대상
-  note?: string // 서술형 메모 — 채점 대상 아님
+  note?: string // 노드 내용. 형식 계약: docs/plans/orchestration_modes.md §3.2 (줄 단위, '- ' 불릿, ==y:텍스트== 형광펜)
   aliases: string[] // 허용 표현(동의어·약어)
   collapsed?: boolean
   /** 그래프 뷰에서 마우스로 옮긴 양(px). 자동 배치 위치 기준이며 자손에게도 누적 적용. 없으면 {0,0} */
   offset?: { x: number; y: number }
+  /** 노드 폭 단계 1|2|3 (없으면 1). px 값은 에디터 소유 */
+  width?: 1 | 2 | 3
   updatedAt: number
 }
 
@@ -44,6 +46,7 @@ export interface NodeSrs {
   lastStructure: Structure
   autoCorrectDays: string[] // 자동 정답(exact|alias|fuzzy + 구조 ok)을 받은 서로 다른 날짜 YYYY-MM-DD
   pendingRecheck: boolean // self_accept 후, 다음 회차 자동 정답 전까지 true
+  miss?: number // 오답 점수: 틀리면 +1, 맞히면 -1 (0 미만 없음). 에디터 붉은 농도의 근거
   updatedAt: number
 }
 
@@ -55,6 +58,8 @@ export type EventType =
   | 'drilldown_retrieval_submitted'
   | 'tree_created'
   | 'outline_imported'
+  | 'flash_rated' // props: { nodeId, known }
+  | 'dnd_attempt_completed' // props: { mode: 'dnd' | 'blank_dnd', rootId, total, correct }
 
 export interface AppEvent {
   id: ID

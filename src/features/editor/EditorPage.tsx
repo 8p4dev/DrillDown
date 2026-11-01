@@ -7,6 +7,7 @@ import type { ID, NodeSrs, TreeNode } from '../../core/types'
 import { href } from '../../router'
 import NodeRow from './NodeRow'
 import GraphView from './graph/GraphView'
+import TreeHeader from '../TreeHeader'
 import './editor.css'
 
 const UNDO_LIMIT = 50
@@ -338,14 +339,11 @@ export default function EditorPage({ treeId }: { treeId: string }) {
   const sel = nodes.find((n) => n.id === selId) ?? root
   return (
     <section className="editor">
-      <header className="editor-head">
-        <h1>
-          {root.title} <small><a href={href.study(treeId)}>학습</a> · <a href={href.quiz(treeId)}>백지 퀴즈</a></small>
-        </h1>
+      <TreeHeader treeId={treeId} active="edit" title={root.title}>
         <button type="button" onClick={autoArrange} disabled={!nodes.some((n) => n.offset)} title="드래그로 옮긴 위치를 모두 되돌립니다">
           자동 정렬
         </button>
-      </header>
+      </TreeHeader>
       <div className="outline" role="tree" aria-label="아웃라이너" tabIndex={0} ref={outlineRef} onKeyDown={onNavKey}>
         <GraphView
           nodes={nodes}

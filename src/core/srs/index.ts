@@ -50,6 +50,7 @@ export function applyGrade(
       lastStructure: structure,
       autoCorrectDays: auto && !days.includes(day) ? [...days, day] : days,
       pendingRecheck: src === 'self_accept' ? true : auto ? false : wasPending,
+      miss: Math.max(0, (prev?.miss ?? 0) + (gradeToRating(src, structure) === Rating.Again ? 1 : -1)),
       updatedAt: +now,
     },
     recheckResolved: wasPending && auto,
@@ -109,6 +110,12 @@ function childIndex(nodes: TreeNode[]): Map<ID, TreeNode[]> {
   return m
 }
 
+/** 오답 농도 0..1 — 에디터 붉은색. miss 4 이상이면 최대 */
+export const MISS_MAX = 4
+export function missHeat(s: NodeSrs | undefined): number {
+  return Math.min(s?.miss ?? 0, MISS_MAX) / MISS_MAX
+}
+
 // ── DB 래퍼 ────────────────────────────────────────────────
 
 export async function recordGrade(nodeId: ID, treeId: ID, src: GradeSource, structure: Structure, now = new Date()): Promise<NodeSrs> {
@@ -116,6 +123,11 @@ export async function recordGrade(nodeId: ID, treeId: ID, src: GradeSource, stru
   await db.srs.put(next)
   if (recheckResolved) await logEvent('self_graded_node_rechecked', { origNodeId: nodeId, nextGradeSource: src }, treeId)
   return next
+}
+
+/** 학습 모드(플래시카드·D&D) 공용 기록: 맞음 = Good(자동 정답과 동일, 초록 가능), 틀림 = Again. miss 도 갱신 */
+export function recordResult(nodeId: ID, treeId: ID, ok: boolean, now = new Date()): Promise<NodeSrs> {
+  return recordGrade(nodeId, treeId, ok ? 'exact' : 'auto_reject', ok ? 'ok' : null, now)
 }
 
 export async function getSrsMap(treeId: ID): Promise<Map<ID, NodeSrs>> {

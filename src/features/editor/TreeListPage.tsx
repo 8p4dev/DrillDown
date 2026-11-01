@@ -56,8 +56,9 @@ export default function TreeListPage() {
               <strong>{t.title}</strong>
               <div className="tree-links">
                 <a href={href.edit(t.id)}>편집</a>
-                <a href={href.study(t.id)}>학습</a>
-                <a href={href.quiz(t.id)}>백지 퀴즈</a>
+                <a href={href.flash(t.id)}>플래시카드</a>
+                <a href={href.dnd(t.id)}>D&D 퀴즈</a>
+                <a href={href.blank(t.id)}>백지 D&D</a>
               </div>
               <div className="tree-tools">
                 <button type="button" onClick={() => rename(t)}>이름 변경</button>

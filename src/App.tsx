@@ -1,9 +1,10 @@
 import { href, useRoute } from './router'
 import TreeListPage from './features/editor/TreeListPage'
 import EditorPage from './features/editor/EditorPage'
-import StudyPage from './features/study/StudyPage'
-import QuizPage from './features/study/QuizPage'
-import ReviewPage from './features/study/ReviewPage'
+import FlashPage from './features/flash/FlashPage'
+import ReviewPage from './features/flash/ReviewPage'
+import DndPage from './features/dnd/DndPage'
+import BlankDndPage from './features/dnd/BlankDndPage'
 
 export default function App() {
   const r = useRoute()
@@ -17,8 +18,9 @@ export default function App() {
       <main>
         {r.name === 'trees' && <TreeListPage />}
         {r.name === 'edit' && <EditorPage treeId={r.treeId} />}
-        {r.name === 'study' && <StudyPage treeId={r.treeId} />}
-        {r.name === 'quiz' && <QuizPage treeId={r.treeId} rootId={r.rootId} />}
+        {r.name === 'flash' && <FlashPage key={r.treeId} treeId={r.treeId} rootId={r.rootId} />}
+        {r.name === 'dnd' && <DndPage key={r.treeId + r.rootId} treeId={r.treeId} rootId={r.rootId} />}
+        {r.name === 'blank' && <BlankDndPage key={r.treeId + r.rootId} treeId={r.treeId} rootId={r.rootId} />}
         {r.name === 'review' && <ReviewPage />}
       </main>
     </>

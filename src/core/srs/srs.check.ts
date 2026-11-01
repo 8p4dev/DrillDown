@@ -1,7 +1,7 @@
 // plan §2 R4 점검 — 순수 함수만 (DB 미사용). 실행: npx tsx src/core/srs/srs.check.ts
 import { Rating } from 'ts-fsrs'
 import type { GradeSource, NodeSrs, Structure, TreeNode } from '../types'
-import { applyGrade, colorClass, colorMap, gradeToRating, isAutoCorrect, isBranchComplete, nodeColor, retrievability } from './index'
+import { applyGrade, colorClass, colorMap, gradeToRating, isAutoCorrect, isBranchComplete, missHeat, nodeColor, retrievability } from './index'
 
 // node:assert 대신 최소 assert — 앱 tsconfig 에 node 타입이 없음
 const assert = {
@@ -113,5 +113,19 @@ assert.equal(cm.get('r')!.color, 'none', 'red 자식이 있어도 부모는 자�
 cm = set({ r: g(), a: g(), b: undefined, a1: g() })
 assert.equal(cm.get('r')!.color, 'lightgreen', '미학습 자식 → 부모 green 아님')
 assert.equal(cm.size, nodes.length)
+
+// miss: 틀리면 +1, 맞히면 -1, 0 미만 없음 → 붉은 농도
+{
+  const t0 = new Date('2026-01-01T00:00:00Z')
+  let m = applyGrade(undefined, 'm', 't', 'auto_reject', null, t0).next
+  m = applyGrade(m, 'm', 't', 'auto_reject', null, t0).next
+  assert.equal(m.miss, 2)
+  assert.equal(missHeat(m), 0.5)
+  m = applyGrade(m, 'm', 't', 'exact', 'ok', t0).next
+  m = applyGrade(m, 'm', 't', 'exact', 'ok', t0).next
+  m = applyGrade(m, 'm', 't', 'exact', 'ok', t0).next
+  assert.equal(m.miss, 0)
+  assert.equal(missHeat(undefined), 0)
+}
 
 console.log('srs.check: ok')
