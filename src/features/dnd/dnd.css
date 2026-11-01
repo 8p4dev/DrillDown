@@ -1,4 +1,6 @@
 .dnd { --ok: #2e9e5b; user-select: none; -webkit-user-select: none; }
+main:has(.dnd) { max-width: 1400px; } /* 넓은 트리: 에디터처럼 폭 제한 완화 */
+.dnd button:disabled { opacity: 1; }
 .dnd-scope { display: inline-flex; align-items: center; gap: .4rem; font-size: .9rem; }
 .dnd-scope select { max-width: 14rem; padding: .3rem .5rem; }
 .dnd-hint { margin: 0 0 .6rem; font-size: .88rem; }
@@ -56,7 +58,7 @@
 .dnd-bar [role='status'] { margin: 0 auto 0 0; }
 .dnd-score b { font-size: 1.05rem; }
 
-.dnd-compare { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: .9rem; }
+.dnd-compare { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: .9rem; }
 .dnd-compare h2 { margin: 0 0 .4rem; font-size: .95rem; color: var(--muted); font-weight: 600; }
 
 .dnd-ghost {

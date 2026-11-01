@@ -27,8 +27,8 @@
 - [x] `DndPage.tsx` (D1)
 - [x] `BlankDndPage.tsx` (D2)
 - [x] 검증: check, build, lint
-- [ ] 스크린샷 확인 (D1 드래그·채점, D2 트리 만들기·채점·원본 비교, 다크 모드)
-- [ ] 커밋
+- [x] 스크린샷 확인 (D1 드래그·채점, D2 트리 만들기·채점·원본 비교, 다크 모드)
+- [x] 커밋
 
 ## 검증 방법
 - 로직: `npx tsx src/features/dnd/dnd.check.ts`
@@ -38,3 +38,4 @@
 ## 변경 사항
 - 훅 `useDragDrop` 은 `kit.tsx` 대신 `useDragDrop.ts` 로 분리 — `react/only-export-components` 린트 경고(컴포넌트 파일에 훅 export) 회피.
 - `dnd.check.ts` 는 `node:assert` 대신 자체 assert — 앱 tsconfig 에 node 타입이 없어 `tsc -b` 가 실패(layout.check.ts 와 같은 방식).
+- 화면 폭: `main:has(.dnd) { max-width: 1400px }` — 넓은 트리 가로 스크롤 줄이기(에디터의 `main:has(> .editor)` 와 같은 방식). 채점 후 `disabled` 버튼 흐림 해제(결과 색 유지).
