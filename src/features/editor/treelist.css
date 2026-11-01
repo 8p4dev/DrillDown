@@ -1,6 +1,6 @@
 .trees-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
 .trees-head h1 { margin: 0; }
-.trees-head button { font-size: .82rem; color: var(--muted); }
+.trees-head button { width: 2.1rem; height: 2.1rem; padding: 0; font-size: 1.05rem; color: var(--muted); }
 .trees-form { display: flex; gap: .5rem; padding: .6rem; margin-bottom: 1.25rem; }
 .trees .trees-form input { flex: 1; border-color: transparent; background: transparent; }
 .trees .trees-form input:focus { box-shadow: none; border-color: transparent; }
@@ -8,12 +8,50 @@
 .trees-empty { text-align: center; padding: 2.5rem 1rem; border: 1px dashed var(--border); border-radius: var(--radius); }
 
 .tree-cards { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: .9rem; }
-.tree-cards li { display: flex; flex-direction: column; gap: .9rem; transition: border-color .15s, box-shadow .15s, transform .15s; }
-.tree-cards li:hover { border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); box-shadow: 0 2px 4px #1018280f, 0 8px 20px #10182814; }
-.tree-cards strong { font-size: 1.05rem; font-weight: 650; letter-spacing: -.01em; overflow-wrap: anywhere; }
-.tree-links { display: flex; gap: .4rem; flex-wrap: wrap; }
-.tree-links a { font-size: .85rem; font-weight: 500; padding: .3rem .65rem; border-radius: 999px; background: var(--accent-soft); }
-.tree-links a:hover { text-decoration: none; background: color-mix(in srgb, var(--accent) 22%, transparent); }
-.tree-tools { display: flex; gap: .4rem; margin-top: auto; padding-top: .75rem; border-top: 1px solid var(--border); }
-.tree-tools button { font-size: .8rem; padding: .3rem .6rem; }
-.tree-tools .danger { margin-left: auto; }
+.tree-cards li {
+  position: relative; display: flex; flex-direction: column; cursor: pointer;
+  transition: border-color var(--t-fast), box-shadow var(--t-med) var(--ease-out), transform var(--t-med) var(--ease-out);
+}
+.tree-cards li:hover { border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); box-shadow: var(--shadow-lift); transform: translateY(-2px); }
+.tree-cards li:has(.tree-open:active) { transform: scale(.99); transition-duration: var(--t-fast); }
+.tree-cards li.is-new { animation: rise var(--t-slow) var(--ease-out), pulse-ring 900ms var(--ease-out) var(--t-slow); }
+
+/* stretched link: 카드 전체를 덮는 편집 링크. 다른 상호작용 요소는 그 위(z-index 1) */
+.tree-open { flex: 1; min-height: 1.1rem; }
+.tree-open::after { content: ''; position: absolute; inset: 0; border-radius: inherit; }
+.tree-open:focus-visible { outline: none; }
+.tree-open:focus-visible::after { outline: 2px solid var(--accent); outline-offset: -2px; }
+.tree-top, .tree-modes { position: relative; z-index: 1; pointer-events: none; }
+.tree-top > *, .tree-modes > * { pointer-events: auto; }
+
+.tree-top { z-index: 2; display: flex; align-items: flex-start; gap: .5rem; min-height: 1.9rem; }
+.tree-title { flex: 1; padding: .15rem 0; font-size: 1.05rem; font-weight: 650; letter-spacing: -.01em; overflow-wrap: anywhere; cursor: pointer; }
+.tree-cards .tree-rename { flex: 1; min-width: 0; padding: .1rem .4rem; margin: 0 -.4rem; font-size: 1.05rem; font-weight: 650; }
+
+.tree-cards li:has(.tree-menu[open]) { z-index: 3; }
+.tree-menu { position: relative; margin: -.2rem -.45rem 0 auto; }
+.tree-menu summary {
+  list-style: none; display: grid; place-items: center; width: 1.9rem; height: 1.9rem; border-radius: 8px;
+  color: var(--muted); font-size: 1.1rem; cursor: pointer; transition: background var(--t-fast), color var(--t-fast);
+}
+.tree-menu summary::-webkit-details-marker { display: none; }
+.tree-menu summary:hover, .tree-menu[open] summary { color: var(--text); background: var(--accent-soft); }
+.tree-menu-list {
+  position: absolute; right: 0; top: calc(100% + .25rem); z-index: 2; min-width: 7.5rem; padding: .3rem;
+  display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow-lift); transform-origin: top right;
+  animation: pop var(--t-med) var(--ease-out);
+}
+.tree-menu-list button { text-align: left; border-color: transparent; background: none; font-size: .85rem; padding: .4rem .6rem; }
+.tree-menu-list button.danger { border-color: transparent; }
+
+/* 학습 모드 세그먼트: 한 줄, 칸 3개 */
+.tree-modes { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.tree-modes a {
+  display: flex; align-items: center; justify-content: center; gap: .3rem; min-width: 0; padding: .4rem .3rem;
+  font-size: .8rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  color: var(--muted); background: var(--surface); transition: background var(--t-fast), color var(--t-fast);
+}
+.tree-modes a + a { border-left: 1px solid var(--border); }
+.tree-modes a span { color: var(--accent); }
+.tree-modes a:hover { text-decoration: none; color: var(--accent); background: var(--accent-soft); }
