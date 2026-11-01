@@ -25,10 +25,16 @@
 - [x] ReviewPage.tsx (목록 유지 + 카드 복습 세션)
 - [x] flash.css (토큰, 다크 모드, reduced-motion)
 - [x] build·lint 통과
-- [ ] vite + Playwright 스크린샷 확인 (라이트/다크, 흐름)
-- [ ] 커밋, worker_done
+- [x] vite + Playwright 스크린샷 확인 (라이트/다크, 흐름)
+- [x] 커밋, worker_done
 
 ## 검증
 - 순수 로직: `npx tsx src/features/flash/flash.check.ts`
 - 타입·빌드: `npm run build`, `npm run lint`
 - 화면: `npx vite --port 81xx --strictPort` + Playwright(msedge) 스크립트로 흐름(탭→펼침→알음2/모름1→색→다음→미니맵 강조 이동, 새로고침 후 색 유지)과 스크린샷
+
+## 변경 사항
+- 색 계산 기준 시각을 렌더 중 `new Date()` 대신 srs 상태와 함께 저장(`{ map, at }`) — oxlint react(purity) 경고 해소, EditorPage 와 같은 패턴.
+
+## 결과
+- 흐름 확인(라이트·다크): 루트 → Space → 하위 3개 → 알음2/모름1 → data-color lightgreen/green/red → 다음 개념(세포막) 미니맵 aria-current 이동 → 미니맵 '핵' 클릭 이동 → 새로고침 후 색 유지 → 요약 → 복습 목록·복습 시작 카드.
