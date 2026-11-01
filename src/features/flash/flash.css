@@ -1,10 +1,13 @@
 /* 플래시카드·미니맵·오늘의 복습 — index.css 토큰 사용 */
-.flash { --ok: #2e9e5b; --ok-soft: #8fd66a; --no: #e05252; --warn: #dcae1d; }
+/* --ok·--warn 은 index.css 전역 토큰. 연두·모름 색만 지역 정의 */
+.flash { --ok-soft: #8fd66a; --no: var(--danger); }
 
 .flash-layout { display: grid; grid-template-columns: minmax(0, 1fr) 220px; gap: 1.5rem; align-items: start; }
 @media (max-width: 760px) { .flash-layout { grid-template-columns: 1fr; } .flash-aside { order: -1; } }
 .flash-aside { position: sticky; top: 68px; }
 .flash-tally { font-size: .85rem; font-variant-numeric: tabular-nums; }
+.flash-tally b { font-weight: 600; color: var(--text); }
+.pop-num { display: inline-block; animation: pop var(--t-med) var(--ease-out); }
 
 /* 경로 */
 .flash-path { display: flex; flex-wrap: wrap; align-items: center; gap: .15rem; font-size: .85rem; color: var(--muted); margin-bottom: .75rem; min-height: 1.4em; }
@@ -19,34 +22,40 @@
   padding: 2.75rem 1.5rem 1.5rem; text-align: center;
   background: var(--surface); border: 1px solid var(--border); border-radius: calc(var(--radius) + 6px);
   box-shadow: var(--shadow), 0 8px 24px #1018280a; font-size: 1rem; font-weight: 400;
-  transition: transform .15s, box-shadow .15s, border-color .15s, background .2s;
+  transition: transform var(--t-fast) var(--ease-out), box-shadow var(--t-fast), border-color var(--t-med), background var(--t-med);
 }
 .flash-concept:hover:not(:disabled) { background: var(--surface); transform: translateY(-1px); box-shadow: var(--shadow), 0 12px 30px #1018281a; }
 .flash-concept-title { font-size: 2rem; font-weight: 750; letter-spacing: -.02em; line-height: 1.25; }
-.flash-count { margin-top: .6rem; font-size: .85rem; color: var(--muted); padding: .25rem .75rem; border-radius: 999px; background: var(--accent-soft); }
+.flash-count { display: inline-flex; align-items: center; gap: .35rem; margin-top: .6rem; font-size: .85rem; color: var(--muted); padding: .25rem .75rem; border-radius: 999px; background: var(--accent-soft); transition: color var(--t-med); }
+.flash-count .chev { display: inline-block; transition: transform var(--t-med) var(--ease-out); }
+.flash-concept[aria-expanded='true'] .chev { transform: rotate(180deg); }
 .flash-concept[aria-expanded='true'] .flash-count { color: var(--accent); }
 .flash-note { white-space: normal; color: var(--text); opacity: .85; font-size: .92rem; line-height: 1.6; text-align: left; }
 .flash-concept .flash-note { text-align: left; max-width: 36rem; margin: 0 auto; }
 
 /* 하위 개념 */
-.flash-kids { list-style: none; padding: 0; margin: 1rem 0 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: .75rem; }
+.flash-kids-wrap { display: grid; grid-template-rows: 1fr; opacity: 1; transition: grid-template-rows var(--t-slow) var(--ease-out), opacity var(--t-med) var(--ease-out); }
+@starting-style { .flash-kids-wrap { grid-template-rows: 0fr; opacity: 0; } }
+/* 높이 0 에서 열리므로 overflow 를 숨기되, 그림자·shake 가 잘리지 않게 6px 여유 */
+.flash-kids { min-height: 0; overflow: hidden; list-style: none; padding: 6px; margin: calc(1rem - 6px) -6px -6px; display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: .75rem; }
 .flash-kid {
   display: flex; flex-direction: column; justify-content: space-between; gap: .75rem;
   padding: .9rem 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
-  box-shadow: var(--shadow); animation: flash-in .32s cubic-bezier(.2, .8, .3, 1) both; animation-delay: calc(var(--i, 0) * 70ms);
-  transition: background .2s, border-color .2s;
+  box-shadow: var(--shadow); animation: flash-in var(--t-slow) var(--ease-out) both; animation-delay: calc(var(--i, 0) * 70ms);
+  transition: background var(--t-med), border-color var(--t-med), box-shadow var(--t-med);
 }
+/* flash-in 을 목록에 남겨 둬야 shake 가 빠질 때 등장 애니메이션이 재시작하지 않는다 */
+.flash-kid.shake { animation: flash-in var(--t-slow) var(--ease-out) both, shake var(--t-slow) var(--ease-out); animation-delay: calc(var(--i, 0) * 70ms), 0s; }
 .flash-kid-body { display: flex; flex-direction: column; gap: .3rem; }
 .flash-kid strong { font-size: 1.05rem; }
-.flash-dive { align-self: flex-start; font-size: .85rem !important; }
+.flash-dive { align-self: flex-start; padding: .1rem .5rem; font-size: .85rem; color: var(--accent); font-variant-numeric: tabular-nums; }
 @keyframes flash-in { from { opacity: 0; transform: translateY(-10px) scale(.97); } to { opacity: 1; transform: none; } }
-@media (prefers-reduced-motion: reduce) { .flash-kid, .flash-concept { animation: none; transition: none; } }
 
 .flash-rate { display: flex; gap: .4rem; }
 .flash-rate button { flex: 1; }
 .flash-rate button.known:hover:not(:disabled) { color: #fff; background: var(--ok); border-color: var(--ok); }
 .flash-rate button.unknown:hover:not(:disabled) { color: #fff; background: var(--no); border-color: var(--no); }
-.flash-rate .flash-result { font-weight: 600; }
+.flash-rate .flash-result { font-weight: 600; animation: pop var(--t-med) var(--ease-out); }
 .flash-rate .flash-result.known { color: var(--ok); background: color-mix(in srgb, var(--ok) 10%, var(--surface)); border-color: color-mix(in srgb, var(--ok) 40%, var(--border)); }
 .flash-rate .flash-result.unknown { color: var(--no); background: color-mix(in srgb, var(--no) 10%, var(--surface)); border-color: color-mix(in srgb, var(--no) 40%, var(--border)); }
 
@@ -59,12 +68,14 @@
 .flash .flash-concept.c-green:hover, .flash .flash-concept.c-red:hover { background: inherit; }
 
 .flash-nav { justify-content: center; margin-top: 1.5rem; }
+.flash-nav .pulse { animation: pulse-ring calc(var(--t-slow) * 2) var(--ease-out); }
 
 /* 요약 */
 .flash-summary { text-align: center; padding: 2rem 1.5rem; }
 .flash-summary h2 { margin-top: 0; }
 .flash-summary-nums { display: flex; justify-content: center; gap: 2rem; font-size: 1rem; }
-.flash-summary-nums strong { display: block; font-size: 2.2rem; font-variant-numeric: tabular-nums; }
+.flash-summary-nums strong { display: block; font-size: 2.2rem; font-variant-numeric: tabular-nums; animation: pop var(--t-slow) var(--ease-out) both; }
+.flash-summary-nums .unknown strong { animation-delay: 60ms; }
 .flash-summary-nums .known strong { color: var(--ok); }
 .flash-summary-nums .unknown strong { color: var(--no); }
 .flash-missed { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: .4rem; justify-content: center; }
@@ -74,14 +85,13 @@
 /* 미니맵 */
 .minimap { margin: 0; padding: .6rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
 .minimap svg { display: block; width: 100%; height: auto; max-height: 260px; }
-.minimap figcaption { font-size: .75rem; text-align: center; margin-top: .35rem; }
 .minimap path { fill: none; stroke: var(--border); stroke-width: 2; }
 .minimap path.lit { stroke: var(--accent); stroke-width: 3; }
-.mm-node rect { fill: color-mix(in srgb, var(--muted) 22%, var(--surface)); stroke: none; transition: fill .2s; }
-.mm-node[data-color='green'] rect { fill: #2e9e5b; }
-.mm-node[data-color='lightgreen'] rect { fill: #8fd66a; }
-.mm-node[data-color='yellow'] rect { fill: #dcae1d; }
-.mm-node[data-color='red'] rect { fill: #e05252; }
+.mm-node rect { fill: color-mix(in srgb, var(--muted) 22%, var(--surface)); stroke: none; transition: fill var(--t-med), stroke-width var(--t-fast); }
+.mm-node[data-color='green'] rect { fill: var(--ok); }
+.mm-node[data-color='lightgreen'] rect { fill: var(--ok-soft); }
+.mm-node[data-color='yellow'] rect { fill: var(--warn); }
+.mm-node[data-color='red'] rect { fill: var(--no); }
 .mm-node:not(.lit) { opacity: .55; }
 .mm-node.lit rect { stroke: var(--accent); stroke-width: 3; }
 .mm-node.current rect { stroke-width: 5; }
@@ -95,4 +105,6 @@
 .review-list li strong { flex: 1; }
 .review-head { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
 .review-head h1 { margin: 0; }
-.review-head progress { flex: 1; min-width: 120px; accent-color: var(--accent); }
+.review-bar { flex: 1; min-width: 120px; height: 6px; border-radius: 999px; background: var(--accent-soft); overflow: hidden; }
+.review-bar span { display: block; height: 100%; border-radius: inherit; background: var(--accent); transition: width var(--t-slow) var(--ease-out); }
+.review .flash-card-wrap { animation: rise var(--t-med) var(--ease-out); }
