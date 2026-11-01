@@ -1,13 +1,13 @@
-// D2 백지 드래그 앤 드롭 퀴즈: 범위 루트만 놓인 캔버스에 트레이의 노드를 끌어 붙여 트리를 만든다
-import { Fragment, useEffect, useState } from 'react'
+// D2 백지 퀴즈: 범위 루트만 놓인 캔버스에 트레이의 노드를 끌어 붙여 트리를 만든다
+import { Fragment, useEffect, useState, type CSSProperties } from 'react'
 import { logEvent } from '../../core/events'
 import { getRoot, getTreeNodes } from '../../core/repo'
 import { recordResult } from '../../core/srs'
 import type { ID, TreeNode } from '../../core/types'
 import { href } from '../../router'
 import TreeHeader from '../TreeHeader'
-import { attach, detach, gradeBlank, placedTree, scopeOf, shuffle, type Links, type Score } from './dnd'
-import { Ghost, ScopeSelect, ScoreLine, TreeCanvas } from './kit'
+import { attach, detach, gradeBlank, isUnder, placedTree, scopeOf, shuffle, type Links, type Score } from './dnd'
+import { Ghost, Progress, ScopeSelect, ScoreLine, TreeCanvas } from './kit'
 import { useDragDrop } from './useDragDrop'
 
 export default function BlankDndPage({ treeId, rootId }: { treeId: string; rootId?: string }) {
@@ -42,6 +42,8 @@ function Quiz({ treeId, scope }: { treeId: ID; scope: TreeNode[] }) {
   const title = (id: ID) => byId.get(id)?.title ?? ''
   const over = (id: ID) => (drag?.over === id ? ' over' : '')
   const result = (id: ID) => (score ? (score.ok[id] ? 'ok' : 'wrong') : undefined)
+  const holding = drag?.id ?? sel // 집은 카드 → 놓을 수 있는 곳(attach 가 받아 주는 곳)만 .target
+  const target = (ok: boolean) => (holding && ok ? ' target' : '')
 
   async function grade() {
     const s = gradeBlank(scope, links)
@@ -55,15 +57,17 @@ function Quiz({ treeId, scope }: { treeId: ID; scope: TreeNode[] }) {
     setScore(null)
   }
 
-  const card = (id: ID, onCanvas: boolean) => (
+  const card = (id: ID, onCanvas: boolean, i?: number) => (
     <button
       type="button"
-      className={`dnd-card${sel === id ? ' sel' : ''}${drag?.id === id ? ' dragging' : ''}${onCanvas ? over(id) : ''}`}
+      className={`dnd-card${sel === id ? ' sel' : ''}${drag?.id === id ? ' dragging' : ''}${
+        onCanvas ? over(id) + target(id !== holding && !isUnder(links, id, holding!)) : ''}`}
       data-card={id}
       data-drop={onCanvas ? id : undefined}
       data-result={result(id)}
       disabled={!!score}
       title={title(id)}
+      style={i === undefined ? undefined : ({ '--i': i } as CSSProperties)}
     >
       <span>{title(id)}</span>
     </button>
@@ -71,7 +75,7 @@ function Quiz({ treeId, scope }: { treeId: ID; scope: TreeNode[] }) {
 
   const render = (n: TreeNode) =>
     n.parentId === null ? (
-      <button type="button" className={`dnd-node root${over(n.id)}`} data-drop={n.id} disabled={!!score} title={n.title}>
+      <button type="button" className={`dnd-node root${over(n.id)}${target(true)}`} data-drop={n.id} disabled={!!score} title={n.title}>
         <span>{n.title}</span>
       </button>
     ) : (
@@ -79,8 +83,7 @@ function Quiz({ treeId, scope }: { treeId: ID; scope: TreeNode[] }) {
     )
 
   return (
-    <div className={`dnd${score ? ' locked' : ''}`} {...handlers}>
-      <p className="dnd-hint muted">카드를 끌어 캔버스의 노드 위에 놓으면 그 아래 자식으로 붙어요. 붙인 노드는 하위와 함께 옮기거나 트레이로 되돌릴 수 있어요. (탭으로 고른 뒤 대상을 탭해도 돼요)</p>
+    <div className={`dnd${score ? ' locked' : ''}${drag ? ' grabbing' : ''}`} {...handlers}>
       <div className={score ? 'dnd-compare' : undefined}>
         <div>
           {score && <h2>내 트리</h2>}
@@ -97,14 +100,13 @@ function Quiz({ treeId, scope }: { treeId: ID; scope: TreeNode[] }) {
           </div>
         )}
       </div>
-      <div className={`dnd-tray${over('tray')}`} data-drop="tray" aria-label="카드 트레이">
-        {tray.map((id) => <Fragment key={id}>{card(id, false)}</Fragment>)}
-        {!tray.length && <span className="dnd-tray-empty muted">{score ? '' : '모든 카드를 놓았어요. 채점해 보세요.'}</span>}
+      <div className={`dnd-tray${over('tray')}${target(!!holding && links.has(holding))}`} data-drop="tray" aria-label="카드 트레이">
+        {tray.map((id, i) => <Fragment key={id}>{card(id, false, scope.length + i)}</Fragment>)}
       </div>
       <div className="dnd-bar">
         {score && <ScoreLine {...score} />}
-        {!score && <span className="muted" style={{ marginRight: 'auto' }}>{links.size} / {rest.length} 배치</span>}
-        {!score && <button type="button" className="primary" onClick={grade}>채점</button>}
+        {!score && <Progress n={links.size} total={rest.length} />}
+        {!score && <button type="button" className={`primary${tray.length ? '' : ' ready'}`} onClick={grade}>채점</button>}
         {score && <button type="button" className="primary" onClick={retry}>다시 하기</button>}
       </div>
       <Ghost drag={drag} title={title} />

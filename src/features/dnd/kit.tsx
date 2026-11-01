@@ -1,5 +1,5 @@
-// D&D 화면 공용 조각: 범위 선택, 트리 캔버스(layout 재사용), 드래그 고스트
-import type { ReactNode } from 'react'
+// 퀴즈 화면 공용 조각: 범위 선택, 트리 캔버스(layout 재사용), 드래그 고스트, 진행 막대, 점수
+import type { CSSProperties, ReactNode } from 'react'
 import type { ID, TreeNode } from '../../core/types'
 import { layout } from '../editor/graph/layout'
 import type { DragState } from './useDragDrop'
@@ -37,6 +37,8 @@ export function TreeCanvas(p: { nodes: TreeNode[]; render: (n: TreeNode) => Reac
   const root = p.nodes.find((n) => n.parentId === null)
   const g = root ? layout(p.nodes, root.id, () => CARD) : null
   const byId = new Map(p.nodes.map((n) => [n.id, n]))
+  // 채점 결과 stagger 순서(--i): 왼쪽 위부터 = y, 그다음 x
+  const rank = new Map(g ? [...g.boxes].sort(([, a], [, b]) => a.y - b.y || a.x - b.x).map(([id], i) => [id, i]) : [])
   return (
     <div className="dnd-canvas" aria-label={p.label} style={{ minHeight: p.minHeight }}>
       {g && (
@@ -51,7 +53,7 @@ export function TreeCanvas(p: { nodes: TreeNode[]; render: (n: TreeNode) => Reac
             })}
           </svg>
           {[...g.boxes].map(([id, b]) => (
-            <div key={id} className="dnd-pos" style={{ left: b.x, top: b.y, width: b.w, height: b.h }}>
+            <div key={id} className="dnd-pos" style={{ left: b.x, top: b.y, width: b.w, height: b.h, '--i': rank.get(id) } as CSSProperties}>
               {p.render(byId.get(id)!)}
             </div>
           ))}
@@ -73,9 +75,19 @@ export function Ghost({ drag, title }: { drag: DragState | null; title: (id: ID)
 /** 결과 문구: 정답 n / 전체 */
 export function ScoreLine({ correct, total }: { correct: number; total: number }) {
   return (
-    <p role="status" className="dnd-score" data-correct={correct} data-total={total}>
+    <p role="status" className={`dnd-score${correct === total ? ' perfect' : ''}`} data-correct={correct} data-total={total}>
       정답 <b>{correct}</b> / {total}
       {correct === total ? ' — 완벽해요!' : ''}
     </p>
+  )
+}
+
+/** 배치 진행: 얇은 막대 + n/m */
+export function Progress({ n, total }: { n: number; total: number }) {
+  return (
+    <span className="dnd-progress" title="배치">
+      <span aria-hidden><i style={{ width: `${(n / total) * 100}%` }} /></span>
+      {n}/{total}
+    </span>
   )
 }

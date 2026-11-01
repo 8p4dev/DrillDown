@@ -1,5 +1,5 @@
-// D1 드래그 앤 드롭 퀴즈: 뼈대 트리(리프 = 빈칸) + 섞인 리프 카드 트레이
-import { Fragment, useEffect, useMemo, useState } from 'react'
+// D1 빈칸 퀴즈: 뼈대 트리(리프 = 빈칸) + 섞인 리프 카드 트레이
+import { Fragment, useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { logEvent } from '../../core/events'
 import { getRoot, getTreeNodes } from '../../core/repo'
 import { recordResult } from '../../core/srs'
@@ -7,7 +7,7 @@ import type { ID, TreeNode } from '../../core/types'
 import { href } from '../../router'
 import TreeHeader from '../TreeHeader'
 import { gradeDnd, leavesOf, moveCard, scopeOf, shuffle, type Place, type Score } from './dnd'
-import { Ghost, ScopeSelect, ScoreLine, TreeCanvas } from './kit'
+import { Ghost, Progress, ScopeSelect, ScoreLine, TreeCanvas } from './kit'
 import { useDragDrop } from './useDragDrop'
 
 export default function DndPage({ treeId, rootId }: { treeId: string; rootId?: string }) {
@@ -40,6 +40,8 @@ function Quiz({ treeId, scope }: { treeId: ID; scope: TreeNode[] }) {
   const tray = order.filter((id) => !placed.has(id))
   const title = (id: ID) => byId.get(id)?.title ?? ''
   const over = (id: ID) => (drag?.over === id ? ' over' : '')
+  const holding = drag?.id ?? sel // 집은 카드 → 놓을 수 있는 곳만 .target
+  const target = (ok: boolean) => (holding && ok ? ' target' : '')
 
   async function grade() {
     const s = gradeDnd(scope, place)
@@ -54,7 +56,7 @@ function Quiz({ treeId, scope }: { treeId: ID; scope: TreeNode[] }) {
     setAnswer(false)
   }
 
-  const card = (id: ID, result?: boolean) => (
+  const card = (id: ID, result?: boolean, i?: number) => (
     <button
       type="button"
       className={`dnd-card${sel === id ? ' sel' : ''}${drag?.id === id ? ' dragging' : ''}`}
@@ -62,6 +64,7 @@ function Quiz({ treeId, scope }: { treeId: ID; scope: TreeNode[] }) {
       data-result={result === undefined ? undefined : result ? 'ok' : 'wrong'}
       disabled={!!score}
       title={title(id)}
+      style={i === undefined ? undefined : ({ '--i': i } as CSSProperties)}
     >
       <span>{title(id)}</span>
     </button>
@@ -75,30 +78,26 @@ function Quiz({ treeId, scope }: { treeId: ID; scope: TreeNode[] }) {
     const label = `${title(n.parentId)} 아래 빈칸`
     if (!c)
       return (
-        <button type="button" className={`dnd-slot${over(n.id)}`} data-drop={n.id} data-slot={n.id} aria-label={label}
-          data-result={score ? 'wrong' : undefined} disabled={!!score}>
-          {sel ? '여기에 놓기' : ''}
-        </button>
+        <button type="button" className={`dnd-slot${over(n.id)}${target(true)}`} data-drop={n.id} data-slot={n.id} aria-label={label}
+          data-result={score ? 'wrong' : undefined} disabled={!!score} />
       )
     return (
-      <div className={`dnd-slot filled${over(n.id)}`} data-drop={n.id} data-slot={n.id} aria-label={label}>
+      <div className={`dnd-slot filled${over(n.id)}${target(c !== holding)}`} data-drop={n.id} data-slot={n.id} aria-label={label}>
         {card(c, score ? score.ok[c] : undefined)}
       </div>
     )
   }
 
   return (
-    <div className={`dnd${score ? ' locked' : ''}`} {...handlers}>
-      <p className="dnd-hint muted">아래 카드를 끌어 알맞은 빈칸에 놓으세요. 같은 부모 아래라면 순서는 상관없어요. (탭으로 카드를 고른 뒤 빈칸을 탭해도 돼요)</p>
+    <div className={`dnd${score ? ' locked' : ''}${drag ? ' grabbing' : ''}`} {...handlers}>
       <TreeCanvas nodes={scope} render={render} label={answer ? '정답 트리' : '뼈대 트리'} />
-      <div className={`dnd-tray${over('tray')}`} data-drop="tray" aria-label="카드 트레이">
-        {tray.map((id) => <Fragment key={id}>{card(id, score ? false : undefined)}</Fragment>)}
-        {!tray.length && <span className="dnd-tray-empty muted">{score ? '' : '모든 카드를 놓았어요. 채점해 보세요.'}</span>}
+      <div className={`dnd-tray${over('tray')}${target(!!holding && placed.has(holding))}`} data-drop="tray" aria-label="카드 트레이">
+        {tray.map((id, i) => <Fragment key={id}>{card(id, score ? false : undefined, scope.length + i)}</Fragment>)}
       </div>
       <div className="dnd-bar">
         {score && <ScoreLine {...score} />}
-        {!score && <span className="muted" style={{ marginRight: 'auto' }}>{placed.size} / {leaves.length} 배치</span>}
-        {!score && <button type="button" className="primary" onClick={grade}>채점</button>}
+        {!score && <Progress n={placed.size} total={leaves.length} />}
+        {!score && <button type="button" className={`primary${tray.length ? '' : ' ready'}`} onClick={grade}>채점</button>}
         {score && <button type="button" onClick={() => setAnswer((a) => !a)}>{answer ? '내 답 보기' : '정답 보기'}</button>}
         {score && <button type="button" className="primary" onClick={retry}>다시 하기</button>}
       </div>

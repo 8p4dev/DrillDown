@@ -1,9 +1,9 @@
-.dnd { --ok: #2e9e5b; user-select: none; -webkit-user-select: none; }
+.dnd { user-select: none; -webkit-user-select: none; }
+.dnd.grabbing, .dnd.grabbing * { cursor: grabbing !important; }
 main:has(.dnd) { max-width: 1400px; } /* 넓은 트리: 에디터처럼 폭 제한 완화 */
 .dnd button:disabled { opacity: 1; }
 .dnd-scope { display: inline-flex; align-items: center; gap: .4rem; font-size: .9rem; }
-.dnd-scope select { max-width: 14rem; padding: .3rem .5rem; }
-.dnd-hint { margin: 0 0 .6rem; font-size: .88rem; }
+.dnd-scope select { max-width: 14rem; height: 2.3rem; padding: 0 .6rem; border-radius: 999px; }
 
 /* 캔버스: 점 격자 */
 .dnd-canvas {
@@ -14,7 +14,7 @@ main:has(.dnd) { max-width: 1400px; } /* 넓은 트리: 에디터처럼 폭 제�
 .dnd-graph { position: relative; margin: 0 auto; }
 .dnd-graph svg { position: absolute; inset: 0; pointer-events: none; }
 .dnd-graph path { fill: none; stroke: var(--muted); stroke-opacity: .45; stroke-width: 1.5; }
-.dnd-pos { position: absolute; display: flex; }
+.dnd-pos { position: absolute; display: flex; border-radius: 9px; }
 
 /* 칸 공통: 노드(제목)·슬롯(빈칸)·카드 */
 .dnd-node, .dnd-slot, .dnd-card {
@@ -25,38 +25,67 @@ main:has(.dnd) { max-width: 1400px; } /* 넓은 트리: 에디터처럼 폭 제�
 .dnd-node, .dnd-card { overflow: hidden; overflow-wrap: anywhere; }
 .dnd-node { background: var(--surface); border: 1px solid var(--border); font-weight: 650; box-shadow: var(--shadow); }
 .dnd-node.root { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); color: var(--text); font-weight: 700; }
-.dnd-slot { padding: 0; background: color-mix(in srgb, var(--surface) 70%, transparent); border: 1.5px dashed color-mix(in srgb, var(--muted) 55%, transparent); color: var(--muted); }
+.dnd-slot {
+  padding: 0; background: color-mix(in srgb, var(--surface) 70%, transparent);
+  border: 1.5px dashed color-mix(in srgb, var(--muted) 40%, transparent);
+  transition: border-color var(--t-fast), background var(--t-fast);
+}
 .dnd-slot.filled { border-style: solid; border-color: transparent; background: none; }
 .dnd-card {
   cursor: grab; touch-action: none; font-weight: 550;
   background: var(--surface); color: var(--text); border: 1px solid var(--border); box-shadow: var(--shadow);
-  transition: transform .12s, box-shadow .12s, opacity .12s, border-color .12s;
+  transition: transform var(--t-fast) var(--ease-out), box-shadow var(--t-fast), opacity var(--t-fast), border-color var(--t-fast);
 }
-.dnd-card:hover:not(:disabled) { border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); background: var(--surface); transform: translateY(-1px); }
+.dnd-card:hover:not(:disabled) { border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); background: var(--surface); transform: translateY(-2px); box-shadow: var(--shadow-lift); }
 .dnd-card span, .dnd-node span, .dnd-ghost span {
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
-.dnd-card.sel { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.dnd-card.sel { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft), var(--shadow-lift); transform: translateY(-2px); }
 .dnd-card.dragging { opacity: .3; }
-.over { outline: 2px solid var(--accent); outline-offset: 2px; background: var(--accent-soft) !important; }
 .dnd.locked .dnd-card { cursor: default; }
 
-/* 결과 */
+/* 착지 pop · 트레이 복귀 rise (마운트 시 1회) */
+.dnd-slot > .dnd-card, .dnd-pos > .dnd-card { animation: pop var(--t-med) var(--ease-spring); }
+.dnd-tray > .dnd-card { animation: rise var(--t-med) var(--ease-out); }
+
+/* 집은 동안: 놓을 수 있는 곳만 점선 강조 + 래퍼에 pulse-ring 1회 (카드 animation 을 건드리지 않게 래퍼에) */
+.target { outline: 2px dashed color-mix(in srgb, var(--accent) 65%, transparent); outline-offset: 3px; }
+.dnd-slot.target:not(.filled) { border-color: transparent; background: var(--accent-soft); }
+.dnd-pos:has(> .target), .dnd-tray.target { animation: pulse-ring calc(var(--t-slow) * 2) var(--ease-out); }
+.over { outline: 2px solid var(--accent); outline-offset: 2px; background: var(--accent-soft) !important; }
+
+/* 결과: 왼쪽 위부터 stagger(--i) — 정답 pop, 오답 shake */
+[data-result] { --d: calc(min(var(--i, 0) * 35ms, 600ms)); }
 [data-result='ok'] { border-color: var(--ok) !important; background: color-mix(in srgb, var(--ok) 13%, var(--surface)) !important; }
 [data-result='wrong'] { border-color: var(--danger) !important; background: color-mix(in srgb, var(--danger) 12%, var(--surface)) !important; }
+.dnd [data-result='ok'] { animation: pop var(--t-med) var(--ease-spring) var(--d) backwards; }
+.dnd [data-result='wrong'] { animation: shake var(--t-slow) var(--ease-out) var(--d) backwards; }
+.dnd.locked [data-result] { transition: background var(--t-med) var(--d), border-color var(--t-med) var(--d); }
 .dnd-slot[data-result='wrong']:not(.filled) { border-style: dashed; }
 
 /* 트레이 */
 .dnd-tray {
   display: flex; flex-wrap: wrap; gap: .55rem; align-content: flex-start; min-height: 64px;
-  margin-top: .9rem; padding: .8rem; border-radius: var(--radius);
+  margin-top: .9rem; padding: .8rem; border-radius: var(--radius); box-sizing: border-box;
   background: color-mix(in srgb, var(--border) 28%, var(--bg)); border: 1px solid var(--border);
 }
 .dnd-tray > .dnd-card { width: 148px; height: 44px; }
-.dnd-tray-empty { margin: auto; font-size: .88rem; }
 .dnd-bar { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; margin: .9rem 0 .4rem; }
 .dnd-bar [role='status'] { margin: 0 auto 0 0; }
+.dnd-bar button.ready { animation: pulse-ring calc(var(--t-slow) * 2) var(--ease-out); }
+
+/* 진행: 얇은 막대 + n/m */
+.dnd-progress { margin-right: auto; display: inline-flex; align-items: center; gap: .55rem; font-size: .85rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.dnd-progress > span { width: 140px; height: 4px; border-radius: 999px; overflow: hidden; background: var(--border); }
+.dnd-progress i { display: block; height: 100%; background: var(--accent); border-radius: inherit; transition: width var(--t-med) var(--ease-out); }
+
+/* 점수: pop, 만점은 칩 + pulse-ring */
+.dnd-score { padding: 0; border: none; background: none; color: var(--text); font-size: .95rem; animation: pop var(--t-med) var(--ease-spring); }
 .dnd-score b { font-size: 1.05rem; }
+.dnd-score.perfect {
+  padding: .3rem .8rem; border-radius: 999px; color: var(--ok); background: color-mix(in srgb, var(--ok) 13%, var(--surface));
+  animation: pop var(--t-med) var(--ease-spring), pulse-ring calc(var(--t-slow) * 2) var(--ease-out) var(--t-med);
+}
 
 .dnd-compare { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: .9rem; }
 .dnd-compare h2 { margin: 0 0 .4rem; font-size: .95rem; color: var(--muted); font-weight: 600; }
@@ -66,6 +95,5 @@ main:has(.dnd) { max-width: 1400px; } /* 넓은 트리: 에디터처럼 폭 제�
   display: flex; align-items: center; justify-content: center; text-align: center; padding: .2rem .55rem;
   font-size: .86rem; font-weight: 550; line-height: 1.25; border-radius: 9px;
   background: var(--surface); border: 1px solid var(--accent); color: var(--text);
-  box-shadow: 0 8px 24px #10182833; transform: rotate(-2deg) scale(1.03);
+  box-shadow: var(--shadow-lift); transform: rotate(-2deg) scale(1.03);
 }
-@media (prefers-reduced-motion: reduce) { .dnd-card, .dnd-ghost { transition: none; transform: none; } }
