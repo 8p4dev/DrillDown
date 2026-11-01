@@ -18,7 +18,7 @@ export default function GraphView(p: {
   const ref = useRef<HTMLDivElement>(null)
   const [sizes, setSizes] = useState<Map<ID, Size>>(new Map())
   const [drag, setDrag] = useState<{ id: ID; dx: number; dy: number } | null>(null)
-  const start = useRef<{ id: ID; x: number; y: number; moved: boolean } | null>(null)
+  const start = useRef<{ id: ID; x: number; y: number; moved: boolean; el: HTMLElement; pointer: number } | null>(null)
 
   const offsetOf = (n: TreeNode, dx: number, dy: number) => ({ x: (n.offset?.x ?? 0) + dx, y: (n.offset?.y ?? 0) + dy })
   const shown = drag ? p.nodes.map((n) => (n.id === drag.id ? { ...n, offset: offsetOf(n, drag.dx, drag.dy) } : n)) : p.nodes
@@ -48,9 +48,8 @@ export default function GraphView(p: {
   function onPointerDown(e: React.PointerEvent) {
     const t = e.target as HTMLElement
     const card = t.closest<HTMLElement>('[data-node-id]')
-    if (e.button !== 0 || !card || t.closest('input, .badge')) return
-    start.current = { id: card.dataset.nodeId!, x: e.clientX, y: e.clientY, moved: false }
-    card.setPointerCapture(e.pointerId)
+    if (e.button !== 0 || !card || t.closest('input, .badge, .w-handle, [contenteditable]')) return
+    start.current = { id: card.dataset.nodeId!, x: e.clientX, y: e.clientY, moved: false, el: card, pointer: e.pointerId }
   }
   function onPointerMove(e: React.PointerEvent) {
     const s = start.current
@@ -58,6 +57,8 @@ export default function GraphView(p: {
     const dx = e.clientX - s.x
     const dy = e.clientY - s.y
     if (!s.moved && Math.hypot(dx, dy) < DRAG_MIN) return
+    // 실제로 끌기 시작할 때만 캡처: 미리 캡처하면 카드 안 요소(내용 영역)의 클릭·더블클릭 대상이 카드로 바뀐다
+    if (!s.moved) s.el.setPointerCapture(s.pointer)
     s.moved = true
     setDrag({ id: s.id, dx, dy })
   }
@@ -81,8 +82,6 @@ export default function GraphView(p: {
       onPointerCancel={() => ((start.current = null), setDrag(null))}
     >
       <svg className="graph-edges" width={g.width} height={g.height} aria-hidden>
-        {/* 카드 밑판: 학습 상태 색(c-*)이 반투명 틴트라 배경 격자가 비치지 않게 */}
-        {[...g.boxes].map(([id, b]) => <rect key={id} x={b.x} y={b.y} width={b.w} height={b.h} />)}
         {g.edges.map(([a, b]) => {
           const pa = g.boxes.get(a)!
           const pb = g.boxes.get(b)!

@@ -1,13 +1,10 @@
-
-/* ---- 에디터: 그래프(왼쪽, 넓게) + 사이드(오른쪽) ---- */
+/* ---- 에디터: 그래프(왼쪽, 넓게) + 패널(오른쪽) ---- */
 main:has(> .editor) { max-width: none; }
 .editor {
-  display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr) 300px;
-  grid-template-areas: 'head head' 'graph side' 'graph io'; grid-template-rows: auto auto 1fr;
+  display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-areas: 'head head' 'graph side'; grid-template-rows: auto 1fr;
 }
-.editor-head { grid-area: head; display: flex; align-items: center; gap: 1rem; }
-.editor-head h1 { margin: 0; font-size: 1.3rem; flex: 1; }
-.editor-head h1 small { font-size: .85rem; font-weight: 400; color: var(--muted); }
+.editor > :first-child { grid-area: head; }
 .editor button {
   font: inherit; font-size: .85rem; padding: .35rem .8rem; cursor: pointer;
   color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
@@ -25,33 +22,60 @@ main:has(> .editor) { max-width: none; }
 /* ---- 그래프 캔버스 ---- */
 .graph { position: relative; margin: 0 auto; touch-action: none; user-select: none; }
 .graph-edges { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
-.graph-edges rect { fill: var(--surface); rx: var(--radius); }
 .graph-edges path { fill: none; stroke: var(--muted); stroke-opacity: .45; stroke-width: 1.5; }
 
+/* 노드 카드: 제목 + 내용. 폭은 단계(px)로 고정, 오답 농도(--heat 0..1)만큼 붉어짐 */
 .node-row {
-  position: absolute; box-sizing: border-box; width: max-content; min-width: 64px; max-width: 240px;
-  display: flex; align-items: center; justify-content: center; gap: .35rem;
-  padding: .4rem .75rem; font-size: .9rem; line-height: 1.35; text-align: center; color: var(--text);
-  border: 1px solid var(--border); border-left-width: 4px; border-radius: var(--radius);
-  box-shadow: var(--shadow); cursor: grab;
+  --heat: 0;
+  position: absolute; box-sizing: border-box; display: flex; flex-direction: column;
+  color: var(--text); background: color-mix(in srgb, var(--danger) calc(var(--heat) * 24%), var(--surface));
+  border: 1px solid color-mix(in srgb, var(--danger) calc(var(--heat) * 75%), var(--border));
+  border-radius: var(--radius); box-shadow: var(--shadow); cursor: grab;
 }
-.node-row.c-none { background: var(--surface); border-left-color: var(--border); }
-.node-row.root { font-weight: 600; font-size: 1rem; padding: .5rem 1rem; }
 .node-row.selected { box-shadow: 0 0 0 2px var(--accent), var(--shadow); }
-.node-row.c-misplaced { outline-offset: 2px; }
 .node-row.cut { opacity: .45; border-style: dashed; }
+.node-row.resizing { box-shadow: 0 0 0 2px var(--accent-soft), var(--shadow); }
 .graph.dragging .node-row { cursor: grabbing; }
-.node-title { overflow-wrap: anywhere; white-space: pre-wrap; }
-.has-note { color: var(--muted); font-size: .8em; }
 
-/* 편집 입력: 숨은 사본(::after)이 폭을 정해 입력 텍스트만큼 카드가 늘어난다 */
-.grow { display: inline-grid; min-width: 2em; max-width: 100%; }
-.grow::after { content: attr(data-value) ' '; visibility: hidden; white-space: pre; overflow: hidden; }
-.grow::after, .grow input { grid-area: 1 / 1; font: inherit; padding: 0 .15rem; min-width: 0; }
-.grow input {
-  width: 100%; box-sizing: border-box; border: none; outline: none; color: inherit;
-  background: var(--accent-soft); border-radius: 3px; text-align: center;
+.node-title, .title-input {
+  padding: .45rem .75rem; font-size: .95rem; font-weight: 650; line-height: 1.35; text-align: center;
+  overflow-wrap: anywhere; white-space: pre-wrap;
 }
+.node-row.root .node-title, .node-row.root .title-input { font-size: 1.05rem; font-weight: 750; }
+.title-input {
+  width: 100%; box-sizing: border-box; font-family: inherit; color: inherit; border: none; border-radius: var(--radius);
+  background: var(--accent-soft); outline: none; box-shadow: none;
+}
+.title-input:focus { box-shadow: none; }
+
+.node-note {
+  padding: .4rem .75rem .5rem; border-top: 1px solid var(--border);
+  font-size: .82rem; line-height: 1.5; text-align: left; overflow-wrap: anywhere; white-space: pre-wrap; cursor: text;
+}
+.node-note > .note-edit { margin: -.15rem -.3rem; padding: .15rem .3rem; border-radius: 6px; background: var(--accent-soft); }
+
+/* 내용 서식: 불릿 줄, 형광펜 3색 (표시·편집 공용) */
+.ln.b { position: relative; padding-left: 1em; }
+.ln.b::before { content: ''; position: absolute; left: .3em; top: .66em; width: .3em; height: .3em; border-radius: 50%; background: currentColor; opacity: .7; }
+mark { color: inherit; border-radius: 3px; padding: 0 .08em; }
+mark.hl-p, .tool-p::before { background: #ff8fb466; }
+mark.hl-y, .tool-y::before { background: #ffd84d80; }
+mark.hl-b, .tool-b::before { background: #6cc8ff66; }
+
+.note-edit { outline: none; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; cursor: text; }
+.note-edit[data-placeholder]:has(> .ln:only-child > br:only-child)::before {
+  content: attr(data-placeholder); position: absolute; color: var(--muted); pointer-events: none;
+}
+
+/* 너비 핸들: 카드 좌우 가장자리 */
+.w-handle { position: absolute; top: 0; bottom: 0; width: 8px; cursor: ew-resize; touch-action: none; }
+.w-handle.l { left: -4px; }
+.w-handle.r { right: -4px; }
+.w-handle::after {
+  content: ''; position: absolute; top: 50%; left: 3px; width: 2px; height: 18px; transform: translateY(-50%);
+  border-radius: 2px; background: var(--accent); opacity: 0; transition: opacity .12s;
+}
+.node-row:hover .w-handle::after, .node-row.selected .w-handle::after, .node-row.resizing .w-handle::after { opacity: .7; }
 
 /* 접기 배지: 카드 하단 중앙에 걸침 */
 .badge {
@@ -64,21 +88,46 @@ main:has(> .editor) { max-width: none; }
 .badge.folded { color: #fff; background: var(--accent); border-color: var(--accent); }
 .badge:hover { border-color: var(--accent); }
 
-/* ---- 사이드 ---- */
-.side { grid-area: side; }
-.side .detail h2, .io h2 { font-size: 1rem; margin: 0 0 .5rem; }
-.side label { display: block; margin-bottom: .75rem; font-size: .85rem; color: var(--muted); }
-.side textarea, .side input, .io textarea {
-  width: 100%; box-sizing: border-box; font: inherit; color: var(--text); margin-top: .25rem;
-  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: .4rem .5rem;
+/* ---- 우측 패널 ---- */
+.side {
+  grid-area: side; display: flex; flex-direction: column; gap: .75rem; min-width: 0;
+  max-height: calc(100vh - 9rem); overflow: auto;
 }
-.side textarea:focus, .side input:focus, .io textarea:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
-.status { min-height: 1.5em; margin: 0 0 .5rem; color: var(--muted); font-size: .85rem; }
-.help { font-size: .75rem; color: var(--muted); line-height: 1.6; }
-.io { grid-area: io; display: flex; flex-wrap: wrap; gap: .4rem; align-content: start; }
-.io h2, .io textarea { flex-basis: 100%; }
-.io textarea { font-family: ui-monospace, monospace; font-size: .8rem; }
+.status { min-height: 1.4em; margin: 0; color: var(--muted); font-size: .85rem; }
+.detail {
+  display: flex; flex-direction: column; background: var(--surface);
+  border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden;
+}
+.detail-title {
+  font-size: 1.05rem; font-weight: 650; border: none; border-radius: 0; padding: .7rem .85rem; background: transparent;
+}
+.detail-title:focus { box-shadow: inset 0 -2px 0 var(--accent); }
+.toolbar {
+  display: flex; align-items: center; gap: .25rem; padding: .35rem .5rem;
+  border-block: 1px solid var(--border); background: color-mix(in srgb, var(--border) 25%, var(--surface));
+}
+.editor .toolbar button { padding: 0; width: 28px; height: 28px; display: inline-grid; place-items: center; border-color: transparent; background: transparent; }
+.editor .toolbar button:hover:not(:disabled) { background: var(--surface); border-color: var(--border); }
+.tool-bullet::before { content: '•≡'; font-size: .95rem; letter-spacing: .05em; }
+.tool-p::before, .tool-y::before, .tool-b::before { content: ''; width: 16px; height: 16px; border-radius: 4px; box-shadow: inset 0 0 0 1px #0002; }
+.tool-clear::before { content: ''; width: 14px; height: 14px; border-radius: 4px; border: 1.5px solid var(--muted); background: linear-gradient(135deg, transparent 45%, var(--danger) 45% 55%, transparent 55%); }
+.widths { margin-left: auto; display: inline-flex; gap: 2px; }
+.editor .widths button { width: 24px; font-size: .75rem; color: var(--muted); }
+.editor .widths button[aria-pressed='true'] { color: var(--accent); background: var(--accent-soft); }
+.detail .note-edit { position: relative; min-height: 7.5em; padding: .65rem .85rem; font-size: .9rem; line-height: 1.6; }
+.detail .note-edit:focus { box-shadow: inset 0 0 0 2px var(--accent-soft); }
+
+.arrange { align-self: flex-start; }
+.side details { font-size: .85rem; }
+.side summary { cursor: pointer; color: var(--muted); font-weight: 600; padding: .2rem 0; }
+.io textarea {
+  width: 100%; box-sizing: border-box; margin: .4rem 0; font-family: ui-monospace, monospace; font-size: .8rem;
+}
+.io-actions { display: flex; flex-wrap: wrap; gap: .4rem; }
+.help p { margin: .4rem 0 0; font-size: .75rem; color: var(--muted); line-height: 1.6; }
+
 @media (max-width: 860px) {
-  .editor { grid-template-columns: 1fr; grid-template-areas: 'head' 'graph' 'side' 'io'; }
+  .editor { grid-template-columns: 1fr; grid-template-areas: 'head' 'graph' 'side'; }
   .outline { height: 70vh; }
+  .side { max-height: none; }
 }
