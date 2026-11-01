@@ -10,12 +10,31 @@ import Minimap from './Minimap'
 import { nextConcept } from './flash'
 import './flash.css'
 
+const byIdHas = (ns: TreeNode[], id: ID) => ns.some((n) => n.id === id)
+
+// 세션 진행(현재 개념·노드별 마지막 평가)은 탭 세션 동안 유지 — 새로고침해도 집계가 남는다
+type Saved = { current: ID | null; tally: [ID, boolean][] }
+const KEY = (treeId: string) => `flash:${treeId}`
+function load(treeId: string): Saved {
+  try {
+    return JSON.parse(sessionStorage.getItem(KEY(treeId)) ?? '') as Saved
+  } catch {
+    return { current: null, tally: [] }
+  }
+}
+
 export default function FlashPage({ treeId, rootId }: { treeId: string; rootId?: string }) {
   const [nodes, setNodes] = useState<TreeNode[] | null>(null)
   const [srs, setSrs] = useState({ map: new Map<ID, NodeSrs>(), at: new Date(0) }) // at = 색 계산 기준 시각
-  const [current, setCurrent] = useState<ID | null>(null)
+  const [saved] = useState(() => load(treeId))
+  const [current, setCurrent] = useState<ID | null>(saved.current)
   const [done, setDone] = useState(false)
-  const [tally, setTally] = useState(new Map<ID, boolean>()) // 노드별 마지막 평가
+  const [tally, setTally] = useState(() => new Map<ID, boolean>(saved.tally)) // 노드별 마지막 평가
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(KEY(treeId), JSON.stringify({ current, tally: [...tally] } satisfies Saved))
+    } catch { /* 저장 불가(사생활 모드 등)면 새로고침 시 초기화될 뿐 */ }
+  }, [treeId, current, tally])
 
   useEffect(() => {
     Promise.all([getTreeNodes(treeId), getSrsMap(treeId)]).then(([ns, s]) => {
@@ -35,7 +54,7 @@ export default function FlashPage({ treeId, rootId }: { treeId: string; rootId?:
   if (!nodes) return <section className="flash"><TreeHeader treeId={treeId} active="flash" /><p>불러오는 중…</p></section>
   if (!tree) return <section className="flash"><TreeHeader treeId={treeId} active="flash" /><p className="muted">트리가 비어 있습니다.</p></section>
 
-  const at = current ?? tree.scope
+  const at = current && byIdHas(nodes, current) ? current : tree.scope
   const byId = new Map(nodes.map((n) => [n.id, n]))
   const path: TreeNode[] = []
   for (let n = byId.get(at); n; n = n.parentId ? byId.get(n.parentId) : undefined) path.unshift(n)
@@ -83,7 +102,7 @@ export default function FlashPage({ treeId, rootId }: { treeId: string; rootId?:
                   </span>
                 ))}
               </nav>
-              <FlashCard key={at} treeId={treeId} nodes={nodes} conceptId={at} colors={colors} onRated={onRated} onDive={go} />
+              <FlashCard key={at} treeId={treeId} nodes={nodes} conceptId={at} colors={colors} onRated={onRated} onDive={go} initialRated={tally} />
               <div className="actions flash-nav">
                 <button type="button" className="primary" onClick={() => (next ? go(next) : setDone(true))}>
                   {next ? '다음 개념 →' : '요약 보기'}

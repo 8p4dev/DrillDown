@@ -55,8 +55,10 @@ test('플래시카드: 펼침 → 알음/모름 → 색 → 다음 개념 → �
   await expect(page.locator('.flash-concept-title')).toHaveText('근로계약')
   await expect(current).not.toHaveAttribute('data-node-id', rootMini!)
 
-  // 새로고침 후 색 유지
+  // 새로고침 → 보던 개념(근로계약)에서 이어짐, 루트로 돌아가면 색 유지
   await page.reload()
+  await expect(page.locator('.flash-concept-title')).toHaveText('근로계약')
+  await page.getByRole('navigation', { name: '현재 위치' }).getByRole('button', { name: '노동법' }).click()
   await page.locator('button[data-concept-id]').click()
   await expect(kid('임금')).toHaveAttribute('data-color', 'red')
 })

@@ -21,13 +21,15 @@ interface Props {
   onRated: (s: NodeSrs, known: boolean) => void
   /** 자식 있는 하위 노드로 더 들어가기. 없으면 버튼 숨김 */
   onDive?: (id: ID) => void
+  /** 이미 평가한 하위(새로고침 후 복원용) */
+  initialRated?: Map<ID, boolean>
 }
 
-export default function FlashCard({ treeId, nodes, conceptId, colors, onRated, onDive }: Props) {
+export default function FlashCard({ treeId, nodes, conceptId, colors, onRated, onDive, initialRated }: Props) {
   const concept = nodes.find((n) => n.id === conceptId)
   const kids = childrenOf(nodes, conceptId)
   const [open, setOpen] = useState(false)
-  const [rated, setRated] = useState(new Map<ID, boolean>())
+  const [rated, setRated] = useState(() => new Map<ID, boolean>(initialRated))
   const cardRef = useRef<HTMLButtonElement>(null)
   useEffect(() => cardRef.current?.focus({ preventScroll: true }), [])
   if (!concept) return <p className="muted">개념을 찾을 수 없습니다.</p>

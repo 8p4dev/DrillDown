@@ -12,6 +12,7 @@ import TreeHeader from '../TreeHeader'
 import './editor.css'
 
 const UNDO_LIMIT = 50
+const clampZoom = (z: number) => Math.min(2, Math.max(0.3, Math.round(z * 100) / 100))
 
 // ---- 순수 트리 연산 (노드 배열은 불변으로 다룬다: 바뀐 노드만 새 객체) ----
 const patch = (ns: TreeNode[], id: ID, p: Partial<TreeNode>) =>
@@ -58,7 +59,6 @@ export default function EditorPage({ treeId }: { treeId: string }) {
   const draftRef = useRef('')
   const undoRef = useRef<TreeNode[][]>([])
   const redoRef = useRef<TreeNode[][]>([])
-  const saveRef = useRef<Promise<unknown>>(Promise.resolve())
   const outlineRef = useRef<HTMLDivElement>(null)
   const liveBase = useRef<TreeNode[] | null>(null) // 실시간 편집 시작 시점 스냅샷 (끝날 때 실행취소 1단계로)
   const cardNote = useRef<NoteApi | null>(null)
@@ -92,6 +92,28 @@ export default function EditorPage({ treeId }: { treeId: string }) {
       outlineRef.current?.focus()
   }, [editId])
 
+  // ---- 확대·축소: 버튼, Ctrl+휠, 탐색 모드 키 - = 0 ----
+  const [zoom, setZoom] = useState(1)
+  const zoomBy = (f: number) => setZoom((z) => clampZoom(z * f))
+  function fitZoom() {
+    const box = outlineRef.current
+    const g = box?.querySelector<HTMLElement>('.graph')
+    if (!box || !g) return
+    setZoom(clampZoom(Math.min(1, (box.clientWidth - 16) / g.offsetWidth, (box.clientHeight - 16) / g.offsetHeight)))
+  }
+  useEffect(() => {
+    const el = outlineRef.current
+    if (!el) return
+    // React 의 wheel 리스너는 passive 라 preventDefault 가 안 된다 → 직접 등록
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return
+      e.preventDefault()
+      setZoom((z) => clampZoom(z * (e.deltaY < 0 ? 1.1 : 1 / 1.1)))
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [loaded])
+
   const root = nodes?.find((n) => n.parentId === null)
   if (!nodes) return <p>불러오는 중…</p>
   if (!root) return <p>트리를 찾을 수 없습니다. <a href={href.trees()}>목록으로</a></p>
@@ -103,10 +125,9 @@ export default function EditorPage({ treeId }: { treeId: string }) {
     const ids = new Set(next.map((n) => n.id))
     const changed = next.filter((n) => before.get(n.id) !== n)
     const removed = prev.filter((n) => !ids.has(n.id)).map((n) => n.id)
-    saveRef.current = saveRef.current
-      .then(() => putNodes(changed))
-      .then(() => deleteNodes(removed))
-      .catch((e) => setMsg(`저장 실패: ${e}`))
+    // 바로 시작: 겹치는 readwrite 트랜잭션은 IndexedDB 가 생성 순서대로 처리한다.
+    // (앞 저장이 끝난 뒤 시작하도록 줄 세우면, 입력 직후 새로고침·닫기 시 뒤쪽 저장이 시작도 못 하고 사라진다)
+    Promise.all([putNodes(changed), deleteNodes(removed)]).catch((e) => setMsg(`저장 실패: ${e}`))
   }
   function commit(next: TreeNode[], undoable = true) {
     const prev = nodesRef.current
@@ -285,7 +306,10 @@ export default function EditorPage({ treeId }: { treeId: string }) {
     const hasKids = childrenOf(nodesRef.current, sel.id).length > 0
     let handled = true
     // 문자 단축키는 e.code 로 판정 → 한글 자판 상태에서도 동작
-    if (ctrl && e.code === 'KeyZ') restore(e.shiftKey ? redoRef : undoRef, e.shiftKey ? undoRef : redoRef, e.shiftKey ? '다시 실행' : '실행 취소')
+    if (!ctrl && !e.altKey && (e.code === 'Equal' || e.code === 'NumpadAdd')) zoomBy(1.2)
+    else if (!ctrl && !e.altKey && (e.code === 'Minus' || e.code === 'NumpadSubtract')) zoomBy(1 / 1.2)
+    else if (!ctrl && !e.altKey && (e.code === 'Digit0' || e.code === 'Numpad0')) setZoom(1)
+    else if (ctrl && e.code === 'KeyZ') restore(e.shiftKey ? redoRef : undoRef, e.shiftKey ? undoRef : redoRef, e.shiftKey ? '다시 실행' : '실행 취소')
     else if (ctrl && e.code === 'KeyY') restore(redoRef, undoRef, '다시 실행')
     else if (ctrl && e.code === 'KeyX') {
       if (sel.parentId === null) setMsg('루트는 잘라낼 수 없습니다')
@@ -360,9 +384,18 @@ export default function EditorPage({ treeId }: { treeId: string }) {
   const sel = nodes.find((n) => n.id === selId) ?? root
   return (
     <section className="editor">
-      <TreeHeader treeId={treeId} active="edit" title={root.title} />
+      <TreeHeader treeId={treeId} active="edit" title={root.title}>
+        <div className="zoom-tools" role="group" aria-label="확대·축소">
+          <button type="button" aria-label="축소" title="축소 (-, Ctrl+휠)" onClick={() => zoomBy(1 / 1.2)}>−</button>
+          <output aria-label="배율">{Math.round(zoom * 100)}%</output>
+          <button type="button" aria-label="확대" title="확대 (=, Ctrl+휠)" onClick={() => zoomBy(1.2)}>+</button>
+          <button type="button" title="100% (0)" onClick={() => setZoom(1)}>100%</button>
+          <button type="button" title="트리 전체가 보이게" onClick={fitZoom}>화면 맞춤</button>
+        </div>
+      </TreeHeader>
       <div className="outline" role="tree" aria-label="아웃라이너" tabIndex={0} ref={outlineRef} onKeyDown={onNavKey}>
         <GraphView
+          zoom={zoom}
           nodes={nodes}
           rootId={root.id}
           onMove={(id, offset) => commit(patch(nodesRef.current, id, { offset }))}
@@ -413,6 +446,7 @@ export default function EditorPage({ treeId }: { treeId: string }) {
         <DetailPanel
           key={sel.id}
           node={sel}
+          titleDraft={editId === sel.id ? draft : null}
           api={panelNote}
           onLive={(p) => live(sel.id, p)}
           onBegin={beginLive}
@@ -443,10 +477,10 @@ export default function EditorPage({ treeId }: { treeId: string }) {
         <details className="help">
           <summary>단축키</summary>
           <p>
-            ↑ 부모 · ↓ 첫 자식 · ←→ 형제 · Alt+←→ 순서 · Space·F2·더블클릭 제목 편집 · 내용 더블클릭 내용 편집 · Enter 형제 추가 · Tab 자식 추가 ·
+            ↑ 부모 · ↓ 첫 자식 · ←→ 형제 · Alt+←→ 순서 · Space·F2·더블클릭 제목 편집 · 내용 더블클릭(빈 카드는 선택 후 + 내용) 내용 편집 · Enter 형제 추가 · Tab 자식 추가 ·
             Shift+Tab 내어쓰기 · H 접기 · Delete 삭제 · Ctrl+X/V 잘라내기·붙여넣기 · Ctrl+Z / Ctrl+Shift+Z 실행취소·다시실행 ·
             제목 편집 중 Enter 확정+형제, Tab 들여쓰기, Esc 확정 · 내용 편집 중 줄머리 - + * 불릿, 선택 후 Shift+H 형광펜, Esc 확정 ·
-            노드를 끌어 위치 조정(하위 함께) · 카드 좌우 가장자리를 끌어 너비 3단계
+            노드를 끌어 위치 조정(하위 함께) · 빈 배경을 끌어 화면 이동 · - = 0 또는 Ctrl+휠 확대·축소 · 카드 좌우 가장자리를 끌어 너비 3단계
           </p>
         </details>
       </aside>
@@ -464,6 +498,8 @@ const TOOLS: { op: NoteOp; label: string }[] = [
 
 function DetailPanel({ api, ...p }: {
   node: TreeNode
+  /** 카드에서 제목 편집 중이면 그 입력값 — 패널에 실시간 표시 */
+  titleDraft: string | null
   api: React.RefObject<NoteApi | null>
   onLive: (p: Partial<TreeNode>) => void
   onBegin: () => void
@@ -480,7 +516,7 @@ function DetailPanel({ api, ...p }: {
         className="detail-title"
         aria-label="패널 제목"
         placeholder="제목"
-        value={title ?? p.node.title}
+        value={title ?? p.titleDraft ?? p.node.title}
         onFocus={() => (setTitle(p.node.title), p.onBegin())}
         onChange={(e) => {
           setTitle(e.target.value)

@@ -14,7 +14,10 @@ export default function GraphView(p: {
   rootId: ID
   renderNode: (n: TreeNode, box: Box) => ReactNode
   onMove: (id: ID, offset: { x: number; y: number }) => void
+  /** 확대 배율 (1 = 100%). 배치·측정은 배율과 무관한 원래 px, 화면에만 scale */
+  zoom?: number
 }) {
+  const z = p.zoom ?? 1
   const ref = useRef<HTMLDivElement>(null)
   const [sizes, setSizes] = useState<Map<ID, Size>>(new Map())
   const [drag, setDrag] = useState<{ id: ID; dx: number; dy: number } | null>(null)
@@ -54,8 +57,8 @@ export default function GraphView(p: {
   function onPointerMove(e: React.PointerEvent) {
     const s = start.current
     if (!s) return
-    const dx = e.clientX - s.x
-    const dy = e.clientY - s.y
+    const dx = (e.clientX - s.x) / z // 화면 px → 배치 px
+    const dy = (e.clientY - s.y) / z
     if (!s.moved && Math.hypot(dx, dy) < DRAG_MIN) return
     // 실제로 끌기 시작할 때만 캡처: 미리 캡처하면 카드 안 요소(내용 영역)의 클릭·더블클릭 대상이 카드로 바뀐다
     if (!s.moved) s.el.setPointerCapture(s.pointer)
@@ -71,11 +74,31 @@ export default function GraphView(p: {
     if (n && (drag.dx || drag.dy)) p.onMove(n.id, offsetOf(n, drag.dx, drag.dy))
   }
 
+  // 빈 배경을 끌면 스크롤(패닝). 카드 위에서는 카드 드래그가 우선
+  const pan = useRef<{ x: number; y: number; left: number; top: number; el: HTMLElement } | null>(null)
+  const [panning, setPanning] = useState(false)
+  function onPanDown(e: React.PointerEvent<HTMLDivElement>) {
+    const scroller = e.currentTarget.parentElement
+    if (e.button !== 0 || !scroller || (e.target as HTMLElement).closest('[data-node-id]')) return
+    e.currentTarget.setPointerCapture(e.pointerId)
+    pan.current = { x: e.clientX, y: e.clientY, left: scroller.scrollLeft, top: scroller.scrollTop, el: scroller }
+  }
+  function onPanMove(e: React.PointerEvent) {
+    const s = pan.current
+    if (!s) return
+    if (!panning && Math.hypot(e.clientX - s.x, e.clientY - s.y) >= DRAG_MIN) setPanning(true)
+    s.el.scrollLeft = s.left - (e.clientX - s.x)
+    s.el.scrollTop = s.top - (e.clientY - s.y)
+  }
+  const endPan = () => ((pan.current = null), setPanning(false))
+
   return (
+    <div className={`graph-pan${panning ? ' panning' : ''}`} onPointerDown={onPanDown} onPointerMove={onPanMove} onPointerUp={endPan} onPointerCancel={endPan}>
+    <div className="graph-zoom" style={{ width: g.width * z, height: g.height * z }}>
     <div
       ref={ref}
       className={`graph${drag ? ' dragging' : ''}`}
-      style={{ width: g.width, height: g.height }}
+      style={{ width: g.width, height: g.height, transform: z === 1 ? undefined : `scale(${z})` }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
@@ -91,6 +114,8 @@ export default function GraphView(p: {
         })}
       </svg>
       {[...g.boxes].map(([id, box]) => p.renderNode(byId.get(id)!, box))}
+    </div>
+    </div>
     </div>
   )
 }

@@ -20,7 +20,14 @@ main:has(> .editor) { max-width: none; }
 .outline:focus-visible { border-color: var(--accent); }
 
 /* ---- 그래프 캔버스 ---- */
-.graph { position: relative; margin: 0 auto; touch-action: none; user-select: none; }
+.graph-pan { display: flex; justify-content: center; align-items: flex-start; min-width: 100%; min-height: 100%; width: max-content; cursor: default; }
+.graph-pan.panning { cursor: grabbing; }
+.graph-zoom { flex: none; }
+.graph { position: relative; transform-origin: 0 0; touch-action: none; user-select: none; }
+
+/* 확대·축소 */
+.zoom-tools { display: flex; align-items: center; gap: .25rem; }
+.zoom-tools output { min-width: 3.2rem; text-align: center; font-size: .85rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 .graph-edges { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
 .graph-edges path { fill: none; stroke: var(--muted); stroke-opacity: .45; stroke-width: 1.5; }
 
@@ -87,6 +94,12 @@ mark.hl-b, .tool-b::before { background: #6cc8ff66; }
 .node-row:hover .badge, .node-row.selected .badge { opacity: 1; }
 .badge.folded { color: #fff; background: var(--accent); border-color: var(--accent); }
 .badge:hover { border-color: var(--accent); }
+
+/* 내용 없는 카드: 선택 시 오른쪽 아래에 걸치는 '+ 내용' 버튼 */
+.editor .node-row .add-note {
+  position: absolute; right: .5rem; bottom: 0; transform: translateY(50%); z-index: 1;
+  padding: 0 .5rem; font-size: .72rem; line-height: 1.3rem; color: var(--accent); border-radius: 999px;
+}
 
 /* ---- 우측 패널 ---- */
 .side {

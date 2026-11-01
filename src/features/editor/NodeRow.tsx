@@ -42,7 +42,7 @@ export default function NodeRow(p: NodeRowProps) {
   const editing = p.draft !== null
   const step: Step = p.node.width ?? 1
   const [liveW, setLiveW] = useState<number | null>(null) // 너비 핸들 드래그 중 미리보기 폭
-  const drag = useRef<{ x: number; side: 1 | -1 } | null>(null)
+  const drag = useRef<{ x: number; side: 1 | -1; z: number } | null>(null) // z = 그래프 확대 배율
   // 편집 중 들여쓰기·내어쓰기로 카드가 DOM 에서 옮겨지면 포커스를 되찾는다
   useLayoutEffect(() => {
     if (editing && document.activeElement !== inputRef.current) inputRef.current?.focus()
@@ -63,12 +63,13 @@ export default function NodeRow(p: NodeRowProps) {
         e.stopPropagation()
         e.preventDefault()
         e.currentTarget.setPointerCapture(e.pointerId)
-        drag.current = { x: e.clientX, side }
+        const card = e.currentTarget.parentElement!
+        drag.current = { x: e.clientX, side, z: card.getBoundingClientRect().width / card.offsetWidth || 1 }
       }}
       onPointerMove={(e) => {
         const d = drag.current
         // 카드는 가운데 정렬로 배치되므로 양쪽이 함께 늘어난다 → 포인터 이동의 2배
-        if (d) setLiveW(Math.min(Math.max(WIDTH_PX[step] + d.side * (e.clientX - d.x) * 2, 120), 440))
+        if (d) setLiveW(Math.min(Math.max(WIDTH_PX[step] + d.side * ((e.clientX - d.x) / d.z) * 2, 120), 440))
       }}
       onPointerUp={() => {
         if (!drag.current) return
@@ -126,6 +127,11 @@ export default function NodeRow(p: NodeRowProps) {
           // 저장 형식 → HTML (텍스트는 이스케이프됨)
           dangerouslySetInnerHTML={{ __html: toHtml(parse(p.node.note)) }}
         />
+      ) : p.selected && !editing ? (
+        // 내용이 없는 카드: 선택 시 카드 아래에 겹쳐 뜨는 추가 버튼 (배치 높이에 영향 없음)
+        <button type="button" className="add-note" onClick={(e) => (stop(e), p.onStartNoteEdit())} onDoubleClick={stop}>
+          + 내용
+        </button>
       ) : null}
       {handle(-1)}
       {handle(1)}
