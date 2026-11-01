@@ -21,6 +21,10 @@ export interface NodeRowProps {
   cut: boolean
   /** 오답 농도 0..1 (core/srs missHeat) */
   heat: number
+  /** 위치 트랜지션 끔 (측정 전·드래그로 따라오는 중) */
+  still: boolean
+  /** 끌고 있는 카드: 들어 올린 모양 */
+  lifted: boolean
   /** 제목 편집 중이면 입력값, 아니면 null */
   draft: string | null
   onDraft: (v: string) => void
@@ -94,7 +98,7 @@ export default function NodeRow(p: NodeRowProps) {
       data-node-id={p.node.id}
       data-width={step}
       data-miss={p.heat}
-      className={`node-row${p.selected ? ' selected' : ''}${p.cut ? ' cut' : ''}${p.depth === 0 ? ' root' : ''}${liveW !== null ? ' resizing' : ''}`}
+      className={`node-row${p.selected ? ' selected' : ''}${p.cut ? ' cut' : ''}${p.depth === 0 ? ' root' : ''}${liveW !== null ? ' resizing' : ''}${p.still ? ' still' : ''}${p.lifted ? ' lifted' : ''}`}
       style={{ left: p.x, top: p.y, width: liveW ?? WIDTH_PX[step], '--heat': p.heat } as React.CSSProperties}
       onClick={p.onSelect}
       onDoubleClick={p.onStartEdit}
