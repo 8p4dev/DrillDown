@@ -17,6 +17,8 @@ export interface TreeNode {
   note?: string // 서술형 메모 — 채점 대상 아님
   aliases: string[] // 허용 표현(동의어·약어)
   collapsed?: boolean
+  /** 그래프 뷰에서 마우스로 옮긴 양(px). 자동 배치 위치 기준이며 자손에게도 누적 적용. 없으면 {0,0} */
+  offset?: { x: number; y: number }
   updatedAt: number
 }
 

@@ -1,3 +1,12 @@
+:root {
+  /* 디자인 토큰 — 이름은 공유 계약(docs/plans/orchestration_graph_view.md §3). 값은 스타일 담당이 조정 가능 */
+  --bg: #f6f7f9; --surface: #ffffff; --border: #e3e6eb; --text: #1f2328; --muted: #6b7280;
+  --accent: #3b6fd8; --accent-soft: #3b6fd81f; --danger: #d64545;
+  --radius: 8px; --shadow: 0 1px 2px #0000000f, 0 2px 8px #0000000d;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #15171a; --surface: #1e2125; --border: #30353b; --text: #e6e8eb; --muted: #9aa3ad; --accent: #6e9bff; --accent-soft: #6e9bff26; --shadow: 0 1px 2px #0006, 0 2px 8px #0004; }
+}
 :root { font-family: system-ui, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; line-height: 1.5; color-scheme: light dark; }
 body { margin: 0; }
 .topnav { display: flex; gap: 1rem; padding: .5rem 1rem; border-bottom: 1px solid #8884; }
