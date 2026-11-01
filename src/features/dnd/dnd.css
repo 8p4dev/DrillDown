@@ -1,0 +1,69 @@
+.dnd { --ok: #2e9e5b; user-select: none; -webkit-user-select: none; }
+.dnd-scope { display: inline-flex; align-items: center; gap: .4rem; font-size: .9rem; }
+.dnd-scope select { max-width: 14rem; padding: .3rem .5rem; }
+.dnd-hint { margin: 0 0 .6rem; font-size: .88rem; }
+
+/* 캔버스: 점 격자 */
+.dnd-canvas {
+  overflow: auto; padding: .25rem; border: 1px solid var(--border); border-radius: var(--radius);
+  background: radial-gradient(circle, color-mix(in srgb, var(--muted) 22%, transparent) 1px, transparent 1.2px) 0 0 / 18px 18px, var(--surface);
+  box-shadow: var(--shadow);
+}
+.dnd-graph { position: relative; margin: 0 auto; }
+.dnd-graph svg { position: absolute; inset: 0; pointer-events: none; }
+.dnd-graph path { fill: none; stroke: var(--muted); stroke-opacity: .45; stroke-width: 1.5; }
+.dnd-pos { position: absolute; display: flex; }
+
+/* 칸 공통: 노드(제목)·슬롯(빈칸)·카드 */
+.dnd-node, .dnd-slot, .dnd-card {
+  box-sizing: border-box; width: 100%; height: 100%; min-height: 44px; border-radius: 9px;
+  display: flex; align-items: center; justify-content: center; text-align: center;
+  font-size: .86rem; line-height: 1.25; padding: .2rem .55rem; margin: 0;
+}
+.dnd-node, .dnd-card { overflow: hidden; overflow-wrap: anywhere; }
+.dnd-node { background: var(--surface); border: 1px solid var(--border); font-weight: 650; box-shadow: var(--shadow); }
+.dnd-node.root { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); color: var(--text); font-weight: 700; }
+.dnd-slot { padding: 0; background: color-mix(in srgb, var(--surface) 70%, transparent); border: 1.5px dashed color-mix(in srgb, var(--muted) 55%, transparent); color: var(--muted); }
+.dnd-slot.filled { border-style: solid; border-color: transparent; background: none; }
+.dnd-card {
+  cursor: grab; touch-action: none; font-weight: 550;
+  background: var(--surface); color: var(--text); border: 1px solid var(--border); box-shadow: var(--shadow);
+  transition: transform .12s, box-shadow .12s, opacity .12s, border-color .12s;
+}
+.dnd-card:hover:not(:disabled) { border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); background: var(--surface); transform: translateY(-1px); }
+.dnd-card span, .dnd-node span, .dnd-ghost span {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.dnd-card.sel { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.dnd-card.dragging { opacity: .3; }
+.over { outline: 2px solid var(--accent); outline-offset: 2px; background: var(--accent-soft) !important; }
+.dnd.locked .dnd-card { cursor: default; }
+
+/* 결과 */
+[data-result='ok'] { border-color: var(--ok) !important; background: color-mix(in srgb, var(--ok) 13%, var(--surface)) !important; }
+[data-result='wrong'] { border-color: var(--danger) !important; background: color-mix(in srgb, var(--danger) 12%, var(--surface)) !important; }
+.dnd-slot[data-result='wrong']:not(.filled) { border-style: dashed; }
+
+/* 트레이 */
+.dnd-tray {
+  display: flex; flex-wrap: wrap; gap: .55rem; align-content: flex-start; min-height: 64px;
+  margin-top: .9rem; padding: .8rem; border-radius: var(--radius);
+  background: color-mix(in srgb, var(--border) 28%, var(--bg)); border: 1px solid var(--border);
+}
+.dnd-tray > .dnd-card { width: 148px; height: 44px; }
+.dnd-tray-empty { margin: auto; font-size: .88rem; }
+.dnd-bar { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; margin: .9rem 0 .4rem; }
+.dnd-bar [role='status'] { margin: 0 auto 0 0; }
+.dnd-score b { font-size: 1.05rem; }
+
+.dnd-compare { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: .9rem; }
+.dnd-compare h2 { margin: 0 0 .4rem; font-size: .95rem; color: var(--muted); font-weight: 600; }
+
+.dnd-ghost {
+  position: fixed; z-index: 50; pointer-events: none; box-sizing: border-box; height: 44px;
+  display: flex; align-items: center; justify-content: center; text-align: center; padding: .2rem .55rem;
+  font-size: .86rem; font-weight: 550; line-height: 1.25; border-radius: 9px;
+  background: var(--surface); border: 1px solid var(--accent); color: var(--text);
+  box-shadow: 0 8px 24px #10182833; transform: rotate(-2deg) scale(1.03);
+}
+@media (prefers-reduced-motion: reduce) { .dnd-card, .dnd-ghost { transition: none; transform: none; } }
