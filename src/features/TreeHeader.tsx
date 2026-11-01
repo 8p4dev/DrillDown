@@ -7,8 +7,8 @@ import './tree-header.css'
 const MODES: { mode: Mode; label: string; to: (id: string) => string }[] = [
   { mode: 'edit', label: '편집', to: href.edit },
   { mode: 'flash', label: '플래시카드', to: href.flash },
-  { mode: 'dnd', label: 'D&D 퀴즈', to: href.dnd },
-  { mode: 'blank', label: '백지 D&D', to: href.blank },
+  { mode: 'dnd', label: '빈칸 퀴즈', to: href.dnd },
+  { mode: 'blank', label: '백지 퀴즈', to: href.blank },
 ]
 
 /** title = 이미 아는 경우 넘기면 DB 조회 대신 사용(편집 중 루트 제목 즉시 반영). children = 헤더 오른쪽 화면별 도구 */

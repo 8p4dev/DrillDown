@@ -5,6 +5,7 @@ import FlashPage from './features/flash/FlashPage'
 import ReviewPage from './features/flash/ReviewPage'
 import DndPage from './features/dnd/DndPage'
 import BlankDndPage from './features/dnd/BlankDndPage'
+import { Toaster } from './features/Toast'
 
 export default function App() {
   const r = useRoute()
@@ -23,6 +24,7 @@ export default function App() {
         {r.name === 'blank' && <BlankDndPage key={r.treeId + r.rootId} treeId={r.treeId} rootId={r.rootId} />}
         {r.name === 'review' && <ReviewPage />}
       </main>
+      <Toaster />
     </>
   )
 }

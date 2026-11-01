@@ -1,7 +1,8 @@
 .tree-header { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
 .tree-header h1 { margin: 0; font-size: 1.35rem; }
 .mode-tabs { display: flex; gap: .25rem; padding: .2rem; background: var(--surface); border: 1px solid var(--border); border-radius: 999px; }
-.mode-tabs a { padding: .3rem .85rem; border-radius: 999px; color: var(--muted); text-decoration: none; font-size: .9rem; }
+.mode-tabs a { padding: .3rem .85rem; border-radius: 999px; color: var(--muted); text-decoration: none; font-size: .9rem; transition: background var(--t-med) var(--ease-out), color var(--t-fast); }
+.mode-tabs a:hover { text-decoration: none; }
 .mode-tabs a:hover { color: var(--text); }
 .mode-tabs a[aria-current='page'] { background: var(--accent); color: #fff; }
 .tree-header-tools { margin-left: auto; display: flex; gap: .5rem; align-items: center; }

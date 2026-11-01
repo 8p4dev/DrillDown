@@ -3,6 +3,10 @@
   --bg: #f5f6f8; --surface: #ffffff; --border: #e2e5ea; --text: #1d2127; --muted: #6b7280;
   --accent: #3d6ee0; --accent-soft: #3d6ee01a; --danger: #d14343;
   --radius: 10px; --shadow: 0 1px 2px #1018280d, 0 2px 6px #1018280a;
+  --ok: #2e9e5b; --warn: #dcae1d; --shadow-lift: 0 4px 10px #10182814, 0 12px 28px #1018281f;
+  /* 모션 토큰 (docs/plans/orchestration_ux_polish.md §3.1) */
+  --t-fast: 120ms; --t-med: 200ms; --t-slow: 320ms;
+  --ease-out: cubic-bezier(.2, .8, .2, 1); --ease-spring: cubic-bezier(.34, 1.56, .64, 1);
 }
 @media (prefers-color-scheme: dark) {
   :root { --bg: #131518; --surface: #1c1f23; --border: #2d3238; --text: #e6e8eb; --muted: #949ca6; --accent: #739eff; --accent-soft: #739eff24; --danger: #f07070; --shadow: 0 1px 2px #0007, 0 2px 8px #0005; }
@@ -41,8 +45,9 @@ button {
   font: inherit; font-size: .9rem; font-weight: 500; line-height: 1.2;
   padding: .45rem .85rem; border-radius: 8px; cursor: pointer;
   color: var(--text); background: var(--surface); border: 1px solid var(--border);
-  transition: background .12s, border-color .12s, color .12s;
+  transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast), transform var(--t-fast) var(--ease-out);
 }
+button:active:not(:disabled) { transform: scale(.97); }
 button:hover:not(:disabled) { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); background: color-mix(in srgb, var(--accent) 6%, var(--surface)); }
 button:disabled { opacity: .5; cursor: default; }
 button.primary { color: #fff; background: var(--accent); border-color: var(--accent); }
@@ -86,3 +91,23 @@ tbody tr:last-child td { border-bottom: none; }
 .c-red { background: #eb57571c; border-left: 3px solid #e05252; }
 .c-none { border-left: 3px solid transparent; }
 .c-misplaced { outline: 2px solid #f2994a; outline-offset: -2px; }
+
+/* ---- 공용 모션 (§3.1): 애니메이션 이름은 공유 계약 ---- */
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes pop { 0% { transform: scale(.92); } 60% { transform: scale(1.04); } 100% { transform: none; } }
+@keyframes shake { 0%, 100% { transform: none; } 20%, 60% { transform: translateX(-4px); } 40%, 80% { transform: translateX(4px); } }
+@keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent); } 100% { box-shadow: 0 0 0 10px transparent; } }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; scroll-behavior: auto !important; }
+}
+
+/* 토스트 (features/Toast.tsx) */
+.toasts { position: fixed; left: 50%; bottom: 1.25rem; transform: translateX(-50%); z-index: 100; display: flex; flex-direction: column; align-items: center; gap: .4rem; pointer-events: none; }
+.toast {
+  pointer-events: auto; display: flex; align-items: center; gap: .9rem; padding: .55rem .6rem .55rem 1rem; border-radius: 10px;
+  font-size: .9rem; color: var(--surface); background: color-mix(in srgb, var(--text) 92%, transparent); box-shadow: var(--shadow-lift);
+  animation: rise var(--t-med) var(--ease-out);
+}
+.toast button { padding: .25rem .6rem; font-size: .85rem; font-weight: 600; color: var(--accent); background: transparent; border: none; }
+.toast button:hover:not(:disabled) { background: color-mix(in srgb, var(--surface) 12%, transparent); }
+@media (prefers-color-scheme: dark) { .toast button { color: #3d6ee0; } }
