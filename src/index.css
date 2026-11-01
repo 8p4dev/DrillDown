@@ -1,20 +1,86 @@
 :root {
   /* 디자인 토큰 — 이름은 공유 계약(docs/plans/orchestration_graph_view.md §3). 값은 스타일 담당이 조정 가능 */
-  --bg: #f6f7f9; --surface: #ffffff; --border: #e3e6eb; --text: #1f2328; --muted: #6b7280;
-  --accent: #3b6fd8; --accent-soft: #3b6fd81f; --danger: #d64545;
-  --radius: 8px; --shadow: 0 1px 2px #0000000f, 0 2px 8px #0000000d;
+  --bg: #f5f6f8; --surface: #ffffff; --border: #e2e5ea; --text: #1d2127; --muted: #6b7280;
+  --accent: #3d6ee0; --accent-soft: #3d6ee01a; --danger: #d14343;
+  --radius: 10px; --shadow: 0 1px 2px #1018280d, 0 2px 6px #1018280a;
 }
 @media (prefers-color-scheme: dark) {
-  :root { --bg: #15171a; --surface: #1e2125; --border: #30353b; --text: #e6e8eb; --muted: #9aa3ad; --accent: #6e9bff; --accent-soft: #6e9bff26; --shadow: 0 1px 2px #0006, 0 2px 8px #0004; }
+  :root { --bg: #131518; --surface: #1c1f23; --border: #2d3238; --text: #e6e8eb; --muted: #949ca6; --accent: #739eff; --accent-soft: #739eff24; --danger: #f07070; --shadow: 0 1px 2px #0007, 0 2px 8px #0005; }
 }
-:root { font-family: system-ui, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; line-height: 1.5; color-scheme: light dark; }
-body { margin: 0; }
-.topnav { display: flex; gap: 1rem; padding: .5rem 1rem; border-bottom: 1px solid #8884; }
-main { padding: 1rem; max-width: 960px; margin: 0 auto; }
-/* 학습 상태 색 — core/srs 의 NodeColor 와 1:1 (docs/plans/orchestration_core_features.md §4.3) */
-.c-green { background: #2e9e5b33; border-left: 4px solid #2e9e5b; }
-.c-lightgreen { background: #9be27a33; border-left: 4px dashed #7cc35a; }
-.c-yellow { background: #f2c94c33; border-left: 4px solid #e0b020; }
-.c-red { background: #eb575733; border-left: 4px solid #eb5757; }
-.c-none { border-left: 4px solid transparent; }
-.c-misplaced { outline: 2px solid #f2994a; }
+:root {
+  font-family: 'Pretendard', system-ui, -apple-system, 'Segoe UI', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+  font-size: 15px; line-height: 1.55; color-scheme: light dark;
+  color: var(--text); background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+body { margin: 0; min-height: 100vh; background: var(--bg); }
+h1 { font-size: 1.45rem; font-weight: 700; letter-spacing: -.01em; margin: .25rem 0 1rem; }
+h2 { font-size: 1.1rem; font-weight: 650; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* 상단 바 */
+.topnav {
+  position: sticky; top: 0; z-index: 10;
+  display: flex; align-items: center; gap: .25rem;
+  height: 52px; padding: 0 1.25rem; box-sizing: border-box;
+  background: color-mix(in srgb, var(--surface) 88%, transparent); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.topnav a { color: var(--muted); padding: .35rem .7rem; border-radius: 8px; font-weight: 500; }
+.topnav a:hover { color: var(--text); background: var(--accent-soft); text-decoration: none; }
+.topnav a.active { color: var(--accent); background: var(--accent-soft); }
+.topnav .brand { color: var(--text); font-weight: 750; letter-spacing: -.02em; margin-right: .75rem; padding-left: 0; display: inline-flex; align-items: center; gap: .5rem; }
+.topnav .brand:hover { background: none; }
+.topnav .brand::before { content: ''; width: 18px; height: 18px; border-radius: 5px; background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #9b5de5)); }
+main { padding: 1.75rem 1.25rem 3rem; max-width: 960px; margin: 0 auto; }
+
+/* 버튼: 맨 button = 보조(테두리), .primary = accent 채움, .danger = 위험, .link = 링크 모양 */
+button {
+  font: inherit; font-size: .9rem; font-weight: 500; line-height: 1.2;
+  padding: .45rem .85rem; border-radius: 8px; cursor: pointer;
+  color: var(--text); background: var(--surface); border: 1px solid var(--border);
+  transition: background .12s, border-color .12s, color .12s;
+}
+button:hover:not(:disabled) { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); background: color-mix(in srgb, var(--accent) 6%, var(--surface)); }
+button:disabled { opacity: .5; cursor: default; }
+button.primary { color: #fff; background: var(--accent); border-color: var(--accent); }
+@media (prefers-color-scheme: dark) { button.primary { color: #0c1426; } }
+button.primary:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 88%, #000); border-color: transparent; }
+button.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 35%, var(--border)); }
+button.danger:hover:not(:disabled) { color: #fff; background: var(--danger); border-color: var(--danger); }
+button.link { background: none; border: none; padding: 0; color: var(--accent); font-size: inherit; font-weight: inherit; }
+button.link:hover:not(:disabled) { background: none; text-decoration: underline; }
+
+/* 입력 */
+input:not([type='checkbox']):not([type='radio']), textarea, select {
+  font: inherit; color: var(--text); background: var(--surface);
+  border: 1px solid var(--border); border-radius: 8px; padding: .45rem .65rem;
+  transition: border-color .12s, box-shadow .12s;
+}
+input:focus, textarea:focus, select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+input[type='checkbox'] { accent-color: var(--accent); width: 15px; height: 15px; vertical-align: -2px; }
+textarea { resize: vertical; line-height: 1.6; }
+
+/* 표 */
+table { width: 100%; border-collapse: separate; border-spacing: 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
+th, td { text-align: left; padding: .55rem .75rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { font-size: .8rem; font-weight: 600; color: var(--muted); background: color-mix(in srgb, var(--border) 30%, var(--surface)); text-transform: none; }
+tbody tr:last-child td { border-bottom: none; }
+
+/* 카드 · 보조 텍스트 · 상태 메시지 */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 1rem 1.15rem; }
+.muted { color: var(--muted); }
+[role='status'] {
+  padding: .6rem .85rem; border-radius: 8px; font-size: .9rem;
+  color: color-mix(in srgb, #2e9e5b 80%, var(--text)); background: #2e9e5b1a; border: 1px solid #2e9e5b40;
+}
+
+/* 학습 상태 색 — core/srs 의 NodeColor 와 1:1 (docs/plans/orchestration_core_features.md §4.3). 에디터 그래프는 G 가 덮어씀 */
+.c-green { background: #2e9e5b1f; border-left: 3px solid #2e9e5b; }
+.c-lightgreen { background: #8fd66a1f; border-left: 3px dashed #74bd52; }
+.c-yellow { background: #f2c94c26; border-left: 3px solid #dcae1d; }
+.c-red { background: #eb57571c; border-left: 3px solid #e05252; }
+.c-none { border-left: 3px solid transparent; }
+.c-misplaced { outline: 2px solid #f2994a; outline-offset: -2px; }
