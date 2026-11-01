@@ -4,20 +4,86 @@
 .row-form { display: flex; gap: .5rem; }
 .row-form input { flex: 1; }
 
-.editor { display: grid; grid-template-columns: 1fr 280px; gap: 1rem; }
-.editor h1 { grid-column: 1 / -1; margin: 0; font-size: 1.3rem; }
-.outline { outline: none; border: 1px solid #8884; border-radius: 6px; padding: .25rem 0; min-height: 200px; }
-.outline:focus-visible { border-color: #4a90e2; }
-.node-row { display: flex; align-items: center; gap: .35rem; padding-top: .15rem; padding-bottom: .15rem; cursor: default; }
-.node-row.selected { box-shadow: inset 0 0 0 2px #4a90e2aa; }
-.node-row.cut { opacity: .45; }
-.node-row input { flex: 1; font: inherit; }
-.twisty { width: 1em; text-align: center; color: #888; }
-.has-note { color: #888; font-size: .8em; }
-.side label { display: block; margin-bottom: .75rem; font-size: .9rem; }
-.side textarea, .side input { width: 100%; box-sizing: border-box; font: inherit; }
-.status { min-height: 1.5em; color: #c0392b; font-size: .9rem; }
-.help { font-size: .8rem; color: #888; }
-.io { grid-column: 1 / -1; }
-.io textarea { width: 100%; box-sizing: border-box; font-family: ui-monospace, monospace; }
-@media (max-width: 720px) { .editor { grid-template-columns: 1fr; } }
+/* ---- 에디터: 그래프(왼쪽, 넓게) + 사이드(오른쪽) ---- */
+main:has(> .editor) { max-width: none; }
+.editor {
+  display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr) 300px;
+  grid-template-areas: 'head head' 'graph side' 'graph io'; grid-template-rows: auto auto 1fr;
+}
+.editor-head { grid-area: head; display: flex; align-items: center; gap: 1rem; }
+.editor-head h1 { margin: 0; font-size: 1.3rem; flex: 1; }
+.editor-head h1 small { font-size: .85rem; font-weight: 400; color: var(--muted); }
+.editor button {
+  font: inherit; font-size: .85rem; padding: .35rem .8rem; cursor: pointer;
+  color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+}
+.editor button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.editor button:disabled { opacity: .45; cursor: default; }
+
+.outline {
+  grid-area: graph; outline: none; overflow: auto; height: calc(100vh - 9rem); min-height: 360px;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--bg) radial-gradient(circle, var(--border) 1px, transparent 1.2px) 0 0 / 20px 20px;
+}
+.outline:focus-visible { border-color: var(--accent); }
+
+/* ---- 그래프 캔버스 ---- */
+.graph { position: relative; margin: 0 auto; touch-action: none; user-select: none; }
+.graph-edges { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
+.graph-edges rect { fill: var(--surface); rx: var(--radius); }
+.graph-edges path { fill: none; stroke: var(--muted); stroke-opacity: .45; stroke-width: 1.5; }
+
+.node-row {
+  position: absolute; box-sizing: border-box; width: max-content; min-width: 64px; max-width: 240px;
+  display: flex; align-items: center; justify-content: center; gap: .35rem;
+  padding: .4rem .75rem; font-size: .9rem; line-height: 1.35; text-align: center; color: var(--text);
+  border: 1px solid var(--border); border-left-width: 4px; border-radius: var(--radius);
+  box-shadow: var(--shadow); cursor: grab;
+}
+.node-row.c-none { background: var(--surface); border-left-color: var(--border); }
+.node-row.root { font-weight: 600; font-size: 1rem; padding: .5rem 1rem; }
+.node-row.selected { box-shadow: 0 0 0 2px var(--accent), var(--shadow); }
+.node-row.c-misplaced { outline-offset: 2px; }
+.node-row.cut { opacity: .45; border-style: dashed; }
+.graph.dragging .node-row { cursor: grabbing; }
+.node-title { overflow-wrap: anywhere; white-space: pre-wrap; }
+.has-note { color: var(--muted); font-size: .8em; }
+
+/* 편집 입력: 숨은 사본(::after)이 폭을 정해 입력 텍스트만큼 카드가 늘어난다 */
+.grow { display: inline-grid; min-width: 2em; max-width: 100%; }
+.grow::after { content: attr(data-value) ' '; visibility: hidden; white-space: pre; overflow: hidden; }
+.grow::after, .grow input { grid-area: 1 / 1; font: inherit; padding: 0 .15rem; min-width: 0; }
+.grow input {
+  width: 100%; box-sizing: border-box; border: none; outline: none; color: inherit;
+  background: var(--accent-soft); border-radius: 3px; text-align: center;
+}
+
+/* 접기 배지: 카드 하단 중앙에 걸침 */
+.badge {
+  position: absolute; left: 50%; bottom: 0; transform: translate(-50%, 50%);
+  min-width: 1.3rem; padding: 0 .4rem; font-size: .75rem; font-weight: 600; line-height: 1.25rem; text-align: center;
+  color: var(--muted); background: var(--surface); border: 1px solid var(--border); border-radius: 999px; cursor: pointer;
+}
+.badge:not(.folded) { opacity: 0; transition: opacity .12s; }
+.node-row:hover .badge, .node-row.selected .badge { opacity: 1; }
+.badge.folded { color: #fff; background: var(--accent); border-color: var(--accent); }
+.badge:hover { border-color: var(--accent); }
+
+/* ---- 사이드 ---- */
+.side { grid-area: side; }
+.side .detail h2, .io h2 { font-size: 1rem; margin: 0 0 .5rem; }
+.side label { display: block; margin-bottom: .75rem; font-size: .85rem; color: var(--muted); }
+.side textarea, .side input, .io textarea {
+  width: 100%; box-sizing: border-box; font: inherit; color: var(--text); margin-top: .25rem;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: .4rem .5rem;
+}
+.side textarea:focus, .side input:focus, .io textarea:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+.status { min-height: 1.5em; margin: 0 0 .5rem; color: var(--muted); font-size: .85rem; }
+.help { font-size: .75rem; color: var(--muted); line-height: 1.6; }
+.io { grid-area: io; display: flex; flex-wrap: wrap; gap: .4rem; align-content: start; }
+.io h2, .io textarea { flex-basis: 100%; }
+.io textarea { font-family: ui-monospace, monospace; font-size: .8rem; }
+@media (max-width: 860px) {
+  .editor { grid-template-columns: 1fr; grid-template-areas: 'head' 'graph' 'side' 'io'; }
+  .outline { height: 70vh; }
+}

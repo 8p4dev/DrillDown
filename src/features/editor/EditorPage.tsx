@@ -6,6 +6,7 @@ import { colorClass, colorMap, getSrsMap } from '../../core/srs'
 import type { ID, NodeSrs, TreeNode } from '../../core/types'
 import { href } from '../../router'
 import NodeRow from './NodeRow'
+import GraphView from './graph/GraphView'
 import './editor.css'
 
 const UNDO_LIMIT = 50
@@ -258,8 +259,6 @@ export default function EditorPage({ treeId }: { treeId: string }) {
   function onNavKey(e: React.KeyboardEvent<HTMLDivElement>) {
     if (e.target !== e.currentTarget || isComposing(e)) return
     const sel = get(selId) ?? root!
-    const rows = visibleRows(nodesRef.current, root!)
-    const i = rows.findIndex((r) => r.node.id === sel.id)
     const ctrl = e.ctrlKey || e.metaKey
     const hasKids = childrenOf(nodesRef.current, sel.id).length > 0
     let handled = true
@@ -274,18 +273,20 @@ export default function EditorPage({ treeId }: { treeId: string }) {
       }
     } else if (ctrl && e.code === 'KeyV') paste(sel.id)
     else if (ctrl) handled = false
-    else if (e.altKey && e.key === 'ArrowUp') moveSibling(sel.id, -1)
-    else if (e.altKey && e.key === 'ArrowDown') moveSibling(sel.id, 1)
-    else if (e.key === 'ArrowUp') setSelId(rows[Math.max(0, i - 1)].node.id)
-    else if (e.key === 'ArrowDown') setSelId(rows[Math.min(rows.length - 1, i + 1)].node.id)
-    else if (e.key === 'ArrowLeft') {
+    // 그래프 방향: ↑ 부모 · ↓ 첫 자식 · ←→ 형제 (plan G4)
+    else if (e.altKey && e.key === 'ArrowLeft') moveSibling(sel.id, -1)
+    else if (e.altKey && e.key === 'ArrowRight') moveSibling(sel.id, 1)
+    else if (e.key === 'ArrowUp') {
       if (sel.parentId) setSelId(sel.parentId)
-    }
-    else if (e.key === 'ArrowRight') {
+    } else if (e.key === 'ArrowDown') {
       if (hasKids) {
         if (sel.collapsed) commit(patch(nodesRef.current, sel.id, { collapsed: false }), false)
         setSelId(childrenOf(nodesRef.current, sel.id)[0].id)
       }
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      const sib = sel.parentId ? childrenOf(nodesRef.current, sel.parentId) : [sel]
+      const to = sib[sib.indexOf(sel) + (e.key === 'ArrowLeft' ? -1 : 1)]
+      if (to) setSelId(to.id)
     } else if (e.key === ' ' || e.key === 'F2') startEdit(sel.id)
     else if (e.key === 'Enter') startEdit(insertBelow(sel.id), '')
     else if (e.key === 'Tab') {
@@ -326,38 +327,63 @@ export default function EditorPage({ treeId }: { treeId: string }) {
     )
   }
 
+  /** 드래그로 옮긴 위치를 모두 지운다 (실행취소 가능) */
+  function autoArrange() {
+    const ns = nodesRef.current
+    if (!ns.some((n) => n.offset)) return
+    commit(ns.map((n) => (n.offset ? { ...n, offset: undefined, updatedAt: Date.now() } : n)))
+  }
+  const toggle = (n: TreeNode) => commit(patch(nodesRef.current, n.id, { collapsed: !n.collapsed }), false)
+
   const sel = nodes.find((n) => n.id === selId) ?? root
-  const rows = visibleRows(nodes, root)
   return (
     <section className="editor">
-      <h1>
-        {root.title} <small><a href={href.study(treeId)}>학습</a> · <a href={href.quiz(treeId)}>백지 퀴즈</a></small>
-      </h1>
+      <header className="editor-head">
+        <h1>
+          {root.title} <small><a href={href.study(treeId)}>학습</a> · <a href={href.quiz(treeId)}>백지 퀴즈</a></small>
+        </h1>
+        <button type="button" onClick={autoArrange} disabled={!nodes.some((n) => n.offset)} title="드래그로 옮긴 위치를 모두 되돌립니다">
+          자동 정렬
+        </button>
+      </header>
       <div className="outline" role="tree" aria-label="아웃라이너" tabIndex={0} ref={outlineRef} onKeyDown={onNavKey}>
-        {rows.map((r) => (
-          <NodeRow
-            key={r.node.id}
-            node={r.node}
-            depth={r.depth}
-            hasChildren={r.hasChildren}
-            selected={r.node.id === sel.id}
-            cut={r.node.id === cutId}
-            draft={r.node.id === editId ? draft : null}
-            onDraft={(v) => ((draftRef.current = v), setDraft(v))}
-            onEditKey={onEditKey}
-            onBlurEdit={() => onBlurEdit(r.node.id)}
-            onSelect={() => setSelId(r.node.id)}
-            onStartEdit={() => startEdit(r.node.id)}
-            colorClassOf={colorClassOf}
-          />
-        ))}
+        <GraphView
+          nodes={nodes}
+          rootId={root.id}
+          onMove={(id, offset) => commit(patch(nodesRef.current, id, { offset }))}
+          renderNode={(n, box) => {
+            const kids = childrenOf(nodes, n.id)
+            return (
+              <NodeRow
+                key={n.id}
+                node={n}
+                depth={box.depth}
+                x={box.x}
+                y={box.y}
+                hasChildren={kids.length > 0}
+                hiddenCount={n.collapsed && kids.length ? descendantsOf(nodes, n.id).length : 0}
+                selected={n.id === sel.id}
+                cut={n.id === cutId}
+                draft={n.id === editId ? draft : null}
+                onDraft={(v) => ((draftRef.current = v), setDraft(v))}
+                onEditKey={onEditKey}
+                onBlurEdit={() => onBlurEdit(n.id)}
+                onSelect={() => setSelId(n.id)}
+                onStartEdit={() => startEdit(n.id)}
+                onToggle={() => toggle(n)}
+                colorClassOf={colorClassOf}
+              />
+            )
+          }}
+        />
       </div>
       <aside className="side">
         <p className="status" role="status">{msg}</p>
         <DetailPanel key={sel.id} node={sel} onSave={(p) => commit(patch(nodesRef.current, sel.id, p))} />
         <p className="help">
-          ↑↓ 이동 · ←→ 부모/자식 · Space·F2 편집 · Enter 형제 추가 · Tab 자식 추가 · Shift+Tab 내어쓰기 · Alt+↑↓ 순서 · H 접기 · Delete
-          삭제 · Ctrl+X/V 잘라내기·붙여넣기 · Ctrl+Z / Ctrl+Shift+Z 실행취소·다시실행 · 편집 중 Enter 확정+형제, Tab 들여쓰기, Esc 확정
+          ↑ 부모 · ↓ 첫 자식 · ←→ 형제 · Alt+←→ 순서 · Space·F2 편집 · Enter 형제 추가 · Tab 자식 추가 · Shift+Tab 내어쓰기 · H 접기 ·
+          Delete 삭제 · Ctrl+X/V 잘라내기·붙여넣기 · Ctrl+Z / Ctrl+Shift+Z 실행취소·다시실행 · 편집 중 Enter 확정+형제, Tab 들여쓰기, Esc 확정 ·
+          노드를 끌어 위치 조정(하위 함께)
         </p>
       </aside>
       <div className="io">
