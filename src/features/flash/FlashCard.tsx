@@ -4,7 +4,11 @@ import { logEvent } from '../../core/events'
 import { childrenOf } from '../../core/repo'
 import { colorClass, recordResult, type ColorInfo } from '../../core/srs'
 import type { ID, NodeSrs, TreeNode } from '../../core/types'
+import { parse, toHtml } from '../editor/content/format'
 import { plainNote } from './flash'
+
+/** 내용 서식(불릿·형광펜) 표시 — 에디터 렌더러 재사용. toHtml 은 텍스트를 이스케이프한다 */
+const Note = ({ note }: { note: string }) => <div className="flash-note" dangerouslySetInnerHTML={{ __html: toHtml(parse(note)) }} />
 
 const NONE: ColorInfo = { color: 'none', misplaced: false }
 
@@ -50,7 +54,7 @@ export default function FlashCard({ treeId, nodes, conceptId, colors, onRated, o
         onClick={() => setOpen((o) => !o)}
       >
         <span className="flash-concept-title">{concept.title}</span>
-        {note && <span className="flash-note">{note}</span>}
+        {note && <Note note={concept.note!} />}
         <span className="flash-count">
           {kids.length ? `하위 ${kids.length}개 · ${open ? '접기' : '눌러서 펼치기'}` : '하위 개념 없음'}
         </span>
@@ -73,7 +77,7 @@ export default function FlashCard({ treeId, nodes, conceptId, colors, onRated, o
               >
                 <div className="flash-kid-body">
                   <strong>{k.title}</strong>
-                  {kn && <span className="flash-note">{kn}</span>}
+                  {kn && <Note note={k.note!} />}
                   {grand > 0 && onDive && (
                     <button type="button" className="link flash-dive" onClick={() => onDive(k.id)}>
                       하위 {grand}개 · 더 들어가기 →

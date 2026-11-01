@@ -93,6 +93,6 @@ test('백지 D&D: 노드를 끌어 트리 만들기 → 채점 → 에디터 붉
   // 트레이에 남은 7개 = 오답 → 에디터에서 붉은 농도(miss > 0)
   await page.goto(`/#/tree/${treeId}`)
   const row = (t: RegExp) => page.locator('.node-row[data-node-id]').filter({ has: page.locator('.node-title', { hasText: t }) })
-  await expect(row(/^임금$/)).toHaveAttribute('data-miss', '1')
+  await expect(row(/^임금$/)).toHaveAttribute('data-miss', '0.25') // missHeat = miss 1 / MISS_MAX 4
   await expect(row(/^해고$/)).toHaveAttribute('data-miss', '0')
 })
