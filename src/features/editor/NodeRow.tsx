@@ -1,12 +1,19 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { memo, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import type { TreeNode } from '../../core/types'
 import { parse, toHtml } from './content/format'
 
 /** 너비 단계별 카드 폭(px) */
 const WIDTH_PX = { 1: 180, 2: 260, 3: 360 } as const
 type Step = keyof typeof WIDTH_PX
-const nearestStep = (px: number) =>
-  ([1, 2, 3] as Step[]).reduce((a, b) => (Math.abs(WIDTH_PX[b] - px) < Math.abs(WIDTH_PX[a] - px) ? b : a))
+/** 모바일 폭: 최소 배율(.5)에서도 루트와 1단계 카드가 390px 화면에 들어오도록 좁힌다 */
+const WIDTH_PX_NARROW: Record<Step, number> = { 1: 120, 2: 190, 3: 280 }
+const nearestStep = (px: number, w: Record<Step, number>) =>
+  ([1, 2, 3] as Step[]).reduce((a, b) => (Math.abs(w[b] - px) < Math.abs(w[a] - px) ? b : a))
+const narrowMq = matchMedia('(max-width: 760px)')
+const subscribeNarrow = (cb: () => void) => {
+  narrowMq.addEventListener('change', cb)
+  return () => narrowMq.removeEventListener('change', cb)
+}
 
 export interface NodeRowProps {
   node: TreeNode
@@ -25,6 +32,8 @@ export interface NodeRowProps {
   still: boolean
   /** 끌고 있는 카드: 들어 올린 모양 */
   lifted: boolean
+  /** 진입 뒤에 새로 생긴 카드: 스프링으로 등장 */
+  spawn: boolean
   /** 제목 편집 중이면 입력값, 아니면 null */
   draft: string | null
   onDraft: (v: string) => void
@@ -40,11 +49,13 @@ export interface NodeRowProps {
 }
 
 /** 그래프 노드 카드: 제목 + 내용. 클래스 이름 node-row·node-title 은 E2E 계약 */
-export default function NodeRow(p: NodeRowProps) {
+function NodeRow(p: NodeRowProps) {
   const ref = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const editing = p.draft !== null
   const step: Step = p.node.width ?? 1
+  const widths = useSyncExternalStore(subscribeNarrow, () => narrowMq.matches) ? WIDTH_PX_NARROW : WIDTH_PX
+  const [spawned] = useState(p.spawn) // 마운트 시점 값 고정: 정착 표시로 spawn 이 꺼져도 애니메이션이 끊기지 않게
   const [liveW, setLiveW] = useState<number | null>(null) // 너비 핸들 드래그 중 미리보기 폭
   const drag = useRef<{ x: number; side: 1 | -1; z: number } | null>(null) // z = 그래프 확대 배율
   // 편집 중 들여쓰기·내어쓰기로 카드가 DOM 에서 옮겨지면 포커스를 되찾는다
@@ -63,7 +74,7 @@ export default function NodeRow(p: NodeRowProps) {
       aria-label="너비 조절"
       title="끌어서 너비 조절 (3단계)"
       onPointerDown={(e) => {
-        if (e.button !== 0) return
+        if (e.button !== 0 || !e.isPrimary) return
         e.stopPropagation()
         e.preventDefault()
         e.currentTarget.setPointerCapture(e.pointerId)
@@ -73,12 +84,12 @@ export default function NodeRow(p: NodeRowProps) {
       onPointerMove={(e) => {
         const d = drag.current
         // 카드는 가운데 정렬로 배치되므로 양쪽이 함께 늘어난다 → 포인터 이동의 2배
-        if (d) setLiveW(Math.min(Math.max(WIDTH_PX[step] + d.side * ((e.clientX - d.x) / d.z) * 2, 120), 440))
+        if (d) setLiveW(Math.min(Math.max(widths[step] + d.side * ((e.clientX - d.x) / d.z) * 2, 120), 440))
       }}
       onPointerUp={() => {
         if (!drag.current) return
         drag.current = null
-        const to = liveW === null ? step : nearestStep(liveW)
+        const to = liveW === null ? step : nearestStep(liveW, widths)
         setLiveW(null)
         if (to !== step) p.onWidth(to)
       }}
@@ -98,8 +109,8 @@ export default function NodeRow(p: NodeRowProps) {
       data-node-id={p.node.id}
       data-width={step}
       data-miss={p.heat}
-      className={`node-row${p.selected ? ' selected' : ''}${p.cut ? ' cut' : ''}${p.depth === 0 ? ' root' : ''}${liveW !== null ? ' resizing' : ''}${p.still ? ' still' : ''}${p.lifted ? ' lifted' : ''}`}
-      style={{ left: p.x, top: p.y, width: liveW ?? WIDTH_PX[step], '--heat': p.heat } as React.CSSProperties}
+      className={`node-row${p.selected ? ' selected' : ''}${p.cut ? ' cut' : ''}${p.depth === 0 ? ' root' : ''}${liveW !== null ? ' resizing' : ''}${p.still ? ' still' : ''}${p.lifted ? ' lifted' : ''}${spawned ? ' spawn' : ''}`}
+      style={{ left: p.x, top: p.y, width: liveW ?? widths[step], '--heat': p.heat } as React.CSSProperties}
       onClick={p.onSelect}
       onDoubleClick={p.onStartEdit}
     >
@@ -154,3 +165,11 @@ export default function NodeRow(p: NodeRowProps) {
     </div>
   )
 }
+
+/**
+ * 데이터 prop 이 같으면 다시 그리지 않는다 (입력·핀치 때 카드 300장을 다시 그리지 않게). 콜백(on*)은 비교하지 않는다:
+ * 모두 ref(nodesRef·editRef·draftRef) 또는 setState 만 쓰므로 이전 렌더의 것을 불러도 안전하다.
+ */
+export default memo(NodeRow, (a, b) =>
+  (Object.keys(b) as (keyof NodeRowProps)[]).every((k) => k.startsWith('on') || a[k] === b[k]),
+)

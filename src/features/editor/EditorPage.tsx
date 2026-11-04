@@ -1,4 +1,5 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { logEvent } from '../../core/events'
 import { nodesToOutline, outlineToNodes, parseOutline, serializeOutline } from '../../core/outline'
 import { childrenOf, deleteNodes, descendantsOf, getTreeNodes, putNodes } from '../../core/repo'
@@ -10,6 +11,7 @@ import NoteEditor, { type NoteApi, type NoteOp } from './content/NoteEditor'
 import GraphView from './graph/GraphView'
 import TreeHeader from '../TreeHeader'
 import { toast } from '../Toast'
+import { haptic } from '../feel'
 import './editor.css'
 
 const UNDO_LIMIT = 50
@@ -42,6 +44,24 @@ const newNode = (treeId: ID, parentId: ID, order: number): TreeNode => ({
   id: crypto.randomUUID(), treeId, parentId, order, title: '', aliases: [], updatedAt: Date.now(),
 })
 const isComposing = (e: React.KeyboardEvent) => e.nativeEvent.isComposing || e.keyCode === 229
+/** 노드별 자식 유무·하위 수를 한 번에 계산 (O(n)). 노드마다 childrenOf/descendantsOf 를 부르면 O(n²) */
+function countTree(ns: TreeNode[]) {
+  const kids = new Map<ID, ID[]>()
+  for (const n of ns) {
+    if (n.parentId === null) continue
+    const k = kids.get(n.parentId)
+    if (k) k.push(n.id)
+    else kids.set(n.parentId, [n.id])
+  }
+  const desc = new Map<ID, number>()
+  const walk = (id: ID): number => {
+    const total = (kids.get(id) ?? []).reduce((sum, k) => sum + 1 + walk(k), 0)
+    desc.set(id, total)
+    return total
+  }
+  for (const n of ns) if (n.parentId === null) walk(n.id)
+  return { hasKids: (id: ID) => kids.has(id), desc: (id: ID) => desc.get(id) ?? 0 }
+}
 
 export default function EditorPage({ treeId }: { treeId: string }) {
   const [nodes, setNodes] = useState<TreeNode[] | null>(null)
@@ -94,14 +114,34 @@ export default function EditorPage({ treeId }: { treeId: string }) {
       outlineRef.current?.focus()
   }, [editId])
 
-  // ---- 확대·축소: 버튼, Ctrl+휠, 탐색 모드 키 - = 0 ----
+  // ---- 확대·축소: 버튼, Ctrl+휠, 핀치, 탐색 모드 키 - = 0 ----
   const [zoom, setZoom] = useState(1)
-  const zoomBy = (f: number) => setZoom((z) => clampZoom(z * f))
+  const zoomRef = useRef(1)
+  /** 화면 좌표 (cx, cy) 아래의 그래프 지점을 그대로 둔 채 배율 변경. 기준점을 안 주면 캔버스 중앙 */
+  function zoomTo(next: number, cx?: number, cy?: number) {
+    const box = outlineRef.current
+    const g = box?.querySelector<HTMLElement>('.graph')
+    const z = zoomRef.current
+    next = clampZoom(next)
+    if (!box || !g || next === z) return
+    const b = box.getBoundingClientRect()
+    const x = cx ?? b.left + box.clientWidth / 2
+    const y = cy ?? b.top + box.clientHeight / 2
+    const r = g.getBoundingClientRect()
+    const [gx, gy] = [(x - r.left) / z, (y - r.top) / z]
+    zoomRef.current = next
+    flushSync(() => setZoom(next))
+    const r2 = g.getBoundingClientRect()
+    box.scrollLeft += r2.left + gx * next - x
+    box.scrollTop += r2.top + gy * next - y
+  }
+  const zoomBy = (f: number) => zoomTo(zoomRef.current * f)
   function fitZoom() {
     const box = outlineRef.current
     const g = box?.querySelector<HTMLElement>('.graph')
     if (!box || !g) return
-    setZoom(clampZoom(Math.min(1, (box.clientWidth - 16) / g.offsetWidth, (box.clientHeight - 16) / g.offsetHeight)))
+    zoomTo(Math.min(1, (box.clientWidth - 16) / g.offsetWidth, (box.clientHeight - 16) / g.offsetHeight))
+    box.scrollTo(0, 0)
   }
   useEffect(() => {
     const el = outlineRef.current
@@ -110,11 +150,45 @@ export default function EditorPage({ treeId }: { treeId: string }) {
     const onWheel = (e: WheelEvent) => {
       if (!e.ctrlKey && !e.metaKey) return
       e.preventDefault()
-      setZoom((z) => clampZoom(z * (e.deltaY < 0 ? 1.1 : 1 / 1.1)))
+      zoomTo(zoomRef.current * (e.deltaY < 0 ? 1.1 : 1 / 1.1), e.clientX, e.clientY)
     }
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
-  }, [loaded])
+  }, [loaded]) // oxlint-disable-line react-hooks/exhaustive-deps -- zoomTo 는 ref 와 setState 만 쓴다
+
+  // ---- 자동 맞춤: 진입·개요 가져오기 뒤 1회, 넘칠 때만. 일반 편집 중에는 카드가 튀지 않게 하지 않는다 ----
+  const fitPending = useRef(true)
+  const centerPending = useRef<number | null>(null)
+  /** rootX = 배치 좌표의 루트 중심. 루트 카드의 rect 는 재배치 트랜지션 중이라 쓸 수 없다 */
+  function centerRoot(rootX: number) {
+    const box = outlineRef.current
+    const g = box?.querySelector('.graph')
+    if (!box || !g) return
+    box.scrollTop = 0
+    box.scrollLeft += g.getBoundingClientRect().left + rootX * zoomRef.current - (box.getBoundingClientRect().left + box.clientWidth / 2)
+  }
+  /** GraphView 가 실측 크기로 배치를 마칠 때마다 호출 (FALLBACK 크기로는 호출되지 않음) */
+  function onSettled(w: number, h: number, rootX: number) {
+    const box = outlineRef.current
+    if (!fitPending.current || !box) return
+    fitPending.current = false
+    box.scrollIntoView({ block: 'nearest' }) // 모바일: 아래쪽 개요 칸에서 가져오면 캔버스로 돌아온다
+    const [cw, ch] = [box.clientWidth, box.clientHeight]
+    if (w <= cw && h <= ch) return
+    const next = clampZoom(Math.max(0.5, Math.min(1, (cw - 16) / w, (ch - 16) / h)))
+    if (next === zoomRef.current) return centerRoot(rootX)
+    // 레이아웃 이펙트 안이라 flushSync 불가: 배율이 반영된 뒤 아래 이펙트에서 페인트 전에 스크롤한다
+    centerPending.current = rootX
+    zoomRef.current = next
+    setZoom(next)
+  }
+  useLayoutEffect(() => {
+    if (centerPending.current === null) return
+    centerRoot(centerPending.current)
+    centerPending.current = null
+  }, [zoom])
+
+  const counts = useMemo(() => countTree(nodes ?? []), [nodes])
 
   const root = nodes?.find((n) => n.parentId === null)
   if (!nodes) return <p>불러오는 중…</p>
@@ -283,6 +357,7 @@ export default function EditorPage({ treeId }: { treeId: string }) {
     const rows = visibleRows(ns, root!)
     const i = rows.findIndex((r) => r.node.id === id)
     commit(ns.filter((x) => !gone.has(x.id)))
+    haptic('warn')
     setSelId(rows[i - 1]?.node.id ?? root!.id)
     if (cutId && gone.has(cutId)) setCutId(null)
     // 확인창 대신 되돌리기. 그 사이 다른 변경이 있으면 엉뚱한 단계를 되돌리지 않는다
@@ -317,13 +392,14 @@ export default function EditorPage({ treeId }: { treeId: string }) {
     // 문자 단축키는 e.code 로 판정 → 한글 자판 상태에서도 동작
     if (!ctrl && !e.altKey && (e.code === 'Equal' || e.code === 'NumpadAdd')) zoomBy(1.2)
     else if (!ctrl && !e.altKey && (e.code === 'Minus' || e.code === 'NumpadSubtract')) zoomBy(1 / 1.2)
-    else if (!ctrl && !e.altKey && (e.code === 'Digit0' || e.code === 'Numpad0')) setZoom(1)
+    else if (!ctrl && !e.altKey && (e.code === 'Digit0' || e.code === 'Numpad0')) zoomTo(1)
     else if (ctrl && e.code === 'KeyZ') restore(e.shiftKey ? redoRef : undoRef, e.shiftKey ? undoRef : redoRef, e.shiftKey ? '다시 실행' : '실행 취소')
     else if (ctrl && e.code === 'KeyY') restore(redoRef, undoRef, '다시 실행')
     else if (ctrl && e.code === 'KeyX') {
       if (sel.parentId === null) toast('루트는 잘라낼 수 없습니다')
       else {
         setCutId(sel.id)
+        haptic('warn')
         toast(`"${sel.title}" 잘라냄 — 넣을 노드를 선택하고 Ctrl+V`)
       }
     } else if (ctrl && e.code === 'KeyV') paste(sel.id)
@@ -369,6 +445,7 @@ export default function EditorPage({ treeId }: { treeId: string }) {
     const list = asRoot ? [...items[0].children, ...items.slice(1)] : items
     const added = outlineToNodes(list, treeId, target.id, nextOrder(ns, target.id))
     const base = patch(ns, target.id, asRoot ? { title: items[0].text, collapsed: false } : { collapsed: false })
+    if (added.length) fitPending.current = true // 통째로 들어온 트리는 진입과 같게 맞춘다
     commit([...base, ...added])
     void logEvent('outline_imported', { nodeCount: added.length + (asRoot ? 1 : 0) }, treeId)
     setImportText('')
@@ -394,30 +471,17 @@ export default function EditorPage({ treeId }: { treeId: string }) {
   const sel = nodes.find((n) => n.id === selId) ?? root
   return (
     <section className="editor">
-      <TreeHeader treeId={treeId} active="edit" title={root.title}>
-        <div className="zoom-tools">
-          <span className="zoom-group" role="group" aria-label="확대·축소">
-            <button type="button" aria-label="축소" title="축소 (-, Ctrl+휠)" onClick={() => zoomBy(1 / 1.2)}>−</button>
-            <button type="button" className="zoom-reset" title="100%로 (0)" onClick={() => setZoom(1)}>
-              <output aria-label="배율">{Math.round(zoom * 100)}%</output>
-            </button>
-            <button type="button" aria-label="확대" title="확대 (=, Ctrl+휠)" onClick={() => zoomBy(1.2)}>+</button>
-          </span>
-          <button type="button" className="icon" aria-label="화면 맞춤" title="화면 맞춤" onClick={fitZoom}>⤢</button>
-          {nodes.some((n) => n.offset) && (
-            <button type="button" className="icon arrange" aria-label="자동 정렬" title="자동 정렬 (옮긴 위치 되돌리기)" onClick={autoArrange}>⊞</button>
-          )}
-          <button type="button" className="icon" aria-label="단축키" title="단축키 (?)" popoverTarget={KEYS_ID}>?</button>
-        </div>
-      </TreeHeader>
+      <TreeHeader treeId={treeId} active="edit" title={root.title} />
+      <div className="canvas">
       <div className="outline" role="tree" aria-label="아웃라이너" tabIndex={0} ref={outlineRef} onKeyDown={onNavKey}>
         <GraphView
           zoom={zoom}
           nodes={nodes}
           rootId={root.id}
+          onZoomAt={zoomTo}
+          onSettled={onSettled}
           onMove={(id, offset) => commit(patch(nodesRef.current, id, { offset }))}
           renderNode={(n, box, m) => {
-            const kids = childrenOf(nodes, n.id)
             return (
               <NodeRow
                 key={n.id}
@@ -425,13 +489,14 @@ export default function EditorPage({ treeId }: { treeId: string }) {
                 depth={box.depth}
                 x={box.x}
                 y={box.y}
-                hasChildren={kids.length > 0}
-                hiddenCount={n.collapsed && kids.length ? descendantsOf(nodes, n.id).length : 0}
+                hasChildren={counts.hasKids(n.id)}
+                hiddenCount={n.collapsed ? counts.desc(n.id) : 0}
                 selected={n.id === sel.id}
                 cut={n.id === cutId}
                 heat={missHeat(srs.get(n.id))}
                 still={m.still}
                 lifted={m.lifted}
+                spawn={m.spawn}
                 draft={n.id === editId ? draft : null}
                 onDraft={(v) => ((draftRef.current = v), setDraft(v))}
                 onEditKey={onEditKey}
@@ -459,6 +524,21 @@ export default function EditorPage({ treeId }: { treeId: string }) {
             )
           }}
         />
+      </div>
+      <div className="zoom-tools">
+        <span className="zoom-group" role="group" aria-label="확대·축소">
+          <button type="button" aria-label="축소" title="축소 (-, Ctrl+휠)" onClick={() => zoomBy(1 / 1.2)}>−</button>
+          <button type="button" className="zoom-reset" title="100%로 (0)" onClick={() => zoomTo(1)}>
+            <output aria-label="배율">{Math.round(zoom * 100)}%</output>
+          </button>
+          <button type="button" aria-label="확대" title="확대 (=, Ctrl+휠)" onClick={() => zoomBy(1.2)}>+</button>
+        </span>
+        <button type="button" aria-label="화면 맞춤" title="화면 맞춤" onClick={fitZoom}>⤢</button>
+        {nodes.some((n) => n.offset) && (
+          <button type="button" className="arrange" aria-label="자동 정렬" title="자동 정렬 (옮긴 위치 되돌리기)" onClick={autoArrange}>⊞</button>
+        )}
+        <button type="button" aria-label="단축키" title="단축키 (?)" popoverTarget={KEYS_ID}>?</button>
+      </div>
       </div>
       <aside className="side">
         <DetailPanel

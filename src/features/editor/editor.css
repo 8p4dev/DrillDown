@@ -1,82 +1,101 @@
 /* ---- 에디터: 그래프(왼쪽, 넓게) + 패널(오른쪽) ---- */
 main:has(> .editor) { max-width: none; }
+@media (min-width: 861px) { main:has(> .editor) { padding-bottom: .75rem; } }
 .editor {
   display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr) 320px;
   grid-template-areas: 'head head' 'graph side'; grid-template-rows: auto 1fr;
 }
-.editor > :first-child { grid-area: head; }
-.editor button {
-  font: inherit; font-size: .85rem; padding: .35rem .8rem; cursor: pointer;
-  color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+.editor > :first-child { grid-area: head; margin-bottom: 0; }
+@media (hover: hover) {
+  .editor button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 }
-.editor button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
-.editor button:disabled { opacity: .45; cursor: default; }
 
+/* 캔버스: 스크롤러(.outline) + 그 위에 떠 있는 확대 도구 */
+.canvas { grid-area: graph; position: relative; min-width: 0; height: calc(100dvh - 9.25rem); min-height: 360px; }
 .outline {
-  grid-area: graph; outline: none; overflow: auto; height: calc(100vh - 9rem); min-height: 360px;
-  border: 1px solid var(--border); border-radius: var(--radius);
-  background: var(--bg) radial-gradient(circle, var(--border) 1px, transparent 1.2px) 0 0 / 20px 20px;
+  height: 100%; box-sizing: border-box; outline: none; overflow: auto; scroll-margin-top: calc(var(--nav-h) + .5rem);
+  border: 1px solid var(--border); border-radius: var(--radius-lg);
+  background: var(--bg) radial-gradient(circle, color-mix(in srgb, var(--border-strong) 55%, transparent) 1px, transparent 1.2px) 0 0 / 22px 22px;
 }
 .outline:focus-visible { border-color: var(--accent); }
+@media (pointer: coarse) { .outline:focus-visible { border-color: var(--border); } } /* 진입 시 자동 포커스: 터치에선 키보드 표시가 필요 없다 */
 
 /* ---- 그래프 캔버스 ---- */
-.graph-pan { display: flex; justify-content: center; align-items: flex-start; min-width: 100%; min-height: 100%; width: max-content; cursor: default; }
+/* 아래 여백: 맨 아래 카드도 떠 있는 도구에 가리지 않게 스크롤된다. touch-action: 핀치·패닝은 GraphView 가 처리 */
+.graph-pan { display: flex; justify-content: center; align-items: flex-start; box-sizing: border-box; min-width: 100%; min-height: 100%; width: max-content; padding-bottom: 3.25rem; cursor: default; touch-action: none; }
 .graph-pan.panning { cursor: grabbing; }
 .graph-zoom { flex: none; }
 .graph { position: relative; transform-origin: 0 0; touch-action: none; user-select: none; }
 
-/* 확대·축소: [− 배율 +] 묶음 + 아이콘 버튼. 배율 숫자 = 100%로 */
-.zoom-tools { display: flex; align-items: center; gap: .35rem; }
-.zoom-group { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
-.editor .zoom-group button { border: none; background: transparent; padding: .35rem .65rem; }
-.editor .zoom-group .zoom-reset { padding-inline: .2rem; }
-.zoom-tools output { display: inline-block; min-width: 3.2rem; text-align: center; font-size: .85rem; color: var(--muted); font-variant-numeric: tabular-nums; }
-.editor .zoom-reset:hover output { color: var(--accent); }
-.editor .zoom-tools .icon { width: 2.1rem; padding: .35rem 0; text-align: center; }
+/* 떠 있는 확대 도구: [− 배율 +] 맞춤 정렬 ?. 배율 숫자 = 100%로 */
+.zoom-tools {
+  position: absolute; right: .75rem; bottom: .75rem; z-index: 3;
+  display: flex; align-items: center; gap: 1px; padding: 3px; border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent); backdrop-filter: saturate(1.6) blur(10px); -webkit-backdrop-filter: saturate(1.6) blur(10px);
+  border: 1px solid var(--border); box-shadow: var(--shadow-lift);
+}
+.zoom-group { display: inline-flex; padding-right: 3px; margin-right: 2px; border-right: 1px solid var(--border); }
+.editor .zoom-tools button {
+  min-width: 2rem; height: 2rem; padding: 0 .3rem; border: none; border-radius: 999px; background: transparent; box-shadow: none;
+  color: var(--text-2); text-align: center;
+}
+.editor .zoom-tools button:active:not(:disabled) { background: var(--accent-soft); }
+@media (hover: hover) {
+  .editor .zoom-tools button:hover:not(:disabled) { background: var(--accent-soft); }
+  .editor .zoom-reset:hover output { color: var(--accent); }
+}
+@media (pointer: coarse) { .editor .zoom-tools button { min-width: var(--tap); height: var(--tap); } }
+.zoom-tools output { display: inline-block; min-width: 2.8rem; font-size: var(--fs-sm); color: var(--muted); font-variant-numeric: tabular-nums; }
 .editor .zoom-tools .arrange { animation: pop var(--t-med) var(--ease-out); }
+
 .graph-edges { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
-.graph-edges path { fill: none; stroke: var(--muted); stroke-opacity: .45; stroke-width: 1.5; transition: d var(--t-med) var(--ease-out); }
+.graph-edges path { fill: none; stroke: var(--border-strong); stroke-width: 1.5; transition: d var(--t-med) var(--ease-out); }
+.graph-edges path.from-root { stroke: color-mix(in srgb, var(--accent) 25%, var(--border-strong)); }
 .graph-edges path.still { transition: none; }
 
 /* 노드 카드: 제목 + 내용. 폭은 단계(px)로 고정, 오답 농도(--heat 0..1)만큼 붉어짐 */
 .node-row {
-  --heat: 0;
+  --heat: 0; --card: var(--surface); --card-border: var(--border);
   position: absolute; box-sizing: border-box; display: flex; flex-direction: column;
-  color: var(--text); background: color-mix(in srgb, var(--danger) calc(var(--heat) * 24%), var(--surface));
-  border: 1px solid color-mix(in srgb, var(--danger) calc(var(--heat) * 75%), var(--border));
-  border-radius: var(--radius); box-shadow: var(--shadow); cursor: grab;
-  /* 재배치는 미끄러지듯(엣지 d 와 같은 시간), 새 카드는 떠오름. transform·left/top 은 offsetWidth/Height 측정에 영향 없음 */
+  color: var(--text); background: color-mix(in srgb, var(--danger) calc(var(--heat) * 24%), var(--card));
+  border: 1px solid color-mix(in srgb, var(--danger) calc(var(--heat) * 75%), var(--card-border));
+  border-radius: var(--radius-lg); box-shadow: var(--shadow); cursor: grab;
+  /* 재배치는 미끄러지듯(엣지 d 와 같은 시간). 놓으면 스프링 착지. transform·left/top 은 offsetWidth/Height 측정에 영향 없음 */
   transition: left var(--t-med) var(--ease-out), top var(--t-med) var(--ease-out), width var(--t-med) var(--ease-out),
-    box-shadow var(--t-fast), background-color var(--t-med), border-color var(--t-med), transform var(--t-fast) var(--ease-out);
-  animation: rise var(--t-med) var(--ease-out);
+    box-shadow var(--t-fast), background-color var(--t-med), border-color var(--t-med), transform 160ms var(--ease-spring);
 }
+/* 진입 뒤에 생긴 카드: 부모(위) 쪽에서 튀어나옴 */
+.node-row.spawn { transform-origin: 50% 0; animation: spring-in var(--t-med) var(--ease-spring); }
+.node-row.root { --card: color-mix(in srgb, var(--accent) 9%, var(--surface)); --card-border: color-mix(in srgb, var(--accent) 32%, var(--border)); }
 /* 측정 전·드래그로 따라오는 카드는 즉시 / 너비 핸들 드래그 중엔 폭 즉시 */
 .node-row.still { transition-property: box-shadow, background-color, border-color, transform, width; }
 .node-row.resizing { transition-property: left, top, box-shadow, background-color, border-color, transform; }
 .node-row.still.resizing { transition-property: box-shadow, background-color, border-color, transform; }
-.node-row.selected { box-shadow: 0 0 0 2px var(--accent), var(--shadow); }
-.node-row.lifted { z-index: 2; transform: scale(1.02); box-shadow: var(--shadow-lift); }
-.node-row.lifted.selected { box-shadow: 0 0 0 2px var(--accent), var(--shadow-lift); }
+.node-row.selected { box-shadow: 0 0 0 2px var(--accent), 0 0 0 6px var(--accent-soft), var(--shadow); }
+/* 집어 드는 순간은 빠르게(press), 놓을 때는 위 기본값(spring) */
+.node-row.lifted { z-index: 2; transform: scale(1.03); box-shadow: var(--shadow-pop); transition-timing-function: var(--ease-press); }
+.node-row.lifted.selected { box-shadow: 0 0 0 2px var(--accent), var(--shadow-pop); }
 .node-row.cut { opacity: .45; border-style: dashed; }
 .node-row.resizing { box-shadow: 0 0 0 2px var(--accent-soft), var(--shadow); }
 .graph.dragging .node-row { cursor: grabbing; }
 
-.node-title, .title-input {
-  padding: .45rem .75rem; font-size: .95rem; font-weight: 650; line-height: 1.35; text-align: center;
+/* input 선택자: 전역 입력칸 규칙(index.css)보다 우선해야 한다 */
+.node-title, .node-row input.title-input:not([type]) {
+  padding: .5rem .75rem; font-size: var(--fs-md); font-weight: 600; line-height: 1.35; text-align: center; letter-spacing: -.01em;
   overflow-wrap: anywhere; white-space: pre-wrap;
 }
-.node-row.root .node-title, .node-row.root .title-input { font-size: 1.05rem; font-weight: 750; }
-.title-input {
-  width: 100%; box-sizing: border-box; font-family: inherit; color: inherit; border: none; border-radius: var(--radius);
+.node-row.root .node-title, .node-row.root input.title-input:not([type]) { font-size: var(--fs-lg); font-weight: 750; letter-spacing: -.02em; }
+@media (pointer: coarse) { .node-row input.title-input:not([type]), .node-row.root input.title-input:not([type]) { font-size: max(16px, 1em); } } /* iOS 포커스 확대 방지 */
+.node-row input.title-input:not([type]) {
+  width: 100%; min-height: 0; box-sizing: border-box; color: inherit; border: none; border-radius: var(--radius-lg);
   background: var(--accent-soft); outline: none; box-shadow: none;
 }
-.title-input:focus { box-shadow: none; }
 
 .node-note {
-  padding: .4rem .75rem .5rem; border-top: 1px solid var(--border);
+  padding: .4rem .75rem .5rem; border-top: 1px solid var(--border); color: var(--text-2);
   font-size: .82rem; line-height: 1.5; text-align: left; overflow-wrap: anywhere; white-space: pre-wrap; cursor: text;
 }
-.node-note > .note-edit { margin: -.15rem -.3rem; padding: .15rem .3rem; border-radius: 6px; background: var(--accent-soft); }
+.node-note > .note-edit { margin: -.15rem -.3rem; padding: .15rem .3rem; border-radius: var(--radius-sm); background: var(--accent-soft); }
 
 /* 내용 서식: 불릿 줄, 형광펜 3색 (표시·편집 공용) */
 .ln.b { position: relative; padding-left: 1em; }
@@ -97,67 +116,84 @@ mark.hl-b, .tool-b::before { background: #6cc8ff66; }
 .w-handle.r { right: -4px; }
 .w-handle::after {
   content: ''; position: absolute; top: 50%; left: 3px; width: 2px; height: 18px; transform: translateY(-50%);
-  border-radius: 2px; background: var(--accent); opacity: 0; transition: opacity .12s;
+  border-radius: 2px; background: var(--accent); opacity: 0; transition: opacity var(--t-fast);
 }
-.node-row:hover .w-handle::after, .node-row.selected .w-handle::after, .node-row.resizing .w-handle::after { opacity: .7; }
+.node-row.selected .w-handle::after, .node-row.resizing .w-handle::after { opacity: .7; }
 
 /* 접기 배지: 카드 하단 중앙에 걸침 */
 .badge {
   position: absolute; left: 50%; bottom: 0; transform: translate(-50%, 50%);
-  min-width: 1.3rem; padding: 0 .4rem; font-size: .75rem; font-weight: 600; line-height: 1.25rem; text-align: center;
+  min-width: 1.3rem; padding: 0 .4rem; font-size: var(--fs-xs); font-weight: 600; line-height: 1.25rem; text-align: center;
   color: var(--muted); background: var(--surface); border: 1px solid var(--border); border-radius: 999px; cursor: pointer;
+  transition: opacity var(--t-fast), transform var(--t-fast) var(--ease-press);
 }
-.badge:not(.folded) { opacity: 0; transition: opacity .12s; }
-.node-row:hover .badge, .node-row.selected .badge { opacity: 1; }
-.badge.folded { color: #fff; background: var(--accent); border-color: var(--accent); }
-.badge:hover { border-color: var(--accent); }
+.badge:active { transform: translate(-50%, 50%) scale(.92); }
+.badge:not(.folded) { opacity: 0; }
+.node-row.selected .badge { opacity: 1; }
+.badge.folded { color: var(--surface); background: var(--accent); border-color: var(--accent); }
+@media (hover: hover) {
+  .node-row:hover .w-handle::after { opacity: .7; }
+  .node-row:hover .badge { opacity: 1; }
+  .badge:hover { border-color: var(--accent); }
+}
 
 /* 내용 없는 카드: 선택 시 오른쪽 아래에 걸치는 '+ 내용' 버튼. 접기 배지(하단 중앙)가 있으면 모서리 밖으로 비켜 선다 */
 .editor .node-row .add-note {
-  position: absolute; right: .5rem; bottom: 0; transform: translateY(50%); z-index: 1;
+  position: absolute; right: .5rem; bottom: 0; transform: translateY(50%); z-index: 1; min-height: 0;
   padding: 0 .5rem; font-size: .72rem; line-height: 1.3rem; color: var(--accent); border-radius: 999px;
 }
 .editor .node-row:has(> .badge) > .add-note { right: 0; transform: translate(45%, 50%); }
 
+/* 터치: 작은 표적은 보이는 크기를 유지하고 누르는 영역만 넓힌다 */
+@media (pointer: coarse) {
+  .w-handle { width: 18px; }
+  .w-handle.l { left: -9px; }
+  .w-handle.r { right: -9px; }
+  .w-handle::after { left: 8px; }
+  .badge::after, .editor .node-row .add-note::after { content: ''; position: absolute; inset: -12px -8px; }
+}
+
 /* ---- 우측 패널 ---- */
 .side {
   grid-area: side; display: flex; flex-direction: column; gap: .75rem; min-width: 0;
-  max-height: calc(100vh - 9rem); overflow: auto;
+  max-height: calc(100dvh - 9.25rem); overflow: auto;
 }
 .detail {
-  display: flex; flex-direction: column; background: var(--surface);
-  border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden;
+  display: flex; flex-direction: column; background: var(--surface); flex: none;
+  border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow); overflow: hidden;
 }
-.detail-title {
-  font-size: 1.05rem; font-weight: 650; border: none; border-radius: 0; padding: .7rem .85rem; background: transparent;
+.detail input.detail-title:not([type]) {
+  font-size: var(--fs-lg); font-weight: 650; letter-spacing: -.015em; border: none; border-radius: 0; padding: .7rem .85rem; background: transparent;
 }
-.detail-title:focus { box-shadow: inset 0 -2px 0 var(--accent); }
+.detail input.detail-title:not([type]):focus { box-shadow: inset 0 -2px 0 var(--accent); }
 .toolbar {
   display: flex; align-items: center; gap: .25rem; padding: .35rem .5rem;
-  border-block: 1px solid var(--border); background: color-mix(in srgb, var(--border) 25%, var(--surface));
+  border-block: 1px solid var(--border); background: var(--surface-2);
 }
-.editor .toolbar button { padding: 0; width: 28px; height: 28px; display: inline-grid; place-items: center; border-color: transparent; background: transparent; }
-.editor .toolbar button:hover:not(:disabled) { background: var(--surface); border-color: var(--border); }
+.editor .toolbar button { min-height: 0; padding: 0; width: 28px; height: 28px; display: inline-grid; place-items: center; border-color: transparent; background: transparent; box-shadow: none; border-radius: var(--radius-sm); }
+@media (hover: hover) {
+  .editor .toolbar button:hover:not(:disabled) { background: var(--surface); border-color: var(--border); }
+}
 .tool-bullet::before { content: '•≡'; font-size: .95rem; letter-spacing: .05em; }
 .tool-p::before, .tool-y::before, .tool-b::before { content: ''; width: 16px; height: 16px; border-radius: 4px; box-shadow: inset 0 0 0 1px #0002; }
 .tool-clear::before { content: ''; width: 14px; height: 14px; border-radius: 4px; border: 1.5px solid var(--muted); background: linear-gradient(135deg, transparent 45%, var(--danger) 45% 55%, transparent 55%); }
 .widths { margin-left: auto; display: inline-flex; gap: 2px; }
-.editor .widths button { width: 24px; font-size: .75rem; color: var(--muted); }
+.editor .widths button { width: 24px; font-size: var(--fs-xs); color: var(--muted); }
 .editor .widths button[aria-pressed='true'] { color: var(--accent); background: var(--accent-soft); }
 .detail .note-edit { position: relative; min-height: 7.5em; padding: .65rem .85rem; font-size: .9rem; line-height: 1.6; }
 .detail .note-edit:focus { box-shadow: inset 0 0 0 2px var(--accent-soft); }
 
-.side details { font-size: .85rem; }
+.side details { font-size: var(--fs-sm); }
 .side summary { cursor: pointer; color: var(--muted); font-weight: 600; padding: .2rem 0; }
 .io textarea {
   width: 100%; box-sizing: border-box; margin: .4rem 0; font-family: ui-monospace, monospace; font-size: .8rem;
 }
 .io-actions { display: flex; flex-wrap: wrap; gap: .4rem; }
 
-/* 단축키 팝오버 (? 키·버튼) */
+/* 단축키 팝오버 (? 키·버튼): 떠 있는 도구 위에 뜬다 */
 .keys {
-  inset: auto; top: 7.5rem; right: 1.25rem; margin: 0; padding: .6rem .9rem;
-  color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-lift);
+  inset: auto; bottom: 4.25rem; right: calc(1.25rem + 320px + 1rem + .75rem); margin: 0; padding: .6rem .9rem;
+  color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-pop);
 }
 .keys:popover-open { animation: rise var(--t-med) var(--ease-out); }
 .keys dl { margin: 0; display: grid; grid-template-columns: auto auto; gap: .3rem 1rem; font-size: .82rem; }
@@ -165,12 +201,32 @@ mark.hl-b, .tool-b::before { background: #6cc8ff66; }
 .keys dt { display: flex; gap: .25rem; justify-content: flex-end; }
 .keys dd { margin: 0; color: var(--muted); }
 .keys kbd {
-  font: inherit; font-size: .75rem; padding: 0 .35rem; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 5px;
-  background: color-mix(in srgb, var(--border) 25%, var(--surface));
+  font: inherit; font-size: var(--fs-xs); padding: 0 .35rem; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 5px;
+  background: var(--surface-2);
 }
 
+/* 1단 배치: 단축키는 화면 하단 시트 */
 @media (max-width: 860px) {
-  .editor { grid-template-columns: 1fr; grid-template-areas: 'head' 'graph' 'side'; }
-  .outline { height: 70vh; }
-  .side { max-height: none; }
+  .editor { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'head' 'graph' 'side'; }
+  .canvas { height: 70dvh; }
+  .side { max-height: none; overflow: visible; }
+  .keys {
+    inset: auto 0 0; width: 100%; max-width: none; max-height: 70dvh; overflow: auto; box-sizing: border-box;
+    padding: 1rem 1.25rem calc(1rem + var(--safe-b)); border-width: 1px 0 0; border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  }
+  .keys:popover-open { animation: sheet-up var(--t-slow) var(--ease-out); }
+  .keys dl { grid-template-columns: minmax(0, auto) minmax(0, 1fr); }
+}
+@keyframes sheet-up { from { transform: translateY(100%); } to { transform: none; } }
+
+@media (max-width: 760px) {
+  /* 상단 바 + 메인 위 여백 + 제목·모드 탭 + 간격 ≈ 헤더. 그 나머지의 62% */
+  .canvas { height: calc((100dvh - var(--nav-h) - 7rem) * .62); min-height: 300px; }
+  .editor { gap: .75rem; }
+  .editor .toolbar button { width: 36px; height: 36px; }
+  .editor .widths button { width: 36px; }
+  .toolbar { justify-content: space-between; gap: 0; padding-inline: .25rem; }
+  .widths { margin-left: 0; }
+  .io-actions { display: grid; grid-template-columns: 1fr 1fr; }
+  .io-actions button:last-child:nth-child(odd) { grid-column: 1 / -1; }
 }
