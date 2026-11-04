@@ -120,6 +120,15 @@ main:has(.dnd) { max-width: 1400px; } /* 넓은 트리: 에디터처럼 폭 제�
 }
 @media (prefers-reduced-motion: reduce) { .dnd-ghost { transform: none; } }
 
+/* 넓은 화면의 좌→우 트리는 세로로 길다 → 끌어 놓을 수 있게 채점 전 트레이를 하단에 고정 */
+@media (min-width: 761px) {
+  .dnd:not(.locked):has(.dnd-side) .dnd-dock {
+    position: sticky; bottom: 0; z-index: 5; display: flex; flex-direction: column; max-height: 38dvh; background: var(--bg);
+  }
+  .dnd:not(.locked):has(.dnd-side) .dnd-tray { flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; }
+  .dnd:not(.locked):has(.dnd-side) .dnd-bar { flex: none; margin-bottom: 0; padding-bottom: .5rem; }
+}
+
 /* 모바일: 트레이 + 막대 = 화면 하단 고정 시트. 흐름 안에 있어 끝까지 스크롤하면 캔버스 마지막 줄을 가리지 않는다 */
 @media (max-width: 760px) {
   /* 내용이 짧아도 시트가 화면 바닥에 붙도록 화면 높이를 채운다 */

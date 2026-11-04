@@ -90,7 +90,7 @@ function Quiz({ treeId, scope }: { treeId: ID; scope: TreeNode[] }) {
       <div className={score ? 'dnd-compare' : undefined}>
         <div>
           {score && <h2>내 트리</h2>}
-          <TreeCanvas nodes={placed} render={render} label="내 트리" minHeight={240} />
+          <TreeCanvas nodes={placed} orient={scope} render={render} label="내 트리" minHeight={240} />
         </div>
         {score && (
           <div>
