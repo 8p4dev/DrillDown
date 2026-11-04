@@ -1,6 +1,6 @@
 // npx tsx src/features/dnd/dnd.check.ts
 import type { TreeNode } from '../../core/types'
-import { attach, detach, gradeBlank, gradeDnd, leavesOf, moveCard, placedTree, scopeOf, shuffle, type Links } from './dnd'
+import { attach, detach, gradeBlank, gradeDnd, leavesOf, moveCard, placedTree, scopeOf, shuffle, sideLayout, type Links } from './dnd'
 
 // node:assert 대신 (앱 tsconfig 에 node 타입 없음)
 function assert(ok: unknown, msg = '점검 실패'): asserts ok {
@@ -81,5 +81,16 @@ full = attach(attach(full, 'a2', 'B', 'R'), 'b1', 'A', 'R') // 제목 X 둘 교�
 assert.equal(gradeBlank(scope, full).correct, 7)
 full = attach(full, 'c', 'A', 'R')
 assert.equal(gradeBlank(scope, full).ok.c, false)
+
+// sideLayout: 깊이 = 열, 폭 안에 들어감, 칸 겹침 없음, 최소 카드 폭 유지
+const side = sideLayout(scope, 'R', 360)
+assert(side.width <= 360, `side width ${side.width}`)
+const sb2 = [...side.boxes.values()]
+assert.equal(sb2.length, scope.length)
+assert(side.boxes.get('R')!.x < side.boxes.get('A')!.x && side.boxes.get('A')!.x < side.boxes.get('a1')!.x, '열 순서')
+assert(sb2.every((a, i) => sb2.slice(i + 1).every((b) => a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y || b.y + b.h <= a.y)), '겹침')
+assert(sb2.every((b) => b.x >= 0 && b.y >= 0 && b.x + b.w <= side.width && b.y + b.h <= side.height), '경계')
+assert.equal(sideLayout(scope, 'R', 100).boxes.get('R')!.w, 96)
+assert.equal(sideLayout([nodes[0]], 'R', 360).boxes.get('R')!.w, 148)
 
 console.log('dnd.check ok')

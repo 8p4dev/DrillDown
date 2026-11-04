@@ -1,5 +1,21 @@
 // D&D 퀴즈 순수 로직 — 셔플·배치 상태 변경·채점 (DOM·Dexie 없음, dnd.check.ts 로 검증)
 import type { ID, TreeNode } from '../../core/types'
+import { layout, MARGIN, type Box, type Graph } from '../editor/graph/layout'
+
+export const CARD = { w: 148, h: 44 } // 모든 칸 고정 크기(제목 2줄 말줄임)
+
+/** 좁은 화면용 좌→우 트리: layout 의 형제 배치를 세로축으로 쓰고, 깊이별 열은 폭(avail)에 맞춰 카드 폭을 정한다. 원본 offset 무시 */
+export function sideLayout(nodes: TreeNode[], rootId: ID, avail: number): Graph {
+  const PAD = 8
+  const GAP = 18
+  const g = layout(nodes.map((n) => ({ ...n, offset: undefined })), rootId, () => ({ w: CARD.h, h: 1 }))
+  const cols = Math.max(...[...g.boxes.values()].map((b) => b.depth)) + 1
+  const w = Math.max(96, Math.min(CARD.w, Math.floor((avail - PAD * 2 - GAP * (cols - 1)) / cols)))
+  const boxes = new Map<ID, Box>()
+  for (const [id, b] of g.boxes)
+    boxes.set(id, { x: PAD + b.depth * (w + GAP), y: PAD + b.x - MARGIN, w, h: CARD.h, depth: b.depth })
+  return { boxes, edges: g.edges, width: PAD * 2 + cols * w + GAP * (cols - 1), height: PAD * 2 + g.width - MARGIN * 2 }
+}
 
 export function shuffle<T>(a: T[], rand = Math.random): T[] {
   const b = [...a]
