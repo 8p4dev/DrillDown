@@ -20,6 +20,6 @@
   .tree-header h1 { flex: 1 0 100%; font-size: 1.2rem; }
   .mode-tabs { flex: 1 0 100%; overflow-x: auto; scrollbar-width: none; }
   .mode-tabs::-webkit-scrollbar { display: none; }
-  .mode-tabs a { flex: 1 0 auto; min-height: 36px; padding-inline: .6rem; }
+  .mode-tabs a { flex: 1 1 0; min-width: max-content; min-height: 36px; padding-inline: .3rem; }
   .tree-header-tools:empty { display: none; }
 }
