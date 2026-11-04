@@ -10,8 +10,6 @@ import Minimap from './Minimap'
 import { nextConcept } from './flash'
 import './flash.css'
 
-const byIdHas = (ns: TreeNode[], id: ID) => ns.some((n) => n.id === id)
-
 // 세션 진행(현재 개념·노드별 마지막 평가)은 탭 세션 동안 유지 — 새로고침해도 집계가 남는다
 type Saved = { current: ID | null; tally: [ID, boolean][] }
 const KEY = (treeId: string) => `flash:${treeId}`
@@ -50,22 +48,25 @@ export default function FlashPage({ treeId, rootId }: { treeId: string; rootId?:
     return { root, scope }
   }, [nodes, rootId])
   const colors = useMemo(() => colorMap(nodes ?? [], srs.map, srs.at), [nodes, srs])
+  const byId = useMemo(() => new Map((nodes ?? []).map((n) => [n.id, n])), [nodes])
+  const at = current && byId.has(current) ? current : (tree?.scope ?? '') // '' 는 아래 빈 트리 분기에서 걸러진다
+  const path = useMemo(() => {
+    const p: TreeNode[] = []
+    for (let n = byId.get(at); n; n = n.parentId ? byId.get(n.parentId) : undefined) p.unshift(n)
+    return p
+  }, [byId, at])
+  const kids = useMemo(() => (nodes ?? []).filter((n) => n.parentId === at), [nodes, at])
+  const next = useMemo(() => (nodes && tree ? nextConcept(nodes, tree.scope, at) : null), [nodes, tree, at])
 
   if (!nodes) return <section className="flash"><TreeHeader treeId={treeId} active="flash" /><p>불러오는 중…</p></section>
   if (!tree) return <section className="flash"><TreeHeader treeId={treeId} active="flash" /><p className="muted">트리가 비어 있습니다.</p></section>
 
-  const at = current && byIdHas(nodes, current) ? current : tree.scope
-  const byId = new Map(nodes.map((n) => [n.id, n]))
-  const path: TreeNode[] = []
-  for (let n = byId.get(at); n; n = n.parentId ? byId.get(n.parentId) : undefined) path.unshift(n)
-  const next = nextConcept(nodes, tree.scope, at)
   const go = (id: ID) => { setDone(false); setCurrent(id) }
   const onRated = (s: NodeSrs, known: boolean) => {
     setSrs(({ map }) => ({ map: new Map(map).set(s.nodeId, s), at: new Date() }))
     setTally((m) => new Map(m).set(s.nodeId, known))
   }
   const known = [...tally.values()].filter(Boolean).length
-  const kids = nodes.filter((n) => n.parentId === at)
   const allRated = kids.length > 0 && kids.every((k) => tally.has(k.id)) // → [다음] 한 번 강조
   const advance = () => (next ? go(next) : setDone(true))
   const unknown = [...tally].filter(([, k]) => !k).map(([id]) => byId.get(id)).filter(Boolean) as TreeNode[]
