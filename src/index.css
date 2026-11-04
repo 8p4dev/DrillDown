@@ -168,7 +168,8 @@ tbody tr:last-child td { border-bottom: none; }
 .toast button { min-height: 0; padding: .3rem .65rem; font-size: var(--fs-sm); font-weight: 650; color: color-mix(in srgb, var(--accent) 70%, #fff); background: transparent; border: none; box-shadow: none; }
 @media (hover: hover) { .toast button:hover:not(:disabled) { background: color-mix(in srgb, var(--surface) 14%, transparent); } }
 @media (prefers-color-scheme: dark) { .toast button { color: #2f5fd8; } }
-/* 모바일: 화면 하단은 고정 시트·행동 바가 차지하므로 토스트는 상단 바 아래에 띄운다 */
+/* 모바일: 하단 고정 시트·행동 바가 있는 화면(퀴즈·플래시카드)에서만 토스트를 상단 바 아래로 올린다.
+   에디터는 캔버스 맨 위에 루트가 있으므로 하단 그대로 */
 @media (max-width: 760px) {
-  .toasts { top: calc(var(--nav-h) + .6rem + env(safe-area-inset-top, 0px)); bottom: auto; flex-direction: column-reverse; }
+  body:has(.dnd, .flash-nav) .toasts { top: calc(var(--nav-h) + .6rem + env(safe-area-inset-top, 0px)); bottom: auto; flex-direction: column-reverse; }
 }
