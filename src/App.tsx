@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect } from 'react'
 import { href, useRoute } from './router'
 import { Toaster } from './features/Toast'
+import { currentLook, LOOKS, setLook } from './looks/look'
 
 // 화면별 코드 분할: 첫 화면만 받고, 나머지는 유휴 시간에 미리 받는다 (docs/plans/orchestration_visual_polish.md V0-9)
 const load = {
@@ -30,6 +31,9 @@ export default function App() {
         <a className="brand" href={href.trees()} aria-label="Drill Down">Drill Down</a>
         <a className={r.name === 'trees' ? 'active' : undefined} href={href.trees()}>내 트리</a>
         <a className={r.name === 'review' ? 'active' : undefined} href={href.review()}>오늘의 복습</a>
+        <select className="look-picker" aria-label="디자인 시안" defaultValue={currentLook()} onChange={(e) => setLook(e.target.value)}>
+          {Object.entries(LOOKS).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+        </select>
       </nav>
       <main>
         <Suspense fallback={<div className="route-loading" aria-busy="true" />}>

@@ -72,7 +72,7 @@ export default function FlashPage({ treeId, rootId }: { treeId: string; rootId?:
   const unknown = [...tally].filter(([, k]) => !k).map(([id]) => byId.get(id)).filter(Boolean) as TreeNode[]
 
   return (
-    <section className="flash">
+    <section className="flash" style={{ '--depth': path.length - 1 } as React.CSSProperties}>
       <TreeHeader treeId={treeId} active="flash">
         <span className="flash-tally muted" aria-label="평가 집계">알음 <b key={`k${known}`} className="pop-num">{known}</b> · 모름 <b key={`u${unknown.length}`} className="pop-num">{unknown.length}</b></span>
       </TreeHeader>

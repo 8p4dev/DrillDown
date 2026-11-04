@@ -110,7 +110,7 @@ function NodeRow(p: NodeRowProps) {
       data-width={step}
       data-miss={p.heat}
       className={`node-row${p.selected ? ' selected' : ''}${p.cut ? ' cut' : ''}${p.depth === 0 ? ' root' : ''}${liveW !== null ? ' resizing' : ''}${p.still ? ' still' : ''}${p.lifted ? ' lifted' : ''}${spawned ? ' spawn' : ''}`}
-      style={{ left: p.x, top: p.y, width: liveW ?? widths[step], '--heat': p.heat } as React.CSSProperties}
+      style={{ left: p.x, top: p.y, width: liveW ?? widths[step], '--heat': p.heat, '--depth': p.depth } as React.CSSProperties}
       onClick={p.onSelect}
       onDoubleClick={p.onStartEdit}
     >
