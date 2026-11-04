@@ -5,6 +5,7 @@ import { getRoot, getTreeNodes } from '../../core/repo'
 import { recordResult } from '../../core/srs'
 import type { ID, TreeNode } from '../../core/types'
 import { href } from '../../router'
+import { haptic } from '../feel'
 import TreeHeader from '../TreeHeader'
 import { gradeDnd, leavesOf, moveCard, scopeOf, shuffle, type Place, type Score } from './dnd'
 import { Ghost, Progress, ScopeSelect, ScoreLine, TreeCanvas } from './kit'
@@ -46,6 +47,7 @@ function Quiz({ treeId, scope }: { treeId: ID; scope: TreeNode[] }) {
   async function grade() {
     const s = gradeDnd(scope, place)
     setScore(s)
+    haptic(s.correct === s.total ? 'success' : 'warn')
     await Promise.all(leaves.map((l) => recordResult(l.id, treeId, s.ok[l.id])))
     await logEvent('dnd_attempt_completed', { mode: 'dnd', rootId, total: s.total, correct: s.correct }, treeId)
   }
@@ -91,15 +93,17 @@ function Quiz({ treeId, scope }: { treeId: ID; scope: TreeNode[] }) {
   return (
     <div className={`dnd${score ? ' locked' : ''}${drag ? ' grabbing' : ''}`} {...handlers}>
       <TreeCanvas nodes={scope} render={render} label={answer ? '정답 트리' : '뼈대 트리'} />
-      <div className={`dnd-tray${over('tray')}${target(!!holding && placed.has(holding))}`} data-drop="tray" aria-label="카드 트레이">
-        {tray.map((id, i) => <Fragment key={id}>{card(id, score ? false : undefined, scope.length + i)}</Fragment>)}
-      </div>
-      <div className="dnd-bar">
-        {score && <ScoreLine {...score} />}
-        {!score && <Progress n={placed.size} total={leaves.length} />}
-        {!score && <button type="button" className={`primary${tray.length ? '' : ' ready'}`} onClick={grade}>채점</button>}
-        {score && <button type="button" onClick={() => setAnswer((a) => !a)}>{answer ? '내 답 보기' : '정답 보기'}</button>}
-        {score && <button type="button" className="primary" onClick={retry}>다시 하기</button>}
+      <div className="dnd-dock">
+        <div className={`dnd-tray${over('tray')}${target(!!holding && placed.has(holding))}`} data-drop="tray" aria-label="카드 트레이">
+          {tray.map((id, i) => <Fragment key={id}>{card(id, score ? false : undefined, scope.length + i)}</Fragment>)}
+        </div>
+        <div className="dnd-bar">
+          {score && <ScoreLine {...score} />}
+          {!score && <Progress n={placed.size} total={leaves.length} />}
+          {!score && <button type="button" className={`primary${tray.length ? '' : ' ready'}`} onClick={grade}>채점</button>}
+          {score && <button type="button" onClick={() => setAnswer((a) => !a)}>{answer ? '내 답 보기' : '정답 보기'}</button>}
+          {score && <button type="button" className="primary" onClick={retry}>다시 하기</button>}
+        </div>
       </div>
       <Ghost drag={drag} title={title} />
     </div>

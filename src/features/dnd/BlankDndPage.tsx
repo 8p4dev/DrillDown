@@ -1,10 +1,11 @@
 // D2 백지 퀴즈: 범위 루트만 놓인 캔버스에 트레이의 노드를 끌어 붙여 트리를 만든다
-import { Fragment, useEffect, useState, type CSSProperties } from 'react'
+import { Fragment, useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { logEvent } from '../../core/events'
 import { getRoot, getTreeNodes } from '../../core/repo'
 import { recordResult } from '../../core/srs'
 import type { ID, TreeNode } from '../../core/types'
 import { href } from '../../router'
+import { haptic } from '../feel'
 import TreeHeader from '../TreeHeader'
 import { attach, detach, gradeBlank, isUnder, placedTree, scopeOf, shuffle, type Links, type Score } from './dnd'
 import { Ghost, Progress, ScopeSelect, ScoreLine, TreeCanvas } from './kit'
@@ -35,6 +36,7 @@ function Quiz({ treeId, scope }: { treeId: ID; scope: TreeNode[] }) {
     (card, to) => setLinks((l) => (to === 'tray' ? detach(l, card) : attach(l, card, to, rootId))),
     !score,
   )
+  const placed = useMemo(() => placedTree(scope, links), [scope, links]) // 드래그 프레임마다 다시 배치하지 않게
 
   if (!rest.length) return <p className="muted">이 범위에는 하위 개념이 없어요. 범위를 바꿔 보세요.</p>
 
@@ -48,6 +50,7 @@ function Quiz({ treeId, scope }: { treeId: ID; scope: TreeNode[] }) {
   async function grade() {
     const s = gradeBlank(scope, links)
     setScore(s)
+    haptic(s.correct === s.total ? 'success' : 'warn')
     await Promise.all(rest.map((n) => recordResult(n.id, treeId, s.ok[n.id])))
     await logEvent('dnd_attempt_completed', { mode: 'blank_dnd', rootId, total: s.total, correct: s.correct }, treeId)
   }
@@ -87,7 +90,7 @@ function Quiz({ treeId, scope }: { treeId: ID; scope: TreeNode[] }) {
       <div className={score ? 'dnd-compare' : undefined}>
         <div>
           {score && <h2>내 트리</h2>}
-          <TreeCanvas nodes={placedTree(scope, links)} render={render} label="내 트리" minHeight={240} />
+          <TreeCanvas nodes={placed} render={render} label="내 트리" minHeight={240} />
         </div>
         {score && (
           <div>
@@ -100,14 +103,16 @@ function Quiz({ treeId, scope }: { treeId: ID; scope: TreeNode[] }) {
           </div>
         )}
       </div>
-      <div className={`dnd-tray${over('tray')}${target(!!holding && links.has(holding))}`} data-drop="tray" aria-label="카드 트레이">
-        {tray.map((id, i) => <Fragment key={id}>{card(id, false, scope.length + i)}</Fragment>)}
-      </div>
-      <div className="dnd-bar">
-        {score && <ScoreLine {...score} />}
-        {!score && <Progress n={links.size} total={rest.length} />}
-        {!score && <button type="button" className={`primary${tray.length ? '' : ' ready'}`} onClick={grade}>채점</button>}
-        {score && <button type="button" className="primary" onClick={retry}>다시 하기</button>}
+      <div className="dnd-dock">
+        <div className={`dnd-tray${over('tray')}${target(!!holding && links.has(holding))}`} data-drop="tray" aria-label="카드 트레이">
+          {tray.map((id, i) => <Fragment key={id}>{card(id, false, scope.length + i)}</Fragment>)}
+        </div>
+        <div className="dnd-bar">
+          {score && <ScoreLine {...score} />}
+          {!score && <Progress n={links.size} total={rest.length} />}
+          {!score && <button type="button" className={`primary${tray.length ? '' : ' ready'}`} onClick={grade}>채점</button>}
+          {score && <button type="button" className="primary" onClick={retry}>다시 하기</button>}
+        </div>
       </div>
       <Ghost drag={drag} title={title} />
     </div>
