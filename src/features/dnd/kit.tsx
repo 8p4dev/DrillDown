@@ -8,6 +8,7 @@ import './dnd.css'
 
 const MIN_SCALE = 0.6
 const SIDE_MAX = 640 // 캔버스 폭이 이 이하면 좌→우 배치
+const SIDE_BELOW_SCALE = 0.8 // 위→아래 배율이 이보다 작으면 좌→우 배치(글자 약 10.4px 미만)
 const CANVAS_PAD = 4 // dnd.css .dnd-canvas padding 과 같게
 
 /** 자식 있는 노드만, 전위 순서·깊이 들여쓰기. 바꾸면 to(id) 로 이동 */
@@ -37,9 +38,10 @@ export function ScopeSelect(p: { nodes: TreeNode[]; value: ID; to: (id: ID) => s
 
 /**
  * 트리 캔버스: 폭에 맞춰 축소(최소 MIN_SCALE, 그 아래는 가로 스크롤). 넘치지 않으면 배율 1.
- * 폭 ≤ SIDE_MAX 는 좌→우 배치, 그 외 위→아래. nodes 의 parentId=null 노드가 루트 — nodes 참조가 같으면 다시 배치하지 않는다
+ * 폭 ≤ SIDE_MAX 이거나 위→아래 배율 < SIDE_BELOW_SCALE 이면 좌→우 배치. nodes 의 parentId=null 노드가 루트 — nodes 참조가 같으면 다시 배치하지 않는다.
+ * orient: 방향을 정할 때 쓸 트리(기본 nodes). 자라는 트리에 전체 트리를 넘기면 도중에 방향이 뒤집히지 않는다
  */
-export function TreeCanvas(p: { nodes: TreeNode[]; render: (n: TreeNode) => ReactNode; label: string; minHeight?: number }) {
+export function TreeCanvas(p: { nodes: TreeNode[]; orient?: TreeNode[]; render: (n: TreeNode) => ReactNode; label: string; minHeight?: number }) {
   const box = useRef<HTMLDivElement>(null)
   const [avail, setAvail] = useState(0) // 0 = 아직 재지 않음(첫 페인트 전에 정해진다)
   useLayoutEffect(() => {
@@ -48,7 +50,12 @@ export function TreeCanvas(p: { nodes: TreeNode[]; render: (n: TreeNode) => Reac
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
-  const sideW = avail > 0 && avail <= SIDE_MAX ? avail : 0
+  const orient = p.orient ?? p.nodes
+  const topW = useMemo(() => {
+    const root = orient.find((n) => n.parentId === null)
+    return root ? layout(orient, root.id, () => CARD).width : 0
+  }, [orient])
+  const sideW = avail > 0 && (avail <= SIDE_MAX || avail / topW < SIDE_BELOW_SCALE) ? avail : 0
   const view = useMemo(() => {
     const root = p.nodes.find((n) => n.parentId === null)
     if (!root) return null
@@ -60,7 +67,7 @@ export function TreeCanvas(p: { nodes: TreeNode[]; render: (n: TreeNode) => Reac
   const g = view?.g
   const scale = g && avail ? Math.max(MIN_SCALE, Math.min(1, avail / g.width)) : 1
   return (
-    <div ref={box} className="dnd-canvas" aria-label={p.label} style={{ minHeight: p.minHeight }}>
+    <div ref={box} className={`dnd-canvas${sideW ? ' dnd-side' : ''}`} aria-label={p.label} style={{ minHeight: p.minHeight }}>
       {view && g && (
         <div className="dnd-graph" style={{ width: g.width * scale, height: g.height * scale }}>
           <div className="dnd-plane" style={{ width: g.width, height: g.height, transform: scale < 1 ? `scale(${scale})` : undefined }}>
