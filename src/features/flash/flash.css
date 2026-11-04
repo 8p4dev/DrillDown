@@ -1,92 +1,123 @@
 /* 플래시카드·미니맵·오늘의 복습 — index.css 토큰 사용 */
-/* --ok·--warn 은 index.css 전역 토큰. 연두·모름 색만 지역 정의 */
-.flash { --ok-soft: #8fd66a; --no: var(--danger); }
+/* --ok·--warn 은 index.css 전역 토큰. 연두·모름 색·채움색만 지역 정의. 채움은 글자(--surface) 대비를 위해 조금 어둡게 */
+.flash {
+  --ok-soft: #8fd66a; --no: var(--danger);
+  --ok-fill: color-mix(in srgb, var(--ok) 85%, #000); --no-fill: color-mix(in srgb, var(--no) 90%, #000);
+}
 
 .flash-layout { display: grid; grid-template-columns: minmax(0, 1fr) 220px; gap: 1.5rem; align-items: start; }
-@media (max-width: 760px) { .flash-layout { grid-template-columns: 1fr; } .flash-aside { order: -1; } }
-.flash-aside { position: sticky; top: 68px; }
-.flash-tally { font-size: .85rem; font-variant-numeric: tabular-nums; }
-.flash-tally b { font-weight: 600; color: var(--text); }
+.flash-aside { position: sticky; top: calc(var(--nav-h) + 1rem); }
+.flash-tally { font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+.flash-tally b { font-weight: 650; color: var(--text); }
 .pop-num { display: inline-block; animation: pop var(--t-med) var(--ease-out); }
 
 /* 경로 */
-.flash-path { display: flex; flex-wrap: wrap; align-items: center; gap: .15rem; font-size: .85rem; color: var(--muted); margin-bottom: .75rem; min-height: 1.4em; }
+.flash-path { display: flex; flex-wrap: wrap; align-items: center; gap: .15rem; font-size: var(--fs-sm); color: var(--muted); margin-bottom: .75rem; min-height: 1.4em; }
 .flash-path .sep { margin: 0 .35rem; opacity: .6; }
 .flash-path [aria-current] { color: var(--text); font-weight: 600; }
 .flash-path button.link { color: var(--muted); }
-.flash-path button.link:hover { color: var(--accent); }
+@media (hover: hover) { .flash-path button.link:hover:not(:disabled) { color: var(--accent); } }
 
-/* 개념 카드 (상태 색은 .c-* 를 카드 모양으로 덮어씀) */
+/* 카드 공통: 상태 색은 .c-* 가 변수로만 정하고 카드가 읽는다 (전역 button:hover 배경에도 상태 색 유지) */
+.flash .flash-concept, .flash .flash-kid { position: relative; background: var(--tone, var(--surface)); border: 1px solid var(--edge, var(--border)); }
+.flash .flash-concept::before, .flash .flash-kid::before { content: ''; position: absolute; inset: 0 0 auto; height: 4px; background: var(--band, transparent); transition: background var(--t-med); }
+.flash .c-green { --tone: color-mix(in srgb, var(--ok) 9%, var(--surface)); --edge: color-mix(in srgb, var(--ok) 55%, var(--border)); --band: var(--ok); }
+.flash .c-lightgreen { --tone: color-mix(in srgb, var(--ok-soft) 9%, var(--surface)); --edge: color-mix(in srgb, var(--ok-soft) 60%, var(--border)); --band: var(--ok-soft); }
+.flash .c-yellow { --tone: color-mix(in srgb, var(--warn) 9%, var(--surface)); --edge: color-mix(in srgb, var(--warn) 55%, var(--border)); --band: var(--warn); }
+.flash .c-red { --tone: color-mix(in srgb, var(--no) 8%, var(--surface)); --edge: color-mix(in srgb, var(--no) 55%, var(--border)); --band: var(--no); }
+
+/* 개념 카드 */
+.flash .flash-card-wrap { animation: rise var(--t-med) var(--ease-out); }
 .flash-concept {
-  display: flex; flex-direction: column; align-items: center; gap: .6rem; width: 100%;
-  padding: 2.75rem 1.5rem 1.5rem; text-align: center;
-  background: var(--surface); border: 1px solid var(--border); border-radius: calc(var(--radius) + 6px);
-  box-shadow: var(--shadow), 0 8px 24px #1018280a; font-size: 1rem; font-weight: 400;
-  transition: transform var(--t-fast) var(--ease-out), box-shadow var(--t-fast), border-color var(--t-med), background var(--t-med);
+  display: flex; flex-direction: column; align-items: center; gap: .6rem; width: 100%; overflow: hidden; /* 띠가 둥근 모서리를 따른다 */
+  padding: 2.75rem 1.5rem 1.5rem; text-align: center; color: var(--text);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow-lift); font-size: 1rem; font-weight: 400;
+  transition: transform var(--t-fast) var(--ease-press), box-shadow var(--t-fast), border-color var(--t-med), background var(--t-med);
 }
-.flash-concept:hover:not(:disabled) { background: var(--surface); transform: translateY(-1px); box-shadow: var(--shadow), 0 12px 30px #1018281a; }
-.flash-concept-title { font-size: 2rem; font-weight: 750; letter-spacing: -.02em; line-height: 1.25; }
-.flash-count { display: inline-flex; align-items: center; gap: .35rem; margin-top: .6rem; font-size: .85rem; color: var(--muted); padding: .25rem .75rem; border-radius: 999px; background: var(--accent-soft); transition: color var(--t-med); }
-.flash-count .chev { display: inline-block; transition: transform var(--t-med) var(--ease-out); }
+@media (hover: hover) {
+  .flash .flash-concept:hover:not(:disabled) { background: var(--tone, var(--surface)); border-color: var(--edge, var(--border)); transform: translateY(-1px); box-shadow: var(--shadow-pop); }
+}
+.flash .flash-concept:active:not(:disabled) { transform: scale(.985); }
+.flash-concept-title { font-size: clamp(1.5rem, 6vw, 2rem); font-weight: 750; letter-spacing: -.02em; line-height: 1.25; word-break: keep-all; overflow-wrap: anywhere; }
+.flash-count { display: inline-flex; align-items: center; gap: .35rem; margin-top: .5rem; padding: .2rem .7rem; border-radius: 999px; font-size: var(--fs-xs); font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-2); background: color-mix(in srgb, var(--text) 6%, transparent); transition: color var(--t-med), background var(--t-med); }
+.flash-count .chev { display: inline-block; font-size: 1.25em; line-height: 1; transition: transform var(--t-slow) var(--ease-spring); }
 .flash-concept[aria-expanded='true'] .chev { transform: rotate(180deg); }
-.flash-concept[aria-expanded='true'] .flash-count { color: var(--accent); }
-.flash-note { white-space: normal; color: var(--text); opacity: .85; font-size: .92rem; line-height: 1.6; text-align: left; }
+.flash-concept[aria-expanded='true'] .flash-count { color: var(--accent); background: var(--accent-soft); }
+.flash-note { white-space: normal; color: var(--text-2); font-size: var(--fs-md); line-height: 1.6; text-align: left; }
 .flash-concept .flash-note { text-align: left; max-width: 36rem; margin: 0 auto; }
 
-/* 하위 개념 */
-.flash-kids-wrap { display: grid; grid-template-rows: 1fr; opacity: 1; transition: grid-template-rows var(--t-slow) var(--ease-out), opacity var(--t-med) var(--ease-out); }
-@starting-style { .flash-kids-wrap { grid-template-rows: 0fr; opacity: 0; } }
-/* 높이 0 에서 열리므로 overflow 를 숨기되, 그림자·shake 가 잘리지 않게 6px 여유 */
-.flash-kids { min-height: 0; overflow: hidden; list-style: none; padding: 6px; margin: calc(1rem - 6px) -6px -6px; display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: .75rem; }
+/* 하위 개념: 열고 닫기 모두 CSS 전환. display 가 전환에 포함되어 닫힘이 끝나면 display:none (JS·종료 이벤트 없음) */
+.flash-kids-wrap {
+  display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: 1fr; opacity: 1;
+  transition: grid-template-rows var(--t-slow) var(--ease-out), opacity var(--t-med) var(--ease-out), display var(--t-slow) allow-discrete;
+}
+.flash-kids-wrap.closed { display: none; grid-template-rows: 0fr; opacity: 0; }
+@starting-style { .flash-kids-wrap:not(.closed) { grid-template-rows: 0fr; opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .flash-kids-wrap { transition: none; } }
+/* 높이 0 까지 접히도록 잘라내되, 그림자·shake 가 잘리지 않게 좌우 6px·아래 6px 여유 */
+.flash-kids-clip { min-height: 0; overflow: hidden; margin-inline: -6px; }
+.flash-kids { list-style: none; margin: 0; padding: 1rem 6px 6px; display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: .75rem; }
 .flash-kid {
-  display: flex; flex-direction: column; justify-content: space-between; gap: .75rem;
-  padding: .9rem 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  display: flex; flex-direction: column; justify-content: space-between; gap: .75rem; overflow: hidden;
+  padding: 1rem 1rem .9rem; border-radius: var(--radius);
   box-shadow: var(--shadow); animation: flash-in var(--t-slow) var(--ease-out) both; animation-delay: calc(var(--i, 0) * 70ms);
   transition: background var(--t-med), border-color var(--t-med), box-shadow var(--t-med);
 }
 /* flash-in 을 목록에 남겨 둬야 shake 가 빠질 때 등장 애니메이션이 재시작하지 않는다 */
 .flash-kid.shake { animation: flash-in var(--t-slow) var(--ease-out) both, shake var(--t-slow) var(--ease-out); animation-delay: calc(var(--i, 0) * 70ms), 0s; }
 .flash-kid-body { display: flex; flex-direction: column; gap: .3rem; }
-.flash-kid strong { font-size: 1.05rem; }
-.flash-dive { align-self: flex-start; padding: .1rem .5rem; font-size: .85rem; color: var(--accent); font-variant-numeric: tabular-nums; }
+.flash-kid strong { font-size: var(--fs-lg); font-weight: 650; letter-spacing: -.01em; }
+.flash-dive { position: relative; align-self: flex-start; min-height: 0; padding: .25rem .6rem; font-size: var(--fs-sm); color: var(--accent); font-variant-numeric: tabular-nums; }
+.flash-dive::after { content: ''; position: absolute; inset: -8px; } /* 작은 배지의 터치 영역만 넓힌다 */
 @keyframes flash-in { from { opacity: 0; transform: translateY(-10px) scale(.97); } to { opacity: 1; transform: none; } }
 
+/* 평가 버튼 */
 .flash-rate { display: flex; gap: .4rem; }
 .flash-rate button { flex: 1; }
-.flash-rate button.known:hover:not(:disabled) { color: #fff; background: var(--ok); border-color: var(--ok); }
-.flash-rate button.unknown:hover:not(:disabled) { color: #fff; background: var(--no); border-color: var(--no); }
-.flash-rate .flash-result { font-weight: 600; animation: pop var(--t-med) var(--ease-out); }
-.flash-rate .flash-result.known { color: var(--ok); background: color-mix(in srgb, var(--ok) 10%, var(--surface)); border-color: color-mix(in srgb, var(--ok) 40%, var(--border)); }
-.flash-rate .flash-result.unknown { color: var(--no); background: color-mix(in srgb, var(--no) 10%, var(--surface)); border-color: color-mix(in srgb, var(--no) 40%, var(--border)); }
-
-/* 상태 색 — 카드 테두리·배경 */
-.flash .c-green, .flash .c-lightgreen, .flash .c-yellow, .flash .c-red, .flash .c-none { border-left-width: 1px; border-left-style: solid; }
-.flash .c-green { border-color: color-mix(in srgb, var(--ok) 55%, var(--border)); background: color-mix(in srgb, var(--ok) 9%, var(--surface)); box-shadow: inset 0 3px 0 var(--ok), var(--shadow); }
-.flash .c-lightgreen { border-color: color-mix(in srgb, var(--ok-soft) 60%, var(--border)); background: color-mix(in srgb, var(--ok-soft) 9%, var(--surface)); box-shadow: inset 0 3px 0 var(--ok-soft), var(--shadow); }
-.flash .c-yellow { border-color: color-mix(in srgb, var(--warn) 55%, var(--border)); background: color-mix(in srgb, var(--warn) 9%, var(--surface)); box-shadow: inset 0 3px 0 var(--warn), var(--shadow); }
-.flash .c-red { border-color: color-mix(in srgb, var(--no) 55%, var(--border)); background: color-mix(in srgb, var(--no) 8%, var(--surface)); box-shadow: inset 0 3px 0 var(--no), var(--shadow); }
-.flash .flash-concept.c-green:hover, .flash .flash-concept.c-red:hover { background: inherit; }
+.flash-rate button.known:active:not(:disabled), .flash-rate button.unknown:active:not(:disabled) { color: var(--surface); }
+.flash-rate button.known:active:not(:disabled) { background: var(--ok-fill); border-color: transparent; }
+.flash-rate button.unknown:active:not(:disabled) { background: var(--no-fill); border-color: transparent; }
+@media (hover: hover) {
+  .flash-rate button.known:hover:not(:disabled) { color: var(--surface); background: var(--ok-fill); border-color: transparent; }
+  .flash-rate button.unknown:hover:not(:disabled) { color: var(--surface); background: var(--no-fill); border-color: transparent; }
+}
+.flash-mark { display: inline-block; font-weight: 800; }
+.flash-rate .flash-result { font-weight: 650; }
+/* 알음: 가운데서 초록이 차오르고 체크가 튀어나온다. 끝 상태는 애니메이션 없이도 채움 */
+.flash-rate .flash-result.known, .flash-rate .flash-result.known:hover:not(:disabled) {
+  color: var(--surface); border-color: transparent;
+  background: linear-gradient(var(--ok-fill), var(--ok-fill)) center / 100% 100% no-repeat, color-mix(in srgb, var(--ok) 25%, var(--surface));
+}
+.flash-rate .flash-result.known { animation: flash-fill var(--t-med) var(--ease-out); }
+.flash-result.known .flash-mark { animation: flash-check var(--t-slow) var(--ease-spring) 60ms both; }
+@keyframes flash-fill { from { background-size: 0% 100%, auto; } }
+@keyframes flash-check { from { transform: scale(0) rotate(-25deg); } to { transform: none; } }
+.flash-rate .flash-result.unknown, .flash-rate .flash-result.unknown:hover:not(:disabled) { color: var(--no); background: color-mix(in srgb, var(--no) 10%, var(--surface)); border-color: color-mix(in srgb, var(--no) 40%, var(--border)); }
+.flash-rate .flash-result.unknown { animation: pop var(--t-med) var(--ease-out); }
 
 .flash-nav { justify-content: center; margin-top: 1.5rem; }
 .flash-nav .pulse { animation: pulse-ring calc(var(--t-slow) * 2) var(--ease-out); }
 
-/* 요약 */
+/* 요약: 숫자가 주인공, 라벨은 아래 작게 */
 .flash-summary { text-align: center; padding: 2rem 1.5rem; }
-.flash-summary h2 { margin-top: 0; }
-.flash-summary-nums { display: flex; justify-content: center; gap: 2rem; font-size: 1rem; }
-.flash-summary-nums strong { display: block; font-size: 2.2rem; font-variant-numeric: tabular-nums; animation: pop var(--t-slow) var(--ease-out) both; }
+.flash-summary h2 { margin: 0 0 1.25rem; font-size: var(--fs-xl); font-weight: 750; letter-spacing: -.02em; }
+.flash-summary > .muted { margin: 1.25rem 0 .5rem; font-size: var(--fs-sm); }
+.flash-summary-nums { display: flex; justify-content: center; gap: .75rem; margin: 0; }
+.flash-summary-nums > span { display: flex; flex-direction: column-reverse; gap: .1rem; flex: 0 1 9rem; padding: .85rem .5rem .7rem; border-radius: var(--radius); background: var(--surface-2); border: 1px solid var(--border); font-size: var(--fs-sm); font-weight: 550; color: var(--muted); }
+.flash-summary-nums strong { font-size: 2.6rem; font-weight: 750; line-height: 1.1; letter-spacing: -.03em; font-variant-numeric: tabular-nums; animation: pop var(--t-slow) var(--ease-out) both; }
 .flash-summary-nums .unknown strong { animation-delay: 60ms; }
 .flash-summary-nums .known strong { color: var(--ok); }
 .flash-summary-nums .unknown strong { color: var(--no); }
-.flash-missed { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: .4rem; justify-content: center; }
-.flash-missed li { padding: .2rem .6rem; border-radius: 999px; font-size: .85rem; background: color-mix(in srgb, var(--no) 10%, var(--surface)); color: var(--no); }
-.flash-summary .actions { justify-content: center; align-items: center; gap: 1rem; margin-top: 1.25rem; }
+.flash-missed { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: .4rem; justify-content: center; }
+.flash-missed li { padding: .2rem .65rem; border-radius: 999px; font-size: var(--fs-sm); font-weight: 550; background: color-mix(in srgb, var(--no) 10%, var(--surface)); color: var(--no); }
+.flash-summary .actions { justify-content: center; align-items: center; gap: 1rem; margin-top: 1.5rem; }
 
 /* 미니맵 */
-.minimap { margin: 0; padding: .6rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
+.minimap { margin: 0; padding: .6rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow); }
 .minimap svg { display: block; width: 100%; height: auto; max-height: 260px; }
 .minimap path { fill: none; stroke: var(--border); stroke-width: 2; }
 .minimap path.lit { stroke: var(--accent); stroke-width: 3; }
+.minimap-toggle { display: none; } /* 접기는 모바일 전용 */
 .mm-node rect { fill: color-mix(in srgb, var(--muted) 22%, var(--surface)); stroke: none; transition: fill var(--t-med), stroke-width var(--t-fast); }
 .mm-node[data-color='green'] rect { fill: var(--ok); }
 .mm-node[data-color='lightgreen'] rect { fill: var(--ok-soft); }
@@ -96,15 +127,70 @@
 .mm-node.lit rect { stroke: var(--accent); stroke-width: 3; }
 .mm-node.current rect { stroke-width: 5; }
 .mm-node.go { cursor: pointer; }
-.mm-node.go:hover rect, .mm-node.go:focus-visible rect { stroke: var(--accent); stroke-width: 4; }
+.mm-node.go:focus-visible rect { stroke: var(--accent); stroke-width: 4; }
+@media (hover: hover) { .mm-node.go:hover rect { stroke: var(--accent); stroke-width: 4; } }
 .mm-node:focus { outline: none; }
 
 /* 오늘의 복습 */
 .review-list { list-style: none; padding: 0; display: grid; gap: .6rem; }
 .review-list li { display: flex; align-items: center; gap: .9rem; }
-.review-list li strong { flex: 1; }
+.review-list li strong { flex: 1; min-width: 0; font-weight: 650; }
+.due-count { font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
 .review-head { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
 .review-head h1 { margin: 0; }
+.review-head > .muted { font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
 .review-bar { flex: 1; min-width: 120px; height: 6px; border-radius: 999px; background: var(--accent-soft); overflow: hidden; }
 .review-bar span { display: block; height: 100%; border-radius: inherit; background: var(--accent); transition: width var(--t-slow) var(--ease-out); }
-.review .flash-card-wrap { animation: rise var(--t-med) var(--ease-out); }
+
+/* ---- 모바일 (§3.1 브레이크포인트) ---- */
+@media (max-width: 760px) {
+  .flash-layout { grid-template-columns: minmax(0, 1fr); gap: .75rem; }
+  .flash-aside { position: static; order: -1; }
+  .flash-concept { padding: 2rem 1.1rem 1.1rem; }
+  .flash-kids { grid-template-columns: minmax(0, 1fr); gap: .6rem; }
+  .flash-rate button { min-height: 44px; }
+
+  /* 접힌 미니맵: 실제 크기의 .6 배로 그린 트리를 현재 위치가 띠 가운데 오도록 옮긴다 (높이 ≤ 72px) */
+  .minimap { position: relative; overflow: hidden; padding: 0; interpolate-size: allow-keywords; transition: height var(--t-slow) var(--ease-out); }
+  .minimap:not(.open) { height: 64px; }
+  .minimap:not(.open) svg {
+    position: absolute; left: 50%; top: 50%; max-height: none;
+    width: calc(var(--mm-w) * .6px); height: calc(var(--mm-h) * .6px);
+    transform: translate(calc(var(--mm-x) * -.6px), calc(var(--mm-y) * -.6px));
+    transition: transform var(--t-slow) var(--ease-out);
+  }
+  .minimap.open { padding: .6rem; }
+  .minimap.open svg { animation: rise var(--t-med) var(--ease-out); }
+  /* 띠 전체가 펼침 버튼. 양끝은 면 색으로 흐려 잘림을 부드럽게 */
+  .minimap-toggle, .minimap-toggle:hover:not(:disabled) {
+    display: flex; align-items: center; justify-content: flex-end;
+    position: absolute; inset: 0; width: 100%; min-height: 0; padding: 0 .85rem; border: 0; border-radius: 0; box-shadow: none; color: var(--muted);
+    background: linear-gradient(90deg, var(--surface), transparent 16%, transparent 70%, var(--surface));
+  }
+  .minimap.open .minimap-toggle, .minimap.open .minimap-toggle:hover:not(:disabled) { inset: 0 0 auto auto; width: 44px; height: 44px; padding: 0; justify-content: center; background: none; }
+  .minimap-toggle:active:not(:disabled) { transform: none; }
+  .minimap-toggle .chev { display: inline-block; font-size: var(--fs-md); transition: transform var(--t-slow) var(--ease-spring); }
+  .minimap.open .chev { transform: rotate(180deg); }
+
+  /* 하단 행동 바: 짧은 화면에서도 바닥에 붙도록 fixed. 내용 가림은 카드 아래 여백으로 막는다 (main 아래 패딩 2rem + 이 여백 ≥ 바 높이) */
+  .flash-nav {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 9; flex-wrap: nowrap; gap: .5rem; margin: 0;
+    padding: .5rem max(.85rem, env(safe-area-inset-right)) calc(.5rem + var(--safe-b)) max(.85rem, env(safe-area-inset-left));
+    background: color-mix(in srgb, var(--surface) 88%, transparent); backdrop-filter: saturate(1.6) blur(12px); -webkit-backdrop-filter: saturate(1.6) blur(12px);
+    border-top: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  }
+  .flash-nav button { flex: 1; min-height: 44px; font-size: var(--fs-md); }
+  .flash-nav button.primary { flex: 2; }
+  /* 바 높이: 44px 버튼 + 위아래 .5rem + 테두리. 토스트(.flash 밖)도 쓰므로 body 에 둔다 */
+  body:has(.flash-nav) { --flash-bar-h: 60px; }
+  .flash-card-wrap { margin-bottom: calc(var(--flash-bar-h) - 1rem); }
+  body:has(.flash-nav) .toasts { bottom: calc(var(--flash-bar-h) + .75rem + var(--safe-b)); }
+
+  /* 오늘의 복습: 제목 / [플래시카드 · 복습 시작] 두 줄 */
+  .review-list li { flex-wrap: wrap; gap: .6rem; }
+  .review-list li strong { flex-basis: calc(100% - 4rem); }
+  .review-list li a, .review-list li button { flex: 1 1 8rem; min-height: 44px; } /* 기준 폭이 첫 줄 남은 칸(4rem)보다 커서 둘째 줄로 내려간다 */
+  .review-list li a { display: inline-flex; align-items: center; justify-content: center; font-size: var(--fs-sm); font-weight: 550; border: 1px solid var(--border); border-radius: 8px; }
+  .review-head { gap: .5rem .75rem; }
+  .review-head h1 { flex: 1 0 100%; }
+}
