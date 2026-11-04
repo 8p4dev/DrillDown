@@ -2,19 +2,24 @@
 .trees-head h1 { margin: 0; }
 .trees-head button { width: 2.1rem; height: 2.1rem; padding: 0; font-size: 1.05rem; color: var(--muted); }
 .trees-form { display: flex; gap: .5rem; padding: .6rem; margin-bottom: 1.25rem; }
-.trees .trees-form input { flex: 1; border-color: transparent; background: transparent; }
+.trees .trees-form input { flex: 1; min-width: 0; border-color: transparent; background: transparent; }
 .trees .trees-form input:focus { box-shadow: none; border-color: transparent; }
 .trees-form:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-.trees-empty { text-align: center; padding: 2.5rem 1rem; border: 1px dashed var(--border); border-radius: var(--radius); }
+.trees-empty { display: flex; flex-direction: column; align-items: center; gap: .75rem; margin: 0; padding: 2.5rem 1rem; text-align: center; border: 1.5px dashed var(--border-strong); border-radius: var(--radius-lg); }
+.trees-empty svg { width: 64px; height: 48px; fill: var(--surface); stroke: var(--border-strong); stroke-width: 1.5; }
+.trees-empty .branch { fill: none; stroke-linecap: round; }
+.trees-empty .root { fill: var(--accent-soft); stroke: var(--accent); }
 
 .tree-cards { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: .9rem; }
 .tree-cards li {
   position: relative; display: flex; flex-direction: column; cursor: pointer;
   transition: border-color var(--t-fast), box-shadow var(--t-med) var(--ease-out), transform var(--t-med) var(--ease-out);
 }
-.tree-cards li:hover { border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); box-shadow: var(--shadow-lift); transform: translateY(-2px); }
-.tree-cards li:has(.tree-open:active) { transform: scale(.99); transition-duration: var(--t-fast); }
-.tree-cards li.is-new { animation: rise var(--t-slow) var(--ease-out), pulse-ring 900ms var(--ease-out) var(--t-slow); }
+@media (hover: hover) {
+  .tree-cards li:hover { border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); box-shadow: var(--shadow-lift); transform: translateY(-2px); }
+}
+.tree-cards li:has(.tree-open:active, .tree-title:active) { transform: scale(.985); transition: transform 60ms var(--ease-press); }
+.tree-cards li.is-new { animation: spring-in var(--t-slow) var(--ease-spring), pulse-ring 900ms var(--ease-out) var(--t-slow); }
 
 /* stretched link: 카드 전체를 덮는 편집 링크. 다른 상호작용 요소는 그 위(z-index 1) */
 .tree-open { flex: 1; min-height: 1.1rem; }
@@ -24,34 +29,65 @@
 .tree-top, .tree-modes { position: relative; z-index: 1; pointer-events: none; }
 .tree-top > *, .tree-modes > * { pointer-events: auto; }
 
-.tree-top { z-index: 2; display: flex; align-items: flex-start; gap: .5rem; min-height: 1.9rem; }
-.tree-title { flex: 1; padding: .15rem 0; font-size: 1.05rem; font-weight: 650; letter-spacing: -.01em; overflow-wrap: anywhere; cursor: pointer; }
-.tree-cards .tree-rename { flex: 1; min-width: 0; padding: .1rem .4rem; margin: 0 -.4rem; font-size: 1.05rem; font-weight: 650; }
+.tree-top { z-index: 2; display: flex; align-items: flex-start; gap: .65rem; }
+.tree-title { flex: 1; min-width: 0; padding: .3rem 0; font-size: var(--fs-lg); line-height: 1.35; font-weight: 650; letter-spacing: -.015em; overflow-wrap: anywhere; cursor: pointer; }
+.tree-cards .tree-rename { flex: 1; min-width: 0; padding: .2rem .4rem; font-size: var(--fs-lg); font-weight: 650; }
+
+/* 이니셜 아바타: 색조는 토큰끼리 섞어 만들어 다크 모드를 저절로 따른다. 눌림은 뒤의 편집 링크로 통과 */
+.tree-avatar {
+  --tone: var(--accent);
+  flex: none; display: grid; place-items: center; width: 2.25rem; height: 2.25rem; border-radius: var(--radius); pointer-events: none;
+  font-size: var(--fs-md); font-weight: 700; text-transform: uppercase; user-select: none;
+  color: color-mix(in srgb, var(--tone) 65%, var(--text)); background: color-mix(in srgb, var(--tone) 15%, var(--surface));
+}
+.tree-avatar[data-tone='1'] { --tone: color-mix(in oklch, var(--accent) 72%, var(--danger)); }
+.tree-avatar[data-tone='2'] { --tone: color-mix(in oklch, var(--accent) 40%, var(--danger)); }
+.tree-avatar[data-tone='3'] { --tone: color-mix(in oklch, var(--accent) 72%, var(--ok)); }
+.tree-avatar[data-tone='4'] { --tone: color-mix(in oklch, var(--accent) 35%, var(--ok)); }
+.tree-avatar[data-tone='5'] { --tone: color-mix(in oklch, var(--accent) 30%, var(--muted)); }
 
 .tree-cards li:has(.tree-menu[open]) { z-index: 3; }
-.tree-menu { position: relative; margin: -.2rem -.45rem 0 auto; }
+.tree-menu { position: relative; margin: 0 -.45rem 0 auto; }
 .tree-menu summary {
   list-style: none; display: grid; place-items: center; width: 1.9rem; height: 1.9rem; border-radius: 8px;
   color: var(--muted); font-size: 1.1rem; cursor: pointer; transition: background var(--t-fast), color var(--t-fast);
 }
 .tree-menu summary::-webkit-details-marker { display: none; }
-.tree-menu summary:hover, .tree-menu[open] summary { color: var(--text); background: var(--accent-soft); }
+@media (hover: hover) { .tree-menu summary:hover { color: var(--text); background: var(--accent-soft); } }
+.tree-menu summary:active, .tree-menu[open] summary { color: var(--text); background: var(--accent-soft); }
 .tree-menu-list {
   position: absolute; right: 0; top: calc(100% + .25rem); z-index: 2; min-width: 7.5rem; padding: .3rem;
   display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius); box-shadow: var(--shadow-lift); transform-origin: top right;
   animation: pop var(--t-med) var(--ease-out);
 }
-.tree-menu-list button { text-align: left; border-color: transparent; background: none; font-size: .85rem; padding: .4rem .6rem; }
+.tree-menu-list button { text-align: left; border-color: transparent; background: none; box-shadow: none; font-size: .85rem; padding: .4rem .6rem; }
 .tree-menu-list button.danger { border-color: transparent; }
 
 /* 학습 모드 세그먼트: 한 줄, 칸 3개 */
-.tree-modes { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.tree-modes { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
 .tree-modes a {
   display: flex; align-items: center; justify-content: center; gap: .3rem; min-width: 0; padding: .4rem .3rem;
   font-size: .8rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   color: var(--muted); background: var(--surface); transition: background var(--t-fast), color var(--t-fast);
 }
 .tree-modes a + a { border-left: 1px solid var(--border); }
-.tree-modes a span { color: var(--accent); }
-.tree-modes a:hover { text-decoration: none; color: var(--accent); background: var(--accent-soft); }
+.tree-modes svg { flex: none; width: 14px; height: 14px; fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+@media (hover: hover) { .tree-modes a:hover { text-decoration: none; color: var(--accent); background: var(--accent-soft); } }
+.tree-modes a:active { color: var(--accent); background: var(--accent-soft); }
+
+/* 터치 목표 44px: 좁은 화면이거나 터치 기기면 */
+@media (max-width: 760px), (pointer: coarse) {
+  .trees-head button { width: 44px; height: 44px; }
+  .trees-form button, .trees .trees-form input { min-height: 44px; }
+  .tree-menu { margin: -.25rem -.7rem -.25rem auto; }
+  .tree-menu summary { width: 44px; height: 44px; }
+  .tree-menu-list button { min-height: 44px; }
+  .tree-modes a { min-height: 44px; box-sizing: border-box; font-size: var(--fs-sm); }
+  .tree-modes svg { width: 16px; height: 16px; }
+}
+@media (max-width: 760px) {
+  .tree-cards { grid-template-columns: 1fr; }
+}
+/* 44px 입력칸(전역 터치 기본값)이 이름 변경 때 카드 높이를 밀지 않게 */
+@media (pointer: coarse) { .tree-cards .tree-rename { margin-block: -5px; } }
