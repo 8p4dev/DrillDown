@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { flushSync } from 'react-dom'
 
 export type Mode = 'edit' | 'flash' | 'dnd' | 'blank'
 export type Route =
@@ -33,10 +34,17 @@ export const href = {
   review: () => '#/review',
 }
 
+const reduced = matchMedia('(prefers-reduced-motion: reduce)')
+
 export function useRoute(): Route {
   const [route, setRoute] = useState(() => parseHash(location.hash))
   useEffect(() => {
-    const on = () => setRoute(parseHash(location.hash))
+    // 화면 전환 연속성: 지원 브라우저에서 짧은 교차 페이드 (index.css ::view-transition-*)
+    const on = () => {
+      const next = () => setRoute(parseHash(location.hash))
+      if (!document.startViewTransition || reduced.matches) return next()
+      document.startViewTransition(() => flushSync(next))
+    }
     addEventListener('hashchange', on)
     return () => removeEventListener('hashchange', on)
   }, [])

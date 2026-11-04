@@ -1,8 +1,25 @@
-.tree-header { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
-.tree-header h1 { margin: 0; font-size: 1.35rem; }
-.mode-tabs { display: flex; gap: .25rem; padding: .2rem; background: var(--surface); border: 1px solid var(--border); border-radius: 999px; }
-.mode-tabs a { padding: .3rem .85rem; border-radius: 999px; color: var(--muted); text-decoration: none; font-size: .9rem; transition: background var(--t-med) var(--ease-out), color var(--t-fast); }
-.mode-tabs a:hover { text-decoration: none; }
-.mode-tabs a:hover { color: var(--text); }
-.mode-tabs a[aria-current='page'] { background: var(--accent); color: #fff; }
+.tree-header { display: flex; align-items: center; gap: .75rem 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.tree-header h1 { margin: 0; font-size: 1.35rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mode-tabs {
+  display: flex; gap: 2px; padding: 3px; background: color-mix(in srgb, var(--border) 45%, var(--surface));
+  border: 1px solid var(--border); border-radius: 999px;
+}
+.mode-tabs a {
+  display: inline-flex; align-items: center; justify-content: center; padding: .32rem .9rem; border-radius: 999px;
+  color: var(--muted); text-decoration: none; font-size: var(--fs-sm); font-weight: 600; white-space: nowrap;
+  transition: background var(--t-med) var(--ease-out), color var(--t-fast), box-shadow var(--t-med), transform var(--t-fast) var(--ease-press);
+}
+.mode-tabs a:active { transform: scale(.96); }
+@media (hover: hover) { .mode-tabs a:hover { text-decoration: none; color: var(--text); } }
+.mode-tabs a[aria-current='page'] { background: var(--surface); color: var(--accent); box-shadow: var(--shadow), 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent); }
 .tree-header-tools { margin-left: auto; display: flex; gap: .5rem; align-items: center; }
+
+/* 모바일: 제목 한 줄 → 탭 전체 폭(4칸 균등) → 도구 */
+@media (max-width: 760px) {
+  .tree-header { gap: .6rem; margin-bottom: .85rem; }
+  .tree-header h1 { flex: 1 0 100%; font-size: 1.2rem; }
+  .mode-tabs { flex: 1 0 100%; overflow-x: auto; scrollbar-width: none; }
+  .mode-tabs::-webkit-scrollbar { display: none; }
+  .mode-tabs a { flex: 1 0 auto; min-height: 36px; padding-inline: .6rem; }
+  .tree-header-tools:empty { display: none; }
+}
