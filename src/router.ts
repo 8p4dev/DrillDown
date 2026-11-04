@@ -39,11 +39,15 @@ const reduced = matchMedia('(prefers-reduced-motion: reduce)')
 export function useRoute(): Route {
   const [route, setRoute] = useState(() => parseHash(location.hash))
   useEffect(() => {
+    let vt: ViewTransition | undefined
     // 화면 전환 연속성: 지원 브라우저에서 짧은 교차 페이드 (index.css ::view-transition-*)
     const on = () => {
       const next = () => setRoute(parseHash(location.hash))
       if (!document.startViewTransition || reduced.matches) return next()
-      document.startViewTransition(() => flushSync(next))
+      // 연달아 전환하면 앞 전환은 건너뛴다. 건너뛴 전환의 AbortError 는 정상 동작이므로 삼킨다
+      vt?.skipTransition()
+      const t = (vt = document.startViewTransition(() => flushSync(next)))
+      for (const p of [t.ready, t.finished]) p.catch(() => {})
     }
     addEventListener('hashchange', on)
     return () => removeEventListener('hashchange', on)
