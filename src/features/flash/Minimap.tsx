@@ -1,8 +1,8 @@
 // 전체 트리 축소판 — editor/graph/layout.ts 를 읽기 전용으로 재사용
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import type { ColorInfo } from '../../core/srs'
 import type { ID, TreeNode } from '../../core/types'
-import { layout } from '../editor/graph/layout'
+import { layout, VGAP } from '../editor/graph/layout'
 import { minimapNodes } from './flash'
 
 const SIZE = { w: 40, h: 16 } // 고정 크기 measure (글자 없음)
@@ -19,10 +19,19 @@ export default function Minimap({ nodes, rootId, currentId, colors, onGo }: Prop
   const g = useMemo(() => layout(minimapNodes(nodes), rootId, () => SIZE), [nodes, rootId])
   const byId = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes])
   const hasKids = useMemo(() => new Set(nodes.map((n) => n.parentId)), [nodes])
+  const [open, setOpen] = useState(false) // 모바일에서만 의미 있음 — 데스크톱 CSS 는 이 상태를 보지 않는다
+  const at = g.boxes.get(currentId)
+  // 접힌 띠의 초점: 현재 노드와 자식 행의 가운데 (자식이 없으면 노드 자신)
+  const focus = {
+    '--mm-w': g.width,
+    '--mm-h': g.height,
+    '--mm-x': at ? at.x + at.w / 2 : 0,
+    '--mm-y': at ? at.y + at.h / 2 + (hasKids.has(currentId) ? (at.h + VGAP) / 2 : 0) : 0,
+  } as React.CSSProperties
   const lit = (id: ID) => id === currentId || byId.get(id)?.parentId === currentId
 
   return (
-    <figure className="minimap" aria-label="미니맵">
+    <figure className={`minimap${open ? ' open' : ''}`} aria-label="미니맵" style={focus}>
       <svg viewBox={`0 0 ${g.width} ${g.height}`} preserveAspectRatio="xMidYMin meet">
         {g.edges.map(([p, c]) => {
           const a = g.boxes.get(p)!
@@ -56,6 +65,9 @@ export default function Minimap({ nodes, rootId, currentId, colors, onGo }: Prop
           )
         })}
       </svg>
+      <button type="button" className="minimap-toggle" aria-expanded={open} aria-label={open ? '미니맵 접기' : '미니맵 펼치기'} onClick={() => setOpen((o) => !o)}>
+        <span className="chev" aria-hidden="true">▾</span>
+      </button>
     </figure>
   )
 }
