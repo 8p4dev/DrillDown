@@ -1,1 +1,380 @@
-/* 시안 C 서리 — agent GF 소유. 모든 규칙은 :root[data-look='frost'] 아래에 둔다 (docs/plans/orchestration_liquid_glass.md §3) */
+/* 시안 C 서리 — agent GF 소유. 모든 규칙은 :root[data-look='frost'] 아래에 둔다 (docs/plans/orchestration_liquid_glass.md §3)
+   논지: 유리의 맑기 = 기억의 선명도. 설계 근거는 docs/plans/agent_GF_frost.md
+   맑은 유리(알파 낮음 + 또렷한 빛줄기) → 창살이 비친다 / 서리(알파 높음 + 노이즈) → 비치지 않는다 */
+
+/* ---- 토큰 ---- */
+:root[data-look='frost'] {
+  --bg: #e8eef5; --surface: #fcfdff; --surface-2: #f0f4f9; --border: #cdd7e2; --border-strong: #9fb0c2;
+  --text: #111923; --text-2: #2f3c4b; --muted: #465261;
+  --accent: #1b54bf; --accent-soft: #1b54bf1c; --danger: #b3212f; --ok: #0f7a4b; --warn: #8c6200;
+  --radius-sm: 5px; --radius: 9px; --radius-lg: 12px;
+  --shadow: 0 1px 2px #1c2c4010, 0 1px 4px #1c2c4012;
+  --shadow-lift: 0 2px 6px #1c2c4014, 0 10px 24px #1c2c401f;
+  --shadow-pop: 0 6px 14px #1c2c401f, 0 18px 40px #1c2c4033;
+
+  /* 재질 재료 */
+  --frost-lead: #2a3543; /* 납선 */
+  --frost-rim: color-mix(in srgb, var(--frost-lead) 62%, transparent); /* 유리 표면 테두리 */
+  --frost-emerald: #1fc57f; --frost-lime: #a5df84; --frost-amber: #f2c94c; --frost-ruby: #ec3a48; --frost-haze: #e3e9f0;
+  --frost-wipe-fill: #dfe6ee;
+  --frost-under: transparent; /* 투명도 줄이기에서 var(--surface) 로 바뀌어 모든 색유리가 불투명해진다 */
+  --frost-green-a: 58%; --frost-lime-a: 52%; --frost-amber-a: 44%; --frost-red-a: 60%; --frost-none-a: 96%;
+  --frost-mist: #fff; /* 라임·호박 유리를 옅게 만드는 서리 색 */
+  --frost-mist-a: 52%;
+  --frost-pane-a: 84%; /* 라임·호박 유리의 불투명도 */
+  --frost-glass: 74%; --frost-glass-strong: 88%;
+  --frost-glass-fill: color-mix(in srgb, var(--surface) var(--frost-glass), transparent);
+  --frost-glass-fill-strong: color-mix(in srgb, var(--surface) var(--frost-glass-strong), transparent);
+  --frost-blur: blur(14px) saturate(1.25);
+  --frost-bevel: inset 0 1px 0 #ffffffb3;
+  --frost-sheen: #fff;
+  --frost-gloss: linear-gradient(#ffffffb3, transparent 55%);
+  --frost-streak-crisp: linear-gradient(112deg, transparent 0 14%, #ffffff6b 14% 21%, transparent 21% 24%, #ffffff3d 24% 26%, transparent 26%);
+  --frost-streak-soft: linear-gradient(112deg, transparent 6%, #ffffff47 18%, transparent 32%);
+  --frost-edge-rime: radial-gradient(ellipse 58% 75% at 0 100%, #ffffffc7, transparent 72%), radial-gradient(ellipse 50% 65% at 100% 0, #ffffffa6, transparent 72%);
+  /* 정지 SVG 노이즈. grain = 고운 입자, rime = 성에 덩어리 + 입자 */
+  --frost-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='f' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .2 0 0 0 0 .28 0 0 0 0 .38 0 0 0 .38 -.15'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23f)'/%3E%3C/svg%3E");
+  --frost-rime: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='320'%3E%3Cfilter id='f' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.012 .02' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 1.5 -.42'/%3E%3C/filter%3E%3Crect width='320' height='320' filter='url(%23f)'/%3E%3C/svg%3E");
+  /* 창살: 플래시 화면 배경에만 깐다. 맑은 유리 너머로만 또렷하다 */
+  --frost-bar: #2a354324;
+  --frost-lattice: repeating-linear-gradient(60deg, var(--frost-bar) 0 1.5px, transparent 1.5px 112px), repeating-linear-gradient(-60deg, var(--frost-bar) 0 1.5px, transparent 1.5px 112px);
+  --frost-glow: radial-gradient(60% 50% at 18% 6%, #ffffffd9, transparent 70%), radial-gradient(45% 45% at 88% 26%, #9cc8ff66, transparent 72%), radial-gradient(50% 45% at 62% 96%, #a6ebcb59, transparent 72%);
+  --frost-sky: linear-gradient(165deg, #f1f5fa, #dfe7f0);
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-look='frost'] {
+    --bg: #0b1017; --surface: #151c26; --surface-2: #10161f; --border: #2a3542; --border-strong: #46566a;
+    --text: #eaf0f6; --text-2: #c9d3de; --muted: #a0aebc;
+    --accent: #8fb6ff; --accent-soft: #8fb6ff24; --danger: #ff8585; --ok: #52d691; --warn: #efc24a;
+    --shadow: 0 1px 2px #0007, 0 1px 3px #0005;
+    --shadow-lift: 0 2px 6px #0008, 0 10px 24px #0007;
+    --shadow-pop: 0 6px 14px #0009, 0 18px 40px #0009;
+
+    --frost-lead: #03060a;
+    --frost-rim: #5a6b8099;
+    --frost-emerald: #15a368; --frost-lime: #6a9d55; --frost-amber: #a8862a; --frost-ruby: #d63e4b; --frost-haze: #232c37;
+    --frost-wipe-fill: #242d38;
+    --frost-green-a: 52%; --frost-lime-a: 36%; --frost-amber-a: 34%; --frost-red-a: 56%; --frost-none-a: 97%;
+    --frost-mist: #1c2530; --frost-mist-a: 36%; --frost-pane-a: 92%;
+    --frost-glass: 72%; --frost-glass-strong: 86%;
+    --frost-bevel: inset 0 1px 0 #ffffff14;
+    --frost-sheen: #ffffff24;
+    --frost-gloss: linear-gradient(#ffffff12, transparent 55%);
+    --frost-streak-crisp: linear-gradient(112deg, transparent 0 14%, #ffffff17 14% 21%, transparent 21% 24%, #ffffff0d 24% 26%, transparent 26%);
+    --frost-streak-soft: linear-gradient(112deg, transparent 6%, #ffffff0f 18%, transparent 32%);
+    --frost-edge-rime: radial-gradient(ellipse 58% 75% at 0 100%, #ffffff17, transparent 72%), radial-gradient(ellipse 50% 65% at 100% 0, #ffffff12, transparent 72%);
+    --frost-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='f' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .16 -.06'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23f)'/%3E%3C/svg%3E");
+    --frost-rime: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='320'%3E%3Cfilter id='f' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.012 .02' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .17 -.055'/%3E%3C/filter%3E%3Crect width='320' height='320' filter='url(%23f)'/%3E%3C/svg%3E");
+    --frost-bar: #ffffff12;
+    --frost-glow: radial-gradient(60% 50% at 18% 0, #4678c82e, transparent 72%), radial-gradient(50% 45% at 86% 82%, #288c6e24, transparent 72%);
+    --frost-sky: linear-gradient(165deg, #0e141c, #080b10);
+  }
+}
+
+/* ---- 배경: 정지 층 하나. 퀴즈는 무지로 낮추고(회상 방해 금지), 플래시에만 창살과 빛을 깐다 ---- */
+:root[data-look='frost'] body { background: transparent; }
+:root[data-look='frost'] body::before {
+  content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background-color: var(--bg); background-image: var(--frost-grain), var(--frost-sky);
+}
+:root[data-look='frost'] body:has(.flash)::before { background-image: var(--frost-lattice), var(--frost-glow), var(--frost-sky); }
+:root[data-look='frost'] body:has(.dnd)::before { background-image: none; }
+
+/* ---- 공통 콘텐츠 ---- */
+:root[data-look='frost'] .card { border-color: var(--border-strong); background-image: var(--frost-grain); box-shadow: var(--shadow), var(--frost-bevel); }
+:root[data-look='frost'] table { border-color: var(--border-strong); }
+:root[data-look='frost'] input::placeholder, :root[data-look='frost'] textarea::placeholder { color: var(--muted); }
+:root[data-look='frost'] button.primary {
+  background-image: linear-gradient(#ffffff24, transparent 60%);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--accent) 40%, transparent), inset 0 1px 0 #ffffff3d, inset 0 0 0 1px color-mix(in srgb, var(--frost-lead) 30%, transparent);
+}
+:root[data-look='frost'] .trees-empty { border-color: var(--border-strong); background-color: var(--surface-2); background-image: var(--frost-rime), var(--frost-grain); }
+
+/* ---- 조작 표면 ---- */
+/* 전역 reduced-motion 규칙(transition-duration: 1ms, 속성 기본값 all)이 backdrop-filter 를 전환시켜 설정 변경 직후 옛 유리가 남지 않게 */
+:root[data-look='frost'] :is(.topnav, .zoom-tools, .keys, .toast, .tree-menu-list, .flash-nav, .dnd-dock, .dnd-bar, .dnd-ghost) { transition-property: none; }
+:root[data-look='frost'] .topnav {
+  background-color: var(--frost-glass-fill); background-image: var(--frost-grain);
+  backdrop-filter: var(--frost-blur); -webkit-backdrop-filter: var(--frost-blur);
+  border-bottom: 1.5px solid var(--frost-rim);
+  box-shadow: var(--frost-bevel), 0 6px 18px -12px #0b162466;
+}
+:root[data-look='frost'] .topnav a { color: var(--text-2); }
+:root[data-look='frost'] .topnav .brand { color: var(--text); }
+:root[data-look='frost'] .topnav a.active { color: var(--accent); background: color-mix(in srgb, var(--accent) 13%, var(--surface)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 38%, transparent); }
+/* 로고: 납선으로 나눈 네 조각 유리 = 네 가지 맑기 */
+:root[data-look='frost'] .topnav .brand::before {
+  border-radius: 4px; box-sizing: border-box; border: 1.5px solid var(--frost-lead);
+  background:
+    linear-gradient(var(--frost-lead), var(--frost-lead)) center / 1.5px 100% no-repeat,
+    linear-gradient(var(--frost-lead), var(--frost-lead)) center / 100% 1.5px no-repeat,
+    conic-gradient(#27c281 0 25%, #e5404d 0 50%, #d7dfe8 0 75%, #a5df84 0);
+  box-shadow: none;
+}
+:root[data-look='frost'] .topnav .look-picker { background-color: color-mix(in srgb, var(--surface) 62%, transparent); border-color: var(--border-strong); }
+
+/* 모드 탭: 납선으로 나눈 판유리 띠. 뒤로 지나가는 것이 없어 backdrop-filter 는 쓰지 않는다 */
+:root[data-look='frost'] .mode-tabs {
+  gap: 0; padding: 0; overflow: hidden; border-radius: var(--radius); background-color: color-mix(in srgb, var(--surface) 66%, transparent);
+  background-image: var(--frost-grain); border: 1.5px solid var(--frost-rim); box-shadow: var(--frost-bevel);
+}
+:root[data-look='frost'] .mode-tabs a { border-radius: 0; color: var(--text-2); padding-block: .4rem; }
+:root[data-look='frost'] .mode-tabs a + a { border-left: 1px solid var(--frost-rim); }
+:root[data-look='frost'] .mode-tabs a[aria-current='page'] {
+  color: var(--accent); box-shadow: inset 0 -2.5px 0 var(--accent);
+  background: var(--frost-streak-crisp), color-mix(in srgb, var(--accent) 15%, var(--surface));
+}
+@media (max-width: 760px) {
+  :root[data-look='frost'] .mode-tabs { overflow-x: auto; }
+  :root[data-look='frost'] .mode-tabs a { min-height: 44px; box-sizing: border-box; }
+}
+
+:root[data-look='frost'] .zoom-tools {
+  border-radius: var(--radius); background-color: var(--frost-glass-fill-strong); background-image: var(--frost-grain);
+  backdrop-filter: var(--frost-blur); -webkit-backdrop-filter: var(--frost-blur);
+  border: 1.5px solid var(--frost-rim);
+  box-shadow: var(--shadow-lift), var(--frost-bevel);
+}
+:root[data-look='frost'] .editor .zoom-tools button { border-radius: 6px; }
+:root[data-look='frost'] .zoom-tools output { color: var(--text-2); }
+:root[data-look='frost'] .zoom-group { border-right-color: color-mix(in srgb, var(--frost-lead) 35%, transparent); }
+
+:root[data-look='frost'] .keys, :root[data-look='frost'] .tree-menu-list {
+  background-color: var(--frost-glass-fill-strong); background-image: var(--frost-grain);
+  backdrop-filter: var(--frost-blur); -webkit-backdrop-filter: var(--frost-blur);
+  border: 1.5px solid var(--frost-rim);
+}
+:root[data-look='frost'] .keys { box-shadow: var(--shadow-pop), var(--frost-bevel); }
+:root[data-look='frost'] .tree-menu-list { box-shadow: var(--shadow-lift), var(--frost-bevel); }
+/* 1단 배치의 단축키 시트는 유리 도구를 덮는다: 유리 위 유리 금지(G7), 글자가 많아 불투명 */
+@media (max-width: 860px) {
+  :root[data-look='frost'] .keys { background-color: var(--surface); background-image: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
+:root[data-look='frost'] .keys dd { color: var(--text-2); }
+:root[data-look='frost'] .keys kbd { background: var(--surface); border-color: var(--border-strong); }
+
+/* 토스트: 연기 유리. 어느 면 위에 떠도 글자를 지키도록 어둡게(다크에서는 밝게) 민다 */
+:root[data-look='frost'] .toast {
+  background: color-mix(in srgb, var(--text) 91%, transparent); border: 1px solid color-mix(in srgb, var(--surface) 22%, transparent);
+  backdrop-filter: var(--frost-blur); -webkit-backdrop-filter: var(--frost-blur);
+}
+:root[data-look='frost'] .toast button { color: #a9c6ff; }
+@media (prefers-color-scheme: dark) { :root[data-look='frost'] .toast button { color: #1d4fb8; } }
+
+/* ---- 플래시: 재질이 곧 숙련도 ---- */
+:root[data-look='frost'] .flash { --ok-soft: var(--frost-lime); }
+:root[data-look='frost'] :is(.flash-concept, .flash-kid) {
+  border-width: 1.5px; background-color: var(--tone); background-image: var(--frost-mat, none);
+  box-shadow: var(--frost-cast, var(--shadow)), var(--frost-bevel), inset 0 0 0 1px color-mix(in srgb, var(--frost-sheen) 22%, transparent);
+}
+:root[data-look='frost'] .flash .flash-concept:hover:not(:disabled) {
+  background-image: var(--frost-mat, none);
+  box-shadow: var(--frost-cast, var(--shadow)), var(--shadow-lift), var(--frost-bevel);
+}
+/* 맑은 초록: 알파가 가장 낮고 빛줄기가 또렷하다. 빛을 통과시켜 색 그림자를 던진다 */
+:root[data-look='frost'] :is(.flash-concept, .flash-kid)[data-color='green'] {
+  --tone: color-mix(in srgb, var(--frost-emerald) var(--frost-green-a), var(--frost-under));
+  --edge: color-mix(in srgb, var(--ok) 72%, var(--frost-lead));
+  --band: var(--ok);
+  --frost-mat: var(--frost-streak-crisp);
+  --frost-cast: 0 6px 14px -6px color-mix(in srgb, var(--frost-emerald) 60%, transparent);
+}
+/* 바래는 연두: 서리가 모서리부터 끼고 빛줄기가 흐려진다. 띠는 점선 */
+:root[data-look='frost'] :is(.flash-concept, .flash-kid)[data-color='lightgreen'] {
+  --tone: color-mix(in srgb, color-mix(in srgb, var(--frost-lime) var(--frost-lime-a), var(--frost-mist)) var(--frost-pane-a), var(--frost-under));
+  --edge: color-mix(in srgb, var(--frost-lime) 62%, var(--frost-lead));
+  --band: repeating-linear-gradient(90deg, color-mix(in srgb, var(--frost-lime) 70%, var(--frost-lead)) 0 12px, transparent 12px 20px);
+  --frost-mat: var(--frost-grain), var(--frost-edge-rime), var(--frost-streak-soft);
+}
+:root[data-look='frost'] :is(.flash-concept, .flash-kid)[data-color='yellow'] {
+  --tone: color-mix(in srgb, color-mix(in srgb, var(--frost-amber) var(--frost-amber-a), var(--frost-mist)) var(--frost-pane-a), var(--frost-under));
+  --edge: color-mix(in srgb, var(--frost-amber) 62%, var(--frost-lead));
+  --band: repeating-linear-gradient(90deg, color-mix(in srgb, var(--frost-amber) 70%, var(--frost-lead)) 0 12px, transparent 12px 20px);
+  --frost-mat: var(--frost-grain), var(--frost-edge-rime), var(--frost-streak-soft);
+}
+/* 붉은 색유리: 맑지만 경고. 띠는 굵은 빗금 */
+:root[data-look='frost'] :is(.flash-concept, .flash-kid)[data-color='red'] {
+  --tone: color-mix(in srgb, var(--frost-ruby) var(--frost-red-a), var(--frost-under));
+  --edge: color-mix(in srgb, var(--frost-ruby) 72%, var(--frost-lead));
+  --band: repeating-linear-gradient(135deg, var(--frost-ruby) 0 7px, var(--frost-lead) 7px 10px);
+  --frost-band-h: 7px;
+  --frost-mat: var(--frost-streak-crisp);
+  --frost-cast: 0 6px 14px -6px color-mix(in srgb, var(--frost-ruby) 60%, transparent);
+}
+/* 안 봄: 전면 서리. 창살이 비치지 않고 띠도 없다 */
+:root[data-look='frost'] :is(.flash-concept, .flash-kid)[data-color='none'] {
+  --tone: color-mix(in srgb, var(--frost-haze) var(--frost-none-a), var(--frost-under));
+  --edge: color-mix(in srgb, var(--frost-lead) 38%, var(--border-strong));
+  --band: transparent;
+  --frost-mat: var(--frost-rime), var(--frost-edge-rime);
+}
+:root[data-look='frost'] .flash .flash-concept::before, :root[data-look='frost'] .flash .flash-kid::before { height: var(--frost-band-h, 4px); }
+:root[data-look='frost'] .flash-concept .flash-count { color: var(--text); background: color-mix(in srgb, var(--text) 9%, transparent); }
+:root[data-look='frost'] .flash-concept[aria-expanded='true'] .flash-count { color: var(--text); background: color-mix(in srgb, var(--text) 13%, transparent); }
+:root[data-look='frost'] .flash-note { color: var(--text-2); }
+:root[data-look='frost'] :is(.flash-concept, .flash-kid):is([data-color='green'], [data-color='red']) .flash-note { color: var(--text); }
+:root[data-look='frost'] .flash-path { color: var(--text-2); }
+:root[data-look='frost'] .flash-path button.link { color: var(--text-2); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--text-2) 40%, transparent); text-underline-offset: 2px; }
+:root[data-look='frost'] .flash-rate button:not(.flash-result) { border-color: var(--border-strong); }
+
+/* 답 공개 = 서리 닦기: 왼쪽부터 한 번 닦인다. 기본 상태가 투명이라 애니메이션이 없어도 내용이 보인다 */
+:root[data-look='frost'] .flash-kid::after {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; z-index: 1;
+  background-color: var(--frost-wipe-fill); background-image: var(--frost-rime), var(--frost-edge-rime);
+  -webkit-mask-image: linear-gradient(100deg, transparent 40%, #000 60%); mask-image: linear-gradient(100deg, transparent 40%, #000 60%);
+  -webkit-mask-size: 300% 100%; mask-size: 300% 100%;
+  animation: frost-wipe 640ms cubic-bezier(.45, .05, .35, 1) calc(var(--i, 0) * 70ms + 140ms) 1 backwards;
+}
+/* 알음으로 평가: 약하게 한 번 더 닦여 맑아진다 */
+:root[data-look='frost'] .flash-kid[data-rated='known']::after { animation: frost-glint 460ms ease-out 1; }
+@keyframes frost-wipe {
+  from { opacity: 1; -webkit-mask-position: 100% 0; mask-position: 100% 0; }
+  to { opacity: 1; -webkit-mask-position: 0 0; mask-position: 0 0; }
+}
+@keyframes frost-glint {
+  from { opacity: .6; -webkit-mask-position: 100% 0; mask-position: 100% 0; }
+  to { opacity: .6; -webkit-mask-position: 0 0; mask-position: 0 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root[data-look='frost'] .flash-kid::after, :root[data-look='frost'] .flash-kid[data-rated='known']::after { animation: none; }
+}
+
+/* 요약: 숫자 칸도 같은 유리 */
+:root[data-look='frost'] .flash-summary-nums > span { color: var(--text-2); border-width: 1.5px; }
+:root[data-look='frost'] .flash-summary-nums .known { background: var(--frost-streak-crisp), color-mix(in srgb, var(--frost-emerald) 30%, var(--surface)); border-color: color-mix(in srgb, var(--ok) 72%, var(--frost-lead)); }
+:root[data-look='frost'] .flash-summary-nums .unknown { background: var(--frost-streak-crisp), color-mix(in srgb, var(--frost-ruby) 26%, var(--surface)); border-color: color-mix(in srgb, var(--frost-ruby) 72%, var(--frost-lead)); }
+:root[data-look='frost'] .flash-summary-nums .known strong, :root[data-look='frost'] .flash-summary-nums .unknown strong { color: var(--text); }
+:root[data-look='frost'] .flash-missed li { color: var(--text); background: color-mix(in srgb, var(--frost-ruby) 24%, var(--surface)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--frost-ruby) 60%, transparent); }
+
+/* 미니맵 = 기억의 스테인드글라스: 두 모드 모두 어두운 납 패널 위의 색유리. 토큰을 지역으로 바꿔 기본 규칙(접힌 띠 그라데이션 포함)을 그대로 쓴다 */
+:root[data-look='frost'] .minimap {
+  --surface: #18212b; --border: #4e5d6f; --accent: #a8c8ff; --muted: #c5d0dc;
+  --ok: #2fd08a; --ok-soft: #b9eb9a; --warn: #f4c542; --no: #f0525f;
+  border: 1.5px solid var(--frost-rim); box-shadow: var(--shadow-lift), inset 0 1px 0 #ffffff1f;
+}
+:root[data-look='frost'] .mm-node:not(.lit) { opacity: .92; }
+:root[data-look='frost'] .mm-node rect { rx: 3px; fill: #b4c0cd; fill-opacity: .5; stroke: none; }
+:root[data-look='frost'] .mm-node[data-color='green'] rect { fill: var(--ok); fill-opacity: 1; stroke: #eafff4; stroke-width: 1.5; }
+:root[data-look='frost'] .mm-node[data-color='lightgreen'] rect { fill: var(--ok-soft); fill-opacity: .8; stroke: #f3fff0; stroke-width: 2; stroke-dasharray: 12 7; }
+:root[data-look='frost'] .mm-node[data-color='yellow'] rect { fill: var(--warn); fill-opacity: .8; stroke: #fff6da; stroke-width: 2; stroke-dasharray: 12 7; }
+:root[data-look='frost'] .mm-node[data-color='red'] rect { rx: 0; fill: var(--no); fill-opacity: 1; stroke: #ffe2e4; stroke-width: 2.5; }
+:root[data-look='frost'] .mm-node.lit rect { stroke: var(--accent); stroke-width: 3; }
+:root[data-look='frost'] .mm-node.current rect { stroke: #fff; stroke-width: 5; stroke-dasharray: none; }
+:root[data-look='frost'] .mm-node.go:focus-visible rect { stroke: var(--accent); stroke-width: 4; }
+@media (hover: hover) { :root[data-look='frost'] .mm-node.go:hover rect { stroke: var(--accent); stroke-width: 4; } }
+
+@media (max-width: 760px) {
+  :root[data-look='frost'] .flash-nav {
+    background-color: var(--frost-glass-fill-strong); background-image: var(--frost-grain);
+    backdrop-filter: var(--frost-blur); -webkit-backdrop-filter: var(--frost-blur);
+    border-top: 1.5px solid var(--frost-rim);
+  }
+}
+
+/* ---- 에디터: 숙련도 없음. 중립 판유리, 오답 농도만 붉은 색유리(G9) ---- */
+:root[data-look='frost'] .outline { border: 1.5px solid var(--frost-rim); }
+:root[data-look='frost'] .node-row {
+  --card-border: var(--border-strong);
+  background: color-mix(in srgb, var(--frost-ruby) calc(var(--heat) * 42%), var(--card));
+  border-color: color-mix(in srgb, var(--frost-ruby) calc(var(--heat) * 85%), var(--card-border));
+}
+/* 빛줄기는 오답이 있는 카드에만: 300장 카드 페인트 비용 */
+:root[data-look='frost'] .node-row:not([data-miss='0']) { background-image: var(--frost-streak-soft); }
+:root[data-look='frost'] .node-row.root { --card: color-mix(in srgb, var(--accent) 15%, var(--surface)); --card-border: color-mix(in srgb, var(--accent) 62%, var(--frost-lead)); }
+/* 드는 순간만 비치는 유리. 콘텐츠 카드라 backdrop-filter 는 쓰지 않는다(G2) */
+:root[data-look='frost'] .node-row.lifted { --card: color-mix(in srgb, var(--surface) var(--frost-glass-strong), transparent); box-shadow: var(--shadow-pop), var(--frost-bevel); }
+:root[data-look='frost'] .node-row.lifted.selected { box-shadow: 0 0 0 2px var(--accent), var(--shadow-pop), var(--frost-bevel); }
+:root[data-look='frost'] .badge { border-color: var(--border-strong); color: var(--text-2); }
+:root[data-look='frost'] .badge.folded { color: var(--surface); border-color: var(--accent); }
+:root[data-look='frost'] .detail { border-color: var(--border-strong); box-shadow: var(--shadow), var(--frost-bevel); }
+:root[data-look='frost'] .toolbar { border-color: var(--border); }
+:root[data-look='frost'] .side summary { color: var(--text-2); }
+
+/* ---- 목록: 아바타가 작은 색유리 타일 ---- */
+:root[data-look='frost'] .tree-avatar {
+  border-radius: var(--radius-sm); color: color-mix(in srgb, var(--tone) 42%, var(--text));
+  background: var(--frost-streak-crisp), linear-gradient(135deg, color-mix(in srgb, var(--tone) 34%, var(--surface)), color-mix(in srgb, var(--tone) 16%, var(--surface)));
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--tone) 55%, var(--frost-lead));
+}
+:root[data-look='frost'] .tree-modes { border-color: var(--border-strong); }
+:root[data-look='frost'] .tree-modes a { color: var(--text-2); background: var(--surface-2); }
+:root[data-look='frost'] .tree-modes a + a { border-left-color: var(--border-strong); }
+@media (hover: hover) {
+  :root[data-look='frost'] .tree-cards li:hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--border-strong)); box-shadow: var(--shadow-lift), var(--frost-bevel); }
+  :root[data-look='frost'] .tree-modes a:hover { color: var(--accent); background: color-mix(in srgb, var(--accent) 11%, var(--surface)); }
+}
+
+/* ---- 퀴즈: 숙련도 없음(정답 단서 금지). 빈칸 = 서리 낀 칸, 카드 = 맑은 유리 조각, 결과만 색유리 ---- */
+:root[data-look='frost'] .dnd-canvas { border-color: var(--border-strong); }
+:root[data-look='frost'] .dnd-node { border-color: var(--border-strong); }
+:root[data-look='frost'] .dnd-node.root { background: color-mix(in srgb, var(--accent) 15%, var(--surface)); border-color: color-mix(in srgb, var(--accent) 62%, var(--frost-lead)); }
+:root[data-look='frost'] .dnd-slot {
+  background-color: color-mix(in srgb, var(--frost-haze) 45%, var(--surface)); background-image: var(--frost-grain);
+  border-color: color-mix(in srgb, var(--frost-lead) 42%, var(--border-strong));
+  box-shadow: inset 0 1px 4px color-mix(in srgb, var(--text) 12%, transparent);
+}
+:root[data-look='frost'] .dnd-slot.filled { background: none; box-shadow: none; border-color: transparent; }
+:root[data-look='frost'] .dnd-slot.target:not(.filled) { background: var(--accent-soft); border-color: transparent; }
+:root[data-look='frost'] .dnd-card {
+  border-color: color-mix(in srgb, var(--frost-lead) 55%, var(--border-strong)); background-color: var(--surface); background-image: var(--frost-gloss);
+  box-shadow: var(--shadow), var(--frost-bevel);
+}
+@media (hover: hover) {
+  :root[data-look='frost'] .dnd-card:hover:not(:disabled) { background-color: var(--surface); background-image: var(--frost-gloss); border-color: var(--accent); }
+}
+:root[data-look='frost'] .dnd-card.sel { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft), var(--shadow-lift); }
+:root[data-look='frost'] .dnd-tray { border-color: var(--border-strong); }
+:root[data-look='frost'] .dnd-progress { color: var(--text-2); }
+:root[data-look='frost'] .dnd-progress > span { background: var(--border-strong); }
+
+:root[data-look='frost'] [data-result='ok'] {
+  background: var(--frost-gloss), color-mix(in srgb, var(--frost-emerald) 40%, var(--surface)) !important;
+  border-color: color-mix(in srgb, var(--ok) 80%, var(--frost-lead)) !important;
+}
+:root[data-look='frost'] [data-result='wrong'] {
+  background: var(--frost-gloss), color-mix(in srgb, var(--frost-ruby) 36%, var(--surface)) !important;
+  border-color: color-mix(in srgb, var(--frost-ruby) 80%, var(--frost-lead)) !important; border-width: 2px;
+}
+
+/* 끄는 카드: 조작하는 순간만 진짜 유리. 흐림이 아래 글자를 지워 글자 위 글자를 막는다(G7) */
+:root[data-look='frost'] .dnd-ghost {
+  background-color: color-mix(in srgb, var(--surface) var(--frost-glass), transparent); background-image: var(--frost-gloss);
+  backdrop-filter: var(--frost-blur); -webkit-backdrop-filter: var(--frost-blur);
+  border: 1.5px solid var(--accent); box-shadow: var(--shadow-pop), var(--frost-bevel);
+}
+@media (min-width: 761px) {
+  :root[data-look='frost'] .dnd:not(.locked):has(.dnd-side) .dnd-dock {
+    background: var(--frost-glass-fill-strong); backdrop-filter: var(--frost-blur); -webkit-backdrop-filter: var(--frost-blur);
+    border-top: 1.5px solid var(--frost-rim);
+  }
+}
+@media (max-width: 760px) {
+  :root[data-look='frost'] .dnd-dock {
+    background-color: var(--frost-glass-fill-strong); background-image: var(--frost-grain);
+    backdrop-filter: var(--frost-blur); -webkit-backdrop-filter: var(--frost-blur);
+    border-top: 1.5px solid var(--frost-rim);
+  }
+  :root[data-look='frost'] .dnd.locked .dnd-dock { backdrop-filter: none; -webkit-backdrop-filter: none; }
+  :root[data-look='frost'] .dnd.locked .dnd-tray { border-color: var(--border-strong); }
+  :root[data-look='frost'] .dnd.locked .dnd-bar {
+    background-color: var(--frost-glass-fill-strong); background-image: var(--frost-grain);
+    backdrop-filter: var(--frost-blur); -webkit-backdrop-filter: var(--frost-blur);
+    border-top: 1.5px solid var(--frost-rim);
+  }
+}
+
+/* ---- 접근성: 토큰 스위치로 유리·노이즈·창살을 한 번에 끈다 ---- */
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more), (forced-colors: active) {
+  :root[data-look='frost'] {
+    --frost-under: var(--surface); --frost-pane-a: 100%; --frost-none-a: 100%;
+    --frost-glass: 100%; --frost-glass-strong: 100%; --frost-blur: none;
+    --frost-grain: none; --frost-rime: none; --frost-lattice: none; --frost-glow: none;
+    --frost-streak-crisp: none; --frost-streak-soft: none; --frost-edge-rime: none; --frost-gloss: none;
+  }
+}
+@media (prefers-contrast: more) {
+  :root[data-look='frost'] { --border: var(--text-2); --border-strong: var(--text); --muted: var(--text-2); }
+}
+@media (forced-colors: active) {
+  :root[data-look='frost'] .flash-kid::after { content: none; }
+}
