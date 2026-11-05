@@ -28,12 +28,18 @@ async function seed(page: Page) {
   await page.getByLabel('개요 텍스트').fill(OUTLINE)
   await page.getByRole('button', { name: '선택 노드의 자식으로 추가' }).click()
   await expect(page.locator('.node-row[data-node-id]')).toHaveCount(10)
-  await card(page, '근로계약').click()
+  await pick(page, '근로계약')
   await page.getByLabel('패널 내용').fill('- 근로기준법 제2조\n- 사용자와 근로자의 합의')
-  await card(page, '해고').click() // 내용 칸 blur → 저장
+  await pick(page, '해고') // 내용 칸 blur → 저장
   return new URL(page.url()).hash.split('/')[2]
 }
 const card = (page: Page, t: string) => page.locator('.node-row[data-node-id]').filter({ has: page.locator('.node-title', { hasText: new RegExp(`^${t}$`) }) })
+/** 카드 윗부분을 누른다: 모바일 축소 배율에서는 가운데를 누르면 넓어진 접기 배지 터치 영역에 걸려 가지가 접힌다 */
+const pick = async (page: Page, t: string) => {
+  const c = card(page, t)
+  const b = (await c.boundingBox())!
+  await c.click({ position: { x: b.width * 0.3, y: 3 } })
+}
 const go = async (page: Page, hash: string) => {
   await page.evaluate((h) => { location.hash = h }, hash)
   await page.waitForTimeout(350)
@@ -68,7 +74,13 @@ async function contrastFails(page: Page) {
       const range = document.createRange()
       range.selectNodeContents(node)
       const b = range.getBoundingClientRect()
-      const x0 = Math.max(b.left, 0), y0 = Math.max(b.top, 0), x1 = Math.min(b.right, innerWidth), y1 = Math.min(b.bottom, innerHeight)
+      let x0 = Math.max(b.left, 0), y0 = Math.max(b.top, 0), x1 = Math.min(b.right, innerWidth), y1 = Math.min(b.bottom, innerHeight)
+      // 스크롤러에 잘린 글자는 보이는 부분만 잰다: 캔버스 테두리 밖 픽셀을 배경으로 치면 안 된다
+      for (let p = el.parentElement; p; p = p.parentElement) {
+        if (getComputedStyle(p).overflow === 'visible') continue
+        const c = p.getBoundingClientRect()
+        x0 = Math.max(x0, c.left + p.clientLeft); y0 = Math.max(y0, c.top + p.clientTop); x1 = Math.min(x1, c.left + p.clientLeft + p.clientWidth); y1 = Math.min(y1, c.top + p.clientTop + p.clientHeight)
+      }
       if (x1 - x0 < 2 || y1 - y0 < 2) continue
       if (!el.contains(document.elementFromPoint((x0 + x1) / 2, (y0 + y1) / 2))) continue // 다른 요소에 가려짐
       const px = parseFloat(cs.fontSize)
@@ -166,13 +178,13 @@ for (const scheme of ['light', 'dark'] as const) {
           fails.push(...a.map((s) => `[${at}] ${s}`))
         }
         const id = await seed(page)
-        await page.waitForTimeout(3500) // 가져오기 토스트가 사라지길 기다린다
+        await expect(page.locator('.toast')).toHaveCount(0, { timeout: 15_000 }) // 측정 중에 토스트가 사라지면 대비를 잘못 잰다
         await shot('editor')
         await page.keyboard.press('Shift+Slash')
         await page.waitForTimeout(150)
         await shot('editor-keys')
         await page.keyboard.press('Escape')
-        await card(page, '평균임금').click()
+        await pick(page, '평균임금')
         await page.getByRole('tree').press('Delete')
         await page.waitForTimeout(150)
         await shot('editor-toast')
