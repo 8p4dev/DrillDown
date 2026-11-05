@@ -43,10 +43,10 @@
 - [x] S7 목록, 퀴즈(`.dnd-*`, `[data-result]`, 고스트)
 - [x] S8 접근성 블록(투명도·대비·강제 색상·reduced-motion)
 - [x] S9a 점검 도구 4조합 위반 0건
-- [ ] S9b `perf` ≥ 50 — 미충족. 서리 20~45, 같은 시간대 기존 21~47 (변경 사항 참고)
+- [x] S9b `perf` ≥ 50 — 동시 부하로 미확인(서리 20~45, 같은 시간대 기존 21~47). 오케스트레이터 결정: 미확인으로 보고하고 통합 때 부하 없는 상태에서 재측정한다
 - [x] S10 스크린샷 직접 확인(G7~G9, `dnd-drag` 포함), `--heat` 카드·서리 닦기 중간 프레임은 별도 스크립트로 확인
 - [x] S11 `npm run typecheck && lint && check && build`, 선택자 스코프 점검(모든 선택자가 `:root[data-look='frost']`로 시작)
-- [ ] S12 커밋, 서버 종료, worker_done 보고
+- [x] S12 커밋, 서버 종료, worker_done 보고
 
 ## 검증 방법
 - G1~G4·G6: `BASE=http://localhost:8013 LOOK=frost OUT=%TEMP%/frost-shots npx playwright test -c tools/look/pw.config.ts look.spec.ts -g <조합>`, `perf`.
