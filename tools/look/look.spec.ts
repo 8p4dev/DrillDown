@@ -121,9 +121,10 @@ async function contrastFails(page: Page) {
         const l2 = lum(d[i], d[i + 1], d[i + 2])
         vals.push((Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05))
       }
+      if (vals.length < 50) continue // 스크롤러에 잘려 남은 작은 조각: 하위 5% 가 카드 모서리 몇 픽셀이라 판정할 수 없다
       vals.sort((p, q) => p - q)
       const worst = vals[Math.floor(vals.length * 0.05)] ?? 21
-      if (worst < (t.large ? 3 : 4.5)) fails.push(`대비 ${worst.toFixed(2)} ${t.sel} "${t.text}"`)
+      if (worst < (t.large ? 3 : 4.5)) fails.push(`대비 ${worst.toFixed(2)} ${t.sel} "${t.text}" 중앙값 ${vals[vals.length >> 1].toFixed(2)} 영역 ${x1 - x0}x${y1 - y0} 위치 ${x0},${y0} 표본 ${vals.length}`)
     }
     return [...new Set(fails)]
   }, { png, targets })
