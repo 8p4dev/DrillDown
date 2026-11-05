@@ -42,9 +42,10 @@
 - [x] S6 에디터(`--heat` 포함), `.lifted`, `.badge`, `.detail`, `.toolbar`
 - [x] S7 목록, 퀴즈(`.dnd-*`, `[data-result]`, 고스트)
 - [x] S8 접근성 블록(투명도·대비·강제 색상·reduced-motion)
-- [ ] S9 점검 도구 4조합 위반 0건, `perf` ≥ 50
-- [ ] S10 스크린샷 직접 확인(G7~G9, `dnd-drag` 포함), `--heat` 카드·서리 닦기 중간 프레임은 별도 스크립트로 확인
-- [ ] S11 `npm run typecheck && lint && check && build`, 선택자 스코프 점검(모든 선택자가 `:root[data-look='frost']`로 시작)
+- [x] S9a 점검 도구 4조합 위반 0건
+- [ ] S9b `perf` ≥ 50 — 미충족. 서리 20~45, 같은 시간대 기존 21~47 (변경 사항 참고)
+- [x] S10 스크린샷 직접 확인(G7~G9, `dnd-drag` 포함), `--heat` 카드·서리 닦기 중간 프레임은 별도 스크립트로 확인
+- [x] S11 `npm run typecheck && lint && check && build`, 선택자 스코프 점검(모든 선택자가 `:root[data-look='frost']`로 시작)
 - [ ] S12 커밋, 서버 종료, worker_done 보고
 
 ## 검증 방법
@@ -55,4 +56,9 @@
 - 빌드: `npm run typecheck && npm run lint && npm run check && npm run build`.
 
 ## 변경 사항
-(구현 중 계획과 달라지면 기록)
+- 퀴즈 카드·고스트·채점 결과의 빛줄기를 위쪽 광택(`--frost-gloss`)으로 바꿨다. 작은 조각의 또렷한 사선이 다크에서 글자 앞 `/`처럼 읽혔다.
+- 에디터 오답 카드의 빛줄기는 또렷한 것 대신 부드러운 것(`--frost-streak-soft`)을 쓴다. 같은 이유다.
+- 빈칸의 성에 얼룩(`--frost-rime`)을 고운 입자로 바꿨다. 작은 칸에서 흐린 글자처럼 보여 정답 힌트로 오해할 수 있었다. 서리 칸 표현은 그만큼 약해졌다.
+- 1단 배치(≤ 860px)의 `.keys` 시트는 유리 도구를 덮으므로 불투명으로 했다(G7).
+- 유리 표면에 `transition-property: none`을 추가했다. 전역 reduced-motion 규칙이 `backdrop-filter`를 1ms 전환시켜 설정 변경 직후 옛 값이 측정됐다.
+- S9 `perf` ≥ 50은 충족을 확인하지 못했다. 머신 부하로 기존 디자인도 21~44에 머문다. 번갈아 잰 5쌍의 중앙값은 기존 29, 서리 32로 서리가 느려지게 하는 징후는 없다. 통합 때 부하 없는 상태로 재측정이 필요하다.

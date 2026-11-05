@@ -28,7 +28,7 @@
   --frost-blur: blur(14px) saturate(1.25);
   --frost-bevel: inset 0 1px 0 #ffffffb3;
   --frost-sheen: #fff;
-  --frost-gloss: linear-gradient(#ffffffb3, transparent 55%);
+  --frost-gloss: linear-gradient(#ffffff6b, transparent 55%);
   --frost-streak-crisp: linear-gradient(112deg, transparent 0 14%, #ffffff6b 14% 21%, transparent 21% 24%, #ffffff3d 24% 26%, transparent 26%);
   --frost-streak-soft: linear-gradient(112deg, transparent 6%, #ffffff47 18%, transparent 32%);
   --frost-edge-rime: radial-gradient(ellipse 58% 75% at 0 100%, #ffffffc7, transparent 72%), radial-gradient(ellipse 50% 65% at 100% 0, #ffffffa6, transparent 72%);
