@@ -2,14 +2,27 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { logEvent } from '../../core/events'
 import { childrenOf } from '../../core/repo'
-import { colorClass, recordResult, type ColorInfo } from '../../core/srs'
+import { colorClass, type ColorInfo, type NodeColor } from '../../core/srs'
 import type { ID, NodeSrs, TreeNode } from '../../core/types'
+import { Icon } from '../../ui/Icon'
+import { I } from '../../ui/icons'
+import { chevronDown, cornerDownRight, x } from '../../ui/icons.all'
 import { parse, toHtml } from '../editor/content/format'
 import { haptic } from '../feel'
 import { plainNote } from './flash'
 
 /** 내용 서식(불릿·형광펜) 표시 — 에디터 렌더러 재사용. toHtml 은 텍스트를 이스케이프한다 */
 const Note = ({ note }: { note: string }) => <div className="flash-note" dangerouslySetInnerHTML={{ __html: toHtml(parse(note)) }} />
+
+/** 숙련도 4단계의 색 아닌 단서(01 §3.1.2): ✓✓ / ✓ / 없음 / ✕ */
+const Mark = ({ color }: { color: NodeColor }) => {
+  if (color !== 'green' && color !== 'lightgreen' && color !== 'red') return null
+  return (
+    <span className={`flash-state${color === 'green' ? ' dbl' : ''}`} aria-hidden="true">
+      {color === 'red' ? <Icon d={x} /> : <><Icon d={I.check} />{color === 'green' && <Icon d={I.check} />}</>}
+    </span>
+  )
+}
 
 const NONE: ColorInfo = { color: 'none', misplaced: false }
 
@@ -18,6 +31,8 @@ interface Props {
   nodes: TreeNode[]
   conceptId: ID
   colors: Map<ID, ColorInfo>
+  /** 평가 기록 — 데이터 소스 경유(StudySource.record). 돌려준 NodeSrs 로 색을 갱신한다 */
+  record: (nodeId: ID, ok: boolean) => Promise<NodeSrs>
   /** 평가 기록 후 호출 — 부모가 srs 맵·집계를 갱신 */
   onRated: (s: NodeSrs, known: boolean) => void
   /** 자식 있는 하위 노드로 더 들어가기. 없으면 버튼 숨김 */
@@ -32,7 +47,7 @@ interface Props {
 const typing = (e: KeyboardEvent) =>
   e.ctrlKey || e.metaKey || e.altKey || e.isComposing || (e.target as HTMLElement).closest?.('input, textarea, select, [contenteditable]')
 
-export default function FlashCard({ treeId, nodes, conceptId, colors, onRated, onDive, initialRated, onNext }: Props) {
+export default function FlashCard({ treeId, nodes, conceptId, colors, record, onRated, onDive, initialRated, onNext }: Props) {
   const concept = nodes.find((n) => n.id === conceptId)
   const kids = useMemo(() => childrenOf(nodes, conceptId), [nodes, conceptId])
   const [open, setOpen] = useState(false)
@@ -46,7 +61,7 @@ export default function FlashCard({ treeId, nodes, conceptId, colors, onRated, o
     haptic(known ? 'success' : 'warn')
     setRated((m) => new Map(m).set(n.id, known))
     setShook(known ? null : n.id)
-    const s = await recordResult(n.id, treeId, known)
+    const s = await record(n.id, known)
     await logEvent('flash_rated', { nodeId: n.id, known }, treeId)
     onRated(s, known)
   }
@@ -88,10 +103,11 @@ export default function FlashCard({ treeId, nodes, conceptId, colors, onRated, o
         aria-expanded={open}
         onClick={() => { setMounted(true); setOpen((o) => !o); setShook(null) }}
       >
+        <Mark color={color(concept.id).color} />
         <span className="flash-concept-title">{concept.title}</span>
         {note && <Note note={concept.note!} />}
         <span className="flash-count">
-          {kids.length ? <>하위 {kids.length}개<span className="chev" aria-hidden="true">▾</span></> : '하위 개념 없음'}
+          {kids.length ? <><span className="sr">하위 </span>{kids.length}<span className="sr">개</span><Icon d={chevronDown} className="chev" /></> : '하위 개념 없음'}
         </span>
       </button>
 
@@ -110,30 +126,31 @@ export default function FlashCard({ treeId, nodes, conceptId, colors, onRated, o
                 data-rated={r === undefined ? undefined : r ? 'known' : 'unknown'}
                 style={{ '--i': i } as React.CSSProperties}
               >
+                <Mark color={color(k.id).color} />
                 <div className="flash-kid-body">
                   <strong>{k.title}</strong>
                   {kn && <Note note={k.note!} />}
                   {grand > 0 && onDive && (
-                    <button type="button" className="flash-dive" title="더 들어가기" aria-label={`더 들어가기: 하위 ${grand}개`} onClick={() => onDive(k.id)}>
-                      ↳ {grand}
+                    <button type="button" className="flash-dive" data-tip="더 들어가기" aria-label={`더 들어가기: 하위 ${grand}개`} onClick={() => onDive(k.id)}>
+                      <Icon d={cornerDownRight} /> {grand}
                     </button>
                   )}
                 </div>
                 <div className="flash-rate">
                   {r === undefined ? (
                     <>
-                      <button type="button" className="known" title="알음 (1)" onClick={() => rate(k, true)}>알음</button>
-                      <button type="button" className="unknown" title="모름 (2)" onClick={() => rate(k, false)}>모름</button>
+                      <button type="button" className="known" data-tip="알음 (1)" onClick={() => rate(k, true)}><Icon d={I.check} /> 알음</button>
+                      <button type="button" className="unknown" data-tip="모름 (2)" onClick={() => rate(k, false)}><Icon d={x} /> 모름</button>
                     </>
                   ) : (
                     <button
                       type="button"
                       className={`flash-result ${r ? 'known' : 'unknown'}`}
-                      title="다시 평가"
+                      data-tip="다시 평가"
                       aria-label={`${r ? '알음' : '모름'} — 다시 평가`}
                       onClick={() => { setShook(null); setRated((m) => { const c = new Map(m); c.delete(k.id); return c }) }}
                     >
-                      <span className="flash-mark" aria-hidden="true">{r ? '✓' : '✕'}</span> {r ? '알음' : '모름'}
+                      <span className="flash-mark" aria-hidden="true"><Icon d={r ? I.check : x} /></span> {r ? '알음' : '모름'}
                     </button>
                   )}
                 </div>
