@@ -6,6 +6,7 @@ import { getRoot } from '../../core/repo'
 import type { ID, TreeNode } from '../../core/types'
 import { href } from '../../router'
 import { Icon } from '../../ui/Icon'
+import { I } from '../../ui/icons'
 import { checkCheck, eye, eyeOff, rotateCcw } from '../../ui/icons.all'
 import { haptic } from '../feel'
 import { coarseHint, useStudySource } from '../flash/study'
@@ -17,7 +18,7 @@ import { useDragDrop } from './useDragDrop'
 export default function DndPage({ treeId, rootId, source }: { treeId: string; rootId?: string; source?: StudySource }) {
   const src = useStudySource(source, treeId)
   const [all, setAll] = useState<TreeNode[] | null>(null)
-  useEffect(() => void src.nodes().then((ns) => { setAll(ns); coarseHint('dnd', '카드 탭 → 빈칸 탭') }), [src])
+  useEffect(() => void src.nodes().then((ns) => { setAll(ns); coarseHint('dnd', '카드 탭 → 빈칸 탭', I.squareDashed) }), [src])
   const rid = all && (all.some((n) => n.id === rootId) ? rootId! : getRoot(all).id)
   return (
     <section>

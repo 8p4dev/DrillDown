@@ -3,7 +3,6 @@
 .dnd.grabbing, .dnd.grabbing * { cursor: grabbing !important; }
 main:has(.dnd) { max-width: 1400px; } /* 넓은 트리: 에디터처럼 폭 제한 완화 */
 .dnd button:disabled { opacity: 1; }
-.dnd-bar button { display: inline-flex; align-items: center; justify-content: center; gap: .35rem; }
 
 /* 범위: crosshair 아이콘 + 네이티브 select(화살표는 브라우저 것) */
 .dnd-scope { display: inline-flex; align-items: center; gap: .4rem; font-size: var(--fs-sm); color: var(--muted); }

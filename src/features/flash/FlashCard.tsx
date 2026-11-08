@@ -107,7 +107,7 @@ export default function FlashCard({ treeId, nodes, conceptId, colors, record, on
         <span className="flash-concept-title">{concept.title}</span>
         {note && <Note note={concept.note!} />}
         <span className="flash-count">
-          {kids.length ? <><span className="sr">하위 </span>{kids.length}<span className="sr">개</span><Icon d={chevronDown} className="chev" /></> : '하위 개념 없음'}
+          {kids.length ? <><span className="sr-only">하위 </span>{kids.length}<span className="sr-only">개</span><Icon d={chevronDown} className="chev" /></> : '하위 개념 없음'}
         </span>
       </button>
 
