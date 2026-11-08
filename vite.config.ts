@@ -16,4 +16,6 @@ export default defineConfig({
       },
     }),
   ],
+  // dev: API·공유 페이지 HTML 은 Node 서버(npm run dev:server, :3000)로. 공유 보기 SPA 는 Vite 가 그대로 서빙
+  server: { proxy: { '/api': 'http://127.0.0.1:3000' } },
 })

@@ -3,7 +3,7 @@
 import { useEffect } from 'react'
 import type { Provider } from '../../core/api'
 import { chromeIntentHref, isInApp, isIOS } from '../../core/inapp'
-import { mockLogin } from '../../core/mock/me'
+import { mockLogin } from '../../core/me'
 import { href } from '../../router'
 import { toast } from '../Toast'
 import { PROVIDER_LABEL, ProviderLogo } from './providers'

@@ -24,3 +24,9 @@ dist-ssr
 *.sw?
 test-results/
 playwright-report/
+
+# server
+data/
+.e2e-data/
+config/admins.json
+.env

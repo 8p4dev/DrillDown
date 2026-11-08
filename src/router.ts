@@ -12,6 +12,7 @@ export type Route =
   | { name: 'account' }
   | { name: 'admin'; tab: AdminTab }
   | { name: 'gallery' }
+  | { name: 'privacy' }
   | { name: 'shared'; slug: string; mode: 'view' | Exclude<Mode, 'edit'>; rootId?: string }
 
 const MODES: Mode[] = ['flash', 'dnd', 'blank']
@@ -32,6 +33,7 @@ export function parseHash(hash: string): Route {
   if (p[0] === 'account') return { name: 'account' }
   if (p[0] === 'admin') return { name: 'admin', tab: ADMIN_TABS.find((t) => t === p[1]) ?? 'dashboard' }
   if (p[0] === 'gallery') return { name: 'gallery' }
+  if (p[0] === 'privacy') return { name: 'privacy' }
   return { name: 'trees' }
 }
 
@@ -67,6 +69,8 @@ export const href = {
   account: () => '#/account',
   admin: (tab: AdminTab = 'dashboard') => (tab === 'dashboard' ? '#/admin' : `#/admin/${tab}`),
   gallery: () => '#/gallery',
+  /** 개인정보 처리방침 (03 §3.7) */
+  privacy: () => '#/privacy',
   /** 공유 보기. 모드 전환은 ?m= (해시를 쓰면 복사한 URL 에서 OG 가 빠진다, 04 §3.4.2) */
   shared: (slug: string, mode?: Exclude<Mode, 'edit'>, rootId?: string) =>
     `/t/${slug}${mode ? `?m=${mode}${rootId ? `&root=${rootId}` : ''}` : ''}`,

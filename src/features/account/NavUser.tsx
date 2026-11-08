@@ -2,8 +2,8 @@
 // 로그인 시 아바타 32px(+ 닉네임 ≥761) → #/account. 아바타 모서리 동기화 점(오프라인·오류일 때만, 탭=목록). 로그인 직후 rise + "로그인됨"(01 §3.6 #18).
 // 로그인 직후 로컬 트리 병합 대화(MergeDialog)를 세션당 1회 띄운다(03 §3.3) — 로그인 화면은 이동하며 언마운트되므로 여기서.
 import { lazy, Suspense, useEffect, useState } from 'react'
-import { getLastLoginAt, mockServerTreeCount, useMe } from '../../core/mock/me'
-import { useSyncState } from '../../core/mock/sync'
+import { getLastLoginAt, mockServerTreeCount, useMe } from '../../core/me'
+import { useSyncState } from '../../core/sync'
 import { listTrees } from '../../core/repo'
 import { href } from '../../router'
 import { I } from '../../ui/icons'

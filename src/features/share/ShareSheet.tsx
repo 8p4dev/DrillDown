@@ -1,7 +1,7 @@
 // 공개 범위 시트 — 04 §3.10 "공개 범위 컨트롤": 세그먼트 3(비공개/링크/공개), 링크 줄(복사·열기·재발급), 공개 안내, 첫 공개 고지 1회.
 // 호출: TreeListPage(LM) ⋯ 메뉴 "공유…" → <ShareSheet tree={t} onClose={...} onChange={reload} />. 비로그인은 로그인 안내 1줄.
 import { useEffect, useState, useSyncExternalStore } from 'react'
-import { useMe } from '../../core/mock/me'
+import { useMe } from '../../core/me'
 import { getTreeNodes, reissueSlug, setVisibility } from '../../core/repo'
 import type { Tree, Visibility } from '../../core/types'
 import { href } from '../../router'

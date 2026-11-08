@@ -1,6 +1,45 @@
 // 서버 API 응답 타입 — 공유 계약 docs/plans/orchestration_ui_first.md §3.3 (AA 소유, 이름은 03 §3.6 · 04 §3.6 그대로, snake_case)
-// UI-First 단계: fetch 래퍼 없음. 화면은 src/core/mock/* 의 스토어를 읽는다. 서버 구현 때 api<T>() 가 같은 타입을 돌려준다.
+// fetch 래퍼 api<T>() — 모든 서버 호출은 이것만 쓴다(같은 출처 쿠키, JSON, 오류 봉투 → ApiError). 계약: orchestration_server.md §3.4
 import type { ID, Visibility } from './types'
+
+export class ApiError extends Error {
+  status: number
+  code: string
+  field?: string
+  retryAfter?: number
+  constructor(status: number, code: string, message: string, field?: string, retryAfter?: number) {
+    super(message)
+    this.status = status
+    this.code = code
+    this.field = field
+    this.retryAfter = retryAfter
+  }
+}
+
+/** 네트워크 실패는 ApiError(0, 'offline'). 2xx 가 아니면 봉투를 읽어 ApiError. 204 는 undefined */
+export async function api<T>(path: string, init: { method?: string; body?: unknown; signal?: AbortSignal } = {}): Promise<T> {
+  let res: Response
+  try {
+    res = await fetch(path, {
+      method: init.method ?? (init.body === undefined ? 'GET' : 'POST'),
+      credentials: 'same-origin',
+      headers: init.body === undefined ? undefined : { 'content-type': 'application/json' },
+      body: init.body === undefined ? undefined : JSON.stringify(init.body),
+      signal: init.signal,
+    })
+  } catch (e) {
+    if ((e as Error).name === 'AbortError') throw e
+    throw new ApiError(0, 'offline', '네트워크에 연결할 수 없습니다')
+  }
+  if (res.status === 204) return undefined as T
+  const data = await res.json().catch(() => null)
+  if (!res.ok) {
+    const err = (data as ApiErrorBody | null)?.error
+    const ra = Number(res.headers.get('retry-after')) || undefined
+    throw new ApiError(res.status, err?.code ?? 'internal', err?.message ?? `HTTP ${res.status}`, err?.field, ra)
+  }
+  return data as T
+}
 
 export type Provider = 'google' | 'kakao'
 export type Role = 'user' | 'admin'
@@ -31,7 +70,7 @@ export interface Session {
 }
 
 export interface ApiErrorBody {
-  error: { code: 'unauthorized' | 'forbidden' | 'not_found' | 'invalid' | 'unsupported_media' | 'rate_limited' | 'maintenance' | 'suspended' | 'purged'; message: string; field?: string }
+  error: { code: string; message: string; field?: string } // 코드 목록: 03 §3.6 + 04 §3.6
 }
 
 /** GET /api/admin/stats */

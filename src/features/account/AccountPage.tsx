@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { db } from '../../core/db'
 import { exportEvents } from '../../core/events'
-import { mockLogout, mockPatchMe, revokeOtherSessions, revokeSession, useMe, useSessions } from '../../core/mock/me'
+import { mockLogout, mockPatchMe, revokeOtherSessions, revokeSession, useMe, useSessions } from '../../core/me'
 import { listTrees, restoreTree } from '../../core/repo'
 import type { Tree } from '../../core/types'
 import { href } from '../../router'

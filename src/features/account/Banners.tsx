@@ -1,7 +1,7 @@
 // 공지·점검 배너 — 03 §3.4 시스템 탭(공지 1줄 ≤80자·점검 모드) ↔ useMe().notice/maintenance. 공지 닫기는 세션 동안만(sessionStorage).
 // App.tsx 에 <Banners/> 1줄이 들어가기 전까지는 AccountPage·AdminPage 가 상단에서 렌더한다.
 import { useState } from 'react'
-import { useMe } from '../../core/mock/me'
+import { useMe } from '../../core/me'
 import { I } from '../../ui/icons'
 import { megaphone, x } from '../../ui/icons.all'
 import { Icon } from '../../ui/Icon'

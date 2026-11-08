@@ -6,7 +6,7 @@ import { TooltipLayer } from './ui/Tooltip'
 import ThemeToggle from './ui/ThemeToggle'
 import NavUser from './features/account/NavUser'
 import Banners from './features/account/Banners'
-import { useMe } from './core/mock/me'
+import { useMe } from './core/me'
 
 // 화면별 코드 분할: 첫 화면만 받고, 나머지는 유휴 시간에 미리 받는다. 관리자 청크는 admin 일 때만 (01 §3.8)
 const load = {
@@ -20,6 +20,7 @@ const load = {
   account: () => import('./features/account/AccountPage'),
   shared: () => import('./features/share/SharedPage'),
   gallery: () => import('./features/share/GalleryPage'),
+  privacy: () => import('./features/account/PrivacyPage'),
 }
 const loadAdmin = () => import('./features/admin/AdminPage')
 const TreeListPage = lazy(load.trees)
@@ -33,6 +34,7 @@ const AccountPage = lazy(load.account)
 const AdminPage = lazy(loadAdmin)
 const SharedPage = lazy(load.shared)
 const GalleryPage = lazy(load.gallery)
+const PrivacyPage = lazy(load.privacy)
 
 export default function App() {
   const r = useRoute()
@@ -71,6 +73,7 @@ export default function App() {
           {r.name === 'account' && <AccountPage />}
           {r.name === 'admin' && <AdminPage tab={r.tab} />}
           {r.name === 'gallery' && <GalleryPage />}
+          {r.name === 'privacy' && <PrivacyPage />}
           {r.name === 'shared' && <SharedPage key={r.slug} slug={r.slug} mode={r.mode} rootId={r.rootId} />}
         </Suspense>
       </main>

@@ -8,12 +8,16 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "typecheck": "tsc -b",
-    "check": "tsx src/core/outline.check.ts && tsx src/core/srs/srs.check.ts && tsx src/features/editor/graph/layout.check.ts && tsx src/features/flash/flash.check.ts && tsx src/features/dnd/dnd.check.ts && tsx src/features/editor/content/content.check.ts",
-    "e2e": "playwright test"
+    "typecheck": "tsc -b && tsc -p tsconfig.server.json",
+    "check": "tsx src/core/outline.check.ts && tsx src/core/srs/srs.check.ts && tsx src/features/editor/graph/layout.check.ts && tsx src/features/flash/flash.check.ts && tsx src/features/dnd/dnd.check.ts && tsx src/features/editor/content/content.check.ts && node server/check.ts",
+    "e2e": "playwright test",
+    "server": "node --env-file-if-exists=.env server/index.ts",
+    "dev:server": "node --env-file-if-exists=.env --watch server/index.ts"
   },
   "dependencies": {
+    "@hono/node-server": "^2.1.6",
     "dexie": "^4.4.7",
+    "hono": "^4.13.17",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "ts-fsrs": "^6.0.0"
@@ -29,5 +33,8 @@
     "typescript": "~7.0.2",
     "vite": "^8.3.5",
     "vite-plugin-pwa": "^2.0.0"
+  },
+  "engines": {
+    "node": ">=24.19 <25"
   }
 }

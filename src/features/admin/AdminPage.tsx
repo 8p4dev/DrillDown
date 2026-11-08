@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { AdminTree, AdminUser, Report, ReportReason } from '../../core/api'
 import { deleteUser, hideTree, putSettings, resolveReport, restoreTree, suspendUser, unhideTree, unsuspendUser, useAdmin } from '../../core/mock/admin'
-import { useMe } from '../../core/mock/me'
+import { useMe } from '../../core/me'
 import { href, type AdminTab } from '../../router'
 import { I } from '../../ui/icons'
 import { ban, database, eye, eyeOff, hardDrive, megaphone, search, undo2 } from '../../ui/icons.all'

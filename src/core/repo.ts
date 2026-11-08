@@ -1,7 +1,7 @@
 // 트리 저장소 — 공유 계약 §4.2 (에이전트 A 소유)
 import type { SharedTree } from './api'
 import { db, newId } from './db'
-import { bump } from './mock/sync'
+import { bump } from './sync'
 import { mockIssueSlug } from './mock/shared'
 import type { ID, Tree, TreeNode, Visibility } from './types'
 
