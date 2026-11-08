@@ -2,7 +2,7 @@
 import { api, ApiError } from '../api'
 import { db, newId, setKick, track, type MetaRow, type OutboxRow } from '../db'
 import { setSyncState, type MergeChoice, type MergePlan } from '../sync'
-import type { BlankAttempt, ID, NodeSrs, Tree, TreeNode } from '../types'
+import { CAP, type BlankAttempt, type ID, type NodeSrs, type Tree, type TreeNode } from '../types'
 import { toast } from '../../features/Toast'
 
 type RTree = Tree & { hiddenByAdmin?: boolean }
@@ -46,7 +46,9 @@ function schedule() {
   debounce = setTimeout(() => void sync(false), 2000)
 }
 
-function start(): Promise<void> {
+async function start(): Promise<void> {
+  held.clear() // 로그인 = 보류 해제 재시도 (C4)
+  await loadBad()
   if (!running) {
     running = true
     setKick(schedule)
@@ -86,11 +88,18 @@ async function run(pullToo: boolean) {
   setSyncState({ kind: 'syncing' })
   try {
     await pushAll()
-    if (pullToo) await pull()
+    if (pullToo) {
+      await pull()
+      await pushAll() // pull 이 만든 행(고아 복구·srs 합집합)과 트리 삭제로 풀린 보류 행
+    }
     await db.meta.put({ key: 'lastSyncAt', value: Date.now() })
     const pending = await db.outbox.count()
-    if (bad.size) {
-      const reason = `저장 못 한 항목 ${bad.size}개 — ${[...bad.values()].at(-1)}`
+    const msgs = [
+      ...(held.size ? [`트리는 ${CAP.treesPerUser}개까지 저장할 수 있습니다 — ${held.size}개 보류`] : []),
+      ...(bad.size ? [`저장 못 한 항목 ${bad.size}개 — ${[...bad.values()].at(-1)!.reason}`] : []),
+    ]
+    if (msgs.length) {
+      const reason = msgs.join(' · ')
       await db.meta.put({ key: 'lastSyncError', value: reason })
       setSyncState({ kind: 'error', reason, pending })
     } else setSyncState(pending ? { kind: 'syncing' } : { kind: 'saved' })
@@ -122,7 +131,7 @@ async function fail(e: unknown) {
 
 async function pushAll() {
   for (let guard = 0; guard < 100; guard++) {
-    const rows = (await db.outbox.toArray()).sort((a, b) => ORDER[a.kind] - ORDER[b.kind] || a.seq! - b.seq!)
+    const rows = (await db.outbox.toArray()).filter((r) => !held.has(r.treeId)).sort((a, b) => ORDER[a.kind] - ORDER[b.kind] || a.seq! - b.seq!)
     if (!rows.length) return
     await pushOnce(rows.slice(0, MAX_ROWS))
   }
@@ -174,6 +183,16 @@ async function pushOnce(slice: OutboxRow[]) {
   try {
     res = await api<PushRes>('/api/sync', { body })
   } catch (e) {
+    // C4 tree_limit: 새 트리는 격리가 아니라 보류(outbox 에 남김). 어느 트리가 새것인지 모르므로 tree put 행만 이분 탐색
+    if (e instanceof ApiError && e.code === 'tree_limit') {
+      const tp = sent.filter((r) => r.kind === 'tree' && r.op === 'put' && cur.has(r.id) && !(cur.get(r.id) as RTree).deletedAt)
+      if (!tp.length) throw e
+      if (tp.length === 1) return void held.add(tp[0].treeId)
+      const half = Math.ceil(tp.length / 2)
+      await pushOnce(tp.slice(0, half))
+      await pushOnce(tp.slice(half))
+      return
+    }
     // 행 하나 때문에 큐 전체가 막히지 않게: 400 invalid 는 field 로 범인 행을, 못 찾거나 payload_too_large·413 이면 반씩 나눠 격리
     if (!(e instanceof ApiError) || !(e.status === 413 || (e.status === 400 && (e.code === 'invalid' || e.code === 'payload_too_large')))) throw e
     const m = /^((?:deleted\.)?\w+)\[(\d+)\](?:\.(\w+))?/.exec(e.field ?? '')
@@ -185,7 +204,8 @@ async function pushOnce(slice: OutboxRow[]) {
     await pushOnce(sent.slice(half))
     return
   }
-  for (const r of sent) bad.delete(r.kind + r.id) // 다시 바뀌어 통과하면 오류 목록에서 뺀다
+  if (sent.filter((r) => bad.delete(r.kind + r.id)).length) await saveBad() // 다시 바뀌어 통과하면 오류 목록에서 뺀다
+  if (body.deleted.trees.some((d) => res.applied.includes(d.id))) held.clear() // 자리가 났을 수 있다 → 보류 재시도
   const taken = new Set(res.id_taken ?? [])
   // 보낸 행 제거(applied·superseded·dropped 전부). 보낸 뒤 다시 바뀐 행(at 다름)은 남긴다
   await db.transaction('rw', db.outbox, async () => {
@@ -200,16 +220,33 @@ async function pushOnce(slice: OutboxRow[]) {
       nodes: sup.nodes.map((x) => cur.get(x.id) as TreeNode).filter(isDef),
       srs: sup.srs.map((s) => cur.get('srs' + s.nodeId) as NodeSrs).filter(isDef),
     }
-    emit(await applyRemote(sup, true))
+    const ch = await applyRemote(sup, true)
+    await rescueOrphans(ch)
+    emit(ch)
     toast(`다른 기기 변경 반영됨 ${n}건`, { label: '내 버전 유지', run: () => void keepMine(losers) }, 8000)
   }
   if (taken.size) await reId(taken)
 }
 
-/** 서버가 거부한 행: 로컬 데이터는 그대로 두고 outbox 에서만 뺀다. 같은 엔티티가 다시 바뀌면 track 이 새 행을 넣어 재시도된다 */
-const bad = new Map<string, string>()
+/** tree_limit 으로 보류한 트리 id (C4). 그 트리의 outbox 행은 남겨 두고 전송만 건너뛴다. 로그인·트리 삭제 push/pull 때 비운다 */
+const held = new Set<ID>()
+
+/** 서버가 거부한 행: 로컬 데이터는 그대로 두고 outbox 에서만 뺀다. 같은 엔티티가 다시 바뀌면 track 이 새 행을 넣어 재시도된다.
+ *  목록은 db.meta 'rejected' 에 영속 (C3) — 새로고침 뒤에도 오류 표시가 남는다 */
+type Rejected = { kind: OutboxRow['kind']; id: ID; treeId: ID; reason: string }
+const bad = new Map<string, Rejected>()
+const REJ = 'rejected' as MetaRow['key'] // ponytail: db.ts MetaRow key 유니온에 'rejected' 가 들어가면 캐스트 제거
+const saveBad = () => db.meta.put({ key: REJ, value: JSON.stringify([...bad.values()]) })
+async function loadBad() {
+  const v = await getMeta(REJ)
+  const list: Rejected[] = typeof v === 'string' ? JSON.parse(v) : []
+  const alive = new Set((await db.trees.bulkGet([...new Set(list.map((x) => x.treeId))])).filter(isDef).map((t) => t.id))
+  bad.clear()
+  for (const x of list) if (alive.has(x.treeId)) bad.set(x.kind + x.id, x) // 지워진 트리 것은 버린다
+}
 async function quarantine(r: OutboxRow, reason: string) {
-  bad.set(r.kind + r.id, reason)
+  bad.set(r.kind + r.id, { kind: r.kind, id: r.id, treeId: r.treeId, reason })
+  await saveBad()
   await db.transaction('rw', db.outbox, async () => {
     if ((await db.outbox.get(r.seq!))?.at === r.at) await db.outbox.delete(r.seq!)
   })
@@ -297,20 +334,28 @@ async function pull() {
 /** since 부터 more 가 끝날 때까지. 받은 트리 id(톰스톤 포함)를 돌려준다 */
 async function pullFrom(since: number): Promise<Set<ID>> {
   const seen = new Set<ID>()
+  const changed = new Set<ID>()
   for (let guard = 0; guard < 1000; guard++) {
     const r = await api<PullRes>(`/api/sync?since=${since}`)
     for (const t of r.trees) seen.add(t.id)
-    emit(await applyRemote(r, false))
+    const ch = await applyRemote(r, false)
+    ch.forEach((id) => changed.add(id))
+    emit(ch)
     await db.meta.put({ key: 'cursor', value: r.seq })
     since = r.seq
-    if (!r.more) break
+    // D1: 고아 복구는 마지막 페이지까지 받은 뒤 1회. 중간에 끊기면(throw) 건너뛴다 — 부모가 뒤 페이지에 있을 수 있다
+    if (!r.more) {
+      emit(await rescueOrphans(changed))
+      break
+    }
   }
   return seen
 }
 
 /**
  * 서버 행 적용(sequences S2). force=false: 로컬에 보내지 않은 변경(outbox)이 더 나중이면 로컬 유지(다음 push 가 이김).
- * force=true: push 응답 superseded — 서버가 이겼다. 톰스톤은 하드 삭제(outbox 없음), 고아는 루트 아래로. 바뀐 트리 id 반환
+ * force=true: push 응답 superseded — 서버가 이겼다. 트리 톰스톤은 deletedAt 만 반영(휴지통, C2), 노드 톰스톤은 하드 삭제.
+ * 고아 복구는 호출자가 rescueOrphans 로(D1). 바뀐 트리 id 반환
  */
 async function applyRemote(r: Batch, force: boolean): Promise<Set<ID>> {
   const changed = new Set<ID>()
@@ -327,12 +372,10 @@ async function applyRemote(r: Batch, force: boolean): Promise<Set<ID>> {
         continue
       }
       if (deletedAt) {
-        if (!local) continue
-        await db.trees.delete(t.id)
-        await db.nodes.where('treeId').equals(t.id).delete()
-        await db.srs.where('treeId').equals(t.id).delete()
-        await db.attempts.where('treeId').equals(t.id).delete()
-        await db.outbox.filter((o) => o.treeId === t.id).delete()
+        // C2: 하드 삭제 대신 톰스톤 보존 → 휴지통에 보인다. 노드는 그대로, 로컬 purge 는 7일 뒤 repo.purgeDeletedTrees
+        held.clear() // 다른 기기 삭제로 자리가 났을 수 있다
+        if (!local || local.deletedAt === deletedAt) continue
+        await db.trees.put({ ...local, ...rest, deletedAt })
       } else {
         if (local && !local.deletedAt && local.updatedAt === t.updatedAt && local.slug === t.slug && local.visibility === t.visibility && !!local.hiddenByAdmin === !!t.hiddenByAdmin) continue
         const next: RTree = { ...local, ...rest }
@@ -375,8 +418,16 @@ async function applyRemote(r: Batch, force: boolean): Promise<Set<ID>> {
       if (days.length !== (rest.autoCorrectDays ?? []).length) resend.push({ kind: 'srs', id: s.nodeId, treeId: s.treeId, op: 'put' })
       changed.add(s.treeId)
     }
+    await track(resend)
+  })
+  return changed
+}
 
-    // 고아(부모가 없는 노드) → 루트 자식으로, updatedAt=now, 다시 push (C8·C9)
+/** 고아(부모가 없는 노드) → 루트 자식으로, updatedAt=now, 다시 push (C8·C9). pull 전체가 끝난 뒤나 superseded 적용 직후에만 (D1) */
+async function rescueOrphans(changed: Set<ID>): Promise<Set<ID>> {
+  const hit = new Set<ID>()
+  await db.transaction('rw', ALL(), async () => {
+    const resend: Row[] = []
     let orphans = 0
     const now = Date.now()
     for (const treeId of changed) {
@@ -388,13 +439,14 @@ async function applyRemote(r: Batch, force: boolean): Promise<Set<ID>> {
         if (x.parentId === null || ids.has(x.parentId)) continue
         await db.nodes.put({ ...x, parentId: root.id, updatedAt: now })
         resend.push({ kind: 'node', id: x.id, treeId, op: 'put' })
+        hit.add(treeId)
         orphans++
       }
     }
     await track(resend)
     if (orphans) setTimeout(() => toast(`복구된 노드 ${orphans}개를 루트 아래 두었습니다`))
   })
-  return changed
+  return hit
 }
 
 // ── 병합 (04 §3.8) ──────────────────────────────────────────
@@ -405,11 +457,22 @@ async function enqueueAll(treeIds: ID[]) {
     const [ns, ss, as] = await Promise.all([db.nodes.where('treeId').anyOf(treeIds).toArray(), db.srs.where('treeId').anyOf(treeIds).toArray(), db.attempts.where('treeId').anyOf(treeIds).toArray()])
     await track([
       ...treeIds.map((id) => ({ kind: 'tree' as const, id, treeId: id, op: 'put' as const })),
-      ...ns.map((x) => ({ kind: 'node' as const, id: x.id, treeId: x.treeId, op: 'put' as const })),
+      ...parentFirst(ns).map((x) => ({ kind: 'node' as const, id: x.id, treeId: x.treeId, op: 'put' as const })),
       ...ss.map((s) => ({ kind: 'srs' as const, id: s.nodeId, treeId: s.treeId, op: 'put' as const })),
       ...as.map((a) => ({ kind: 'attempt' as const, id: a.id, treeId: a.treeId, op: 'put' as const })),
     ])
   })
+}
+
+/** 부모가 자식보다 먼저(BFS). 서버 seq 도 이 순서로 붙어 다른 기기 pull 페이지에서 부모가 앞선다 (D1) */
+function parentFirst(ns: TreeNode[]): TreeNode[] {
+  const ids = new Set(ns.map((x) => x.id))
+  const kids = new Map<ID, TreeNode[]>()
+  const out = ns.filter((x) => x.parentId === null || !ids.has(x.parentId))
+  for (const x of ns) if (x.parentId !== null && ids.has(x.parentId)) (kids.get(x.parentId) ?? kids.set(x.parentId, []).get(x.parentId)!).push(x)
+  for (let i = 0; i < out.length; i++) out.push(...(kids.get(out[i].id) ?? []))
+  const got = new Set(out)
+  return out.length === ns.length ? out : [...out, ...ns.filter((x) => !got.has(x))] // 순환 등 남은 것도 빠짐없이
 }
 
 async function serverCount(): Promise<number> {

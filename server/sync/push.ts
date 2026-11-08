@@ -34,6 +34,18 @@ export function applyPush(db: DB, userId: string, p: PushPayload, now: number): 
   }
 
   return tx(db, () => {
+    // ---- trees del (톰스톤도 같은 키로 비교하는 쓰기, C11). 상한 계산보다 먼저 — 같은 배치의 삭제가 자리를 낸다 (C4) ----
+    for (const d of p.deleted.trees) {
+      const cur = myTree(d.id)
+      if (cur === null) continue
+      if (!cur) { r.dropped.push(d.id); continue }
+      const at = clamp(d.deletedAt)
+      if (at > cur.updated_at) {
+        db.prepare('UPDATE trees SET deleted_at = ?, updated_at = ?, seq = ? WHERE id = ?').run(at, at, nextSeq(db, userId), d.id)
+        r.applied.push(d.id)
+      } else r.superseded.trees.push(treeOut(cur))
+    }
+
     // 트리 상한(C: tree_limit): 새로 생기는 트리 + 살아 있는 트리 > 200
     const fresh = new Set(p.trees.map((t) => t.id).filter((id) => !getTree.get(id)))
     if (fresh.size) {
@@ -56,18 +68,6 @@ export function applyPush(db: DB, userId: string, p: PushPayload, now: number): 
       } else { r.superseded.trees.push(treeOut(cur)); continue }
       r.applied.push(t.id)
     }
-    // ---- trees del (톰스톤도 같은 키로 비교하는 쓰기, C11) ----
-    for (const d of p.deleted.trees) {
-      const cur = myTree(d.id)
-      if (cur === null) continue
-      if (!cur) { r.dropped.push(d.id); continue }
-      const at = clamp(d.deletedAt)
-      if (at > cur.updated_at) {
-        db.prepare('UPDATE trees SET deleted_at = ?, updated_at = ?, seq = ? WHERE id = ?').run(at, at, nextSeq(db, userId), d.id)
-        r.applied.push(d.id)
-      } else r.superseded.trees.push(treeOut(cur))
-    }
-
     // ---- nodes put (트리가 삭제 상태여도 저장, C11. 부모 없는 고아도 받는다 — 클라이언트가 루트로, C8) ----
     for (const n of p.nodes) {
       const cur = getNode.get(n.id) as NodeRow | undefined
