@@ -112,6 +112,24 @@ export default function EditorPage({ treeId }: { treeId: string }) {
   useEffect(() => {
     if (loaded) outlineRef.current?.focus() // 진입 즉시 키보드로 편집 가능
   }, [loaded])
+  // 동기화 엔진이 pull 뒤 쏘는 dd:remote{treeIds}: 내 트리면 노드를 다시 읽어 교체한다.
+  // undo 스택은 그대로 두고, 편집 중인 노드(카드 제목·카드 내용·패널 live)는 로컬 값을 유지해 입력칸을 덮지 않는다.
+  useEffect(() => {
+    const onRemote = (e: Event) => {
+      if (!(e as CustomEvent<{ treeIds: string[] }>).detail?.treeIds?.includes(treeId)) return
+      const keep = new Set([editId, noteEditId, liveBase.current ? selId : null])
+      getTreeNodes(treeId).then((remote) => {
+        const local = new Map(nodesRef.current.map((n) => [n.id, n]))
+        const next = remote.map((n) => (keep.has(n.id) && local.get(n.id)) || n)
+        nodesRef.current = next
+        setNodes(next)
+        setSelId((id) => (next.some((n) => n.id === id) ? id : (next.find((n) => n.parentId === null)?.id ?? '')))
+        setCutId((id) => (id && next.some((n) => n.id === id) ? id : null))
+      })
+    }
+    addEventListener('dd:remote', onRemote)
+    return () => removeEventListener('dd:remote', onRemote)
+  }, [treeId, editId, noteEditId, selId])
   // 키보드(--kb)·시각 뷰포트 추적. 키보드가 열리면 단축키 시트는 닫는다(02 규칙 4(b))
   useEffect(() => {
     startViewport()
