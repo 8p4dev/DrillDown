@@ -17,13 +17,15 @@ export const MARGIN = 32
 /**
  * 서브트리 폭 = max(노드 폭, 자식 서브트리 폭 합 + 간격). 부모 중심 = 첫·마지막 자식 중심의 가운데.
  * 접힌 노드의 하위는 제외. offset 은 경로상 누적(서브트리 함께 이동) 후 최소 좌표가 MARGIN 이 되게 평행이동.
+ * open(n, depth) = 그 노드의 자식을 그릴지 (기본: 접히지 않았으면). 보기 깊이(C3)는 여기로 들어온다.
  */
-export function layout(nodes: TreeNode[], rootId: ID, measure: (n: TreeNode) => Size): Graph {
+export const isOpen = (n: TreeNode) => !n.collapsed
+export function layout(nodes: TreeNode[], rootId: ID, measure: (n: TreeNode) => Size, open: (n: TreeNode, depth: number) => boolean = isOpen): Graph {
   const byId = new Map(nodes.map((n) => [n.id, n]))
   const kidsOf = new Map<ID, TreeNode[]>()
   for (const n of nodes) if (n.parentId !== null) kidsOf.set(n.parentId, [...(kidsOf.get(n.parentId) ?? []), n])
   for (const k of kidsOf.values()) k.sort((a, b) => a.order - b.order)
-  const visibleKids = (n: TreeNode) => (n.collapsed ? [] : (kidsOf.get(n.id) ?? []))
+  const visibleKids = (n: TreeNode, depth: number) => (open(n, depth) ? (kidsOf.get(n.id) ?? []) : [])
 
   // 1패스(후위): 서브트리 폭, 서브트리 왼쪽 기준 노드 중심, 자식 서브트리의 상대 x
   const size = new Map<ID, Size>()
@@ -33,7 +35,7 @@ export function layout(nodes: TreeNode[], rootId: ID, measure: (n: TreeNode) => 
     const s = measure(n)
     size.set(n.id, s)
     rowH[depth] = Math.max(rowH[depth] ?? 0, s.h)
-    const kids = visibleKids(n)
+    const kids = visibleKids(n, depth)
     if (!kids.length) return void sub.set(n.id, { width: s.w, center: s.w / 2, kidX: [] })
     let x = 0
     const kidX = kids.map((k) => {
@@ -65,7 +67,7 @@ export function layout(nodes: TreeNode[], rootId: ID, measure: (n: TreeNode) => 
     ox += n.offset?.x ?? 0
     oy += n.offset?.y ?? 0
     boxes.set(n.id, { ...s, x: left + o.center - s.w / 2 + ox, y: rowY[depth] + oy, depth })
-    visibleKids(n).forEach((k, i) => {
+    visibleKids(n, depth).forEach((k, i) => {
       edges.push([n.id, k.id])
       place(k, left + o.kidX[i], depth + 1, ox, oy)
     })

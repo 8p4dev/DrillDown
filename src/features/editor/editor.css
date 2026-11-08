@@ -257,3 +257,36 @@ mark.hl-b { background: #6cc8ff66; }
 @media (pointer: coarse) {
   .editor .toolbar button { width: var(--tap); height: var(--tap); }
 }
+
+/* U20: 카드 제목 2줄 말줄임 — 행 높이가 긴 제목 하나에 끌려가지 않게. 전체 제목은 title 툴팁·패널 */
+.node-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+
+/* 보기 깊이 1 2 3 ∞ (U17, C3): 누름 = 반전 */
+.editor .zoom-tools .depth-group button { min-width: 1.6rem; font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+.editor .zoom-tools .depth-group button[aria-pressed='true'] { color: var(--bg); background: var(--text); }
+
+/* 검색(U16): 캔버스 왼쪽 위에 뜬다. 떠 있는 요소 = 1px border-strong, 그림자 없음 */
+.search {
+  position: absolute; left: .75rem; top: .75rem; z-index: 4; width: min(26rem, calc(100% - 1.5rem));
+  background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius-lg); overflow: hidden;
+}
+.search input { width: 100%; box-sizing: border-box; border: none; border-radius: 0; box-shadow: none; }
+.search ul { list-style: none; margin: 0; padding: .25rem 0; max-height: min(50vh, 22rem); overflow: auto; border-top: 1px solid var(--border); }
+.search li[role='option'] { padding: .35rem .75rem; cursor: pointer; }
+.search li[aria-selected='true'] { background: var(--surface-2); }
+@media (hover: hover) { .search li[role='option']:hover { background: var(--surface-2); } }
+.search-title { font-weight: 600; }
+.search .node-path { min-height: 0; font-size: var(--fs-xs); }
+.search-none { padding: .35rem .75rem; color: var(--muted); font-size: var(--fs-sm); }
+
+/* 경로(U14 헤더·U15 패널) */
+.focus-all, .focus-here { font-size: var(--fs-sm); white-space: nowrap; }
+.detail-path { display: flex; align-items: center; gap: .25rem .75rem; flex-wrap: wrap; padding: .55rem .85rem 0; }
+.detail-path .focus-here { margin-left: auto; }
+/* U51: 폰은 패널 위 경로를 한 줄로 — 조상 칸이 줄며 말줄임, 지금 노드는 끝까지 보인다 */
+@media (max-width: 760px) {
+  .detail-path { flex-wrap: nowrap; }
+  .detail-path .node-path { flex-wrap: nowrap; min-width: 0; overflow: hidden; white-space: nowrap; }
+  .detail-path .node-path > span { flex: 0 1 auto; min-width: 1.5em; overflow: hidden; text-overflow: ellipsis; }
+  .detail-path .node-path > span:last-child { flex-shrink: 0; min-width: 0; }
+}
