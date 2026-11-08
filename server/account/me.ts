@@ -8,8 +8,10 @@ import { body, clientIp, fail, hit, limit, requireUser, type AppEnv } from '../h
 import { audit, CTRL, getSettings, purgeUserNow, softDeleteUser } from './admin.ts'
 import { clearSid } from './session.ts'
 
-const userOf = (db: DB, id: string) =>
-  db.prepare('SELECT id, provider, nickname, avatar_url, role, created_at FROM users WHERE id = ?').get(id) as unknown as User
+const userOf = (db: DB, id: string): User => {
+  const u = db.prepare('SELECT id, provider, nickname, avatar_url, use_provider_avatar, role, created_at FROM users WHERE id = ?').get(id) as unknown as Omit<User, 'use_provider_avatar'> & { use_provider_avatar: number }
+  return { ...u, use_provider_avatar: !!u.use_provider_avatar }
+}
 
 export function registerMe(app: Hono<AppEnv>) {
   const uid = (c: Context<AppEnv>) => c.get('user')!.id

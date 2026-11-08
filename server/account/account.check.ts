@@ -64,6 +64,7 @@ r = await req('/api/me', { method: 'PATCH', body: { nickname: ' 앨리스 ' }, c
 assert.equal((await json<{ user: { nickname: string } }>(r)).user.nickname, '앨리스')
 r = await req('/api/me', { method: 'PATCH', body: { use_provider_avatar: true }, cookie: a1 })
 assert.equal((await json(r)).relogin_required, true)
+assert.equal((await json<{ user: { use_provider_avatar: boolean } }>(await me(a1))).user.use_provider_avatar, true)
 const a2 = await login('user', 'alice')
 r = await req('/api/me/sessions', { cookie: a1 })
 const ss = (await json<{ sessions: { id6: string; ua: string; current: boolean }[] }>(r)).sessions
@@ -151,6 +152,16 @@ const pg = await json<{ items: unknown[]; next: string }>(r)
 assert.equal(pg.items.length, 2); assert.ok(pg.next)
 r = await req(`/api/admin/users?limit=2&cursor=${pg.next}`, { cookie: adm })
 assert.equal((await json<{ items: unknown[] }>(r)).items.length, 2)
+// 공개 트리 목록 첫 페이지 = 공개 + 삭제 유예(deleted_at), ?deleted=1 = 유예만
+const ins = db.prepare("INSERT INTO trees(id,owner_id,title,visibility,created_at,updated_at,deleted_at,seq) VALUES(?,?,?,'public',?,?,?,1)")
+ins.run('t-live', carol[0].id, '공개', Date.now(), Date.now(), null)
+ins.run('t-del', carol[0].id, '지움', Date.now(), Date.now(), Date.now() - DAY)
+r = await req('/api/admin/trees?visibility=public', { cookie: adm })
+const at = (await json<{ items: { id: string; deleted_at: number | null; open_reports: number }[] }>(r)).items
+assert.deepEqual(at.map((t) => [t.id, !!t.deleted_at, t.open_reports]), [['t-live', false, 0], ['t-del', true, 0]])
+r = await req('/api/admin/trees?deleted=1', { cookie: adm })
+assert.deepEqual((await json<{ items: { id: string }[] }>(r)).items.map((t) => t.id), ['t-del'])
+db.prepare("DELETE FROM trees WHERE id IN ('t-live','t-del')").run()
 r = await req(`/api/admin/users/${carol[0].id}`, { cookie: adm })
 assert.equal((await json<{ sessions: number }>(r)).sessions, 1)
 
