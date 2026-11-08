@@ -22,8 +22,12 @@ const read = (): Theme => {
 function apply() {
   const t = read()
   const root = document.documentElement
+  // 1프레임 동안 모든 transition 을 끈다(index.css [data-theme-switch]) — 요소마다 색 보간 타이밍이 달라 얼룩지는 것 방지(01 §3.6 #2)
+  root.dataset.themeSwitch = ''
   if (t === 'auto') delete root.dataset.theme
   else root.dataset.theme = t
+  void root.offsetWidth // 스타일 확정 뒤에 속성을 풀어야 보간이 시작되지 않는다
+  requestAnimationFrame(() => delete root.dataset.themeSwitch)
   const dark = t === 'auto' ? !!mq?.matches : t === 'dark'
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? BG.dark : BG.light)
 }

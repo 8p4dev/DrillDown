@@ -84,3 +84,18 @@
 - `.menu` 규칙은 넣지 않았다(계약 §3.2 클래스 목록에 없고 LM `treelist.css` 가 이미 메뉴 스타일을 가짐).
 - 1차 스크린샷에서 `.mode-tabs a { min-height: max(36px, var(--tap)) }` 가 `--tap: auto` 에서 무효 선언이 되는 것을 발견 → 36px 고정 + `(pointer: coarse)` 44px 로 수정, `.seg > a/button` 에 `box-sizing: border-box`(패딩 포함 44px).
 - 툴팁 CSS 는 `src/ui/Tooltip.css` 가 아니라 `index.css` 에 두었다(CSS 파일 1개 유지, 계약 §3.2 "+css 또는 index.css").
+
+## 2차 — QA 결함 수정 (2026-11-08, `06_ui_qa.md` DS 담당, main e5e9456 머지 후)
+
+| # | 수정 | 확인(Playwright 임시 스크립트, Edge) |
+|---|---|---|
+| 5 | `:root:has(.sheet) .toasts` 를 `data-kb` 규칙과 합쳐 상단으로 | `.sheet` 주입 시 토스트 rect.top 61px(1440) |
+| 6 | coarse 에서 `.toast button::after { inset: -9px 0 }` — 보이는 크기 유지, 표적 26+18 ≥ 44 | 390 coarse: 버튼 위 7px 지점 `elementFromPoint` = 버튼 |
+| 7 | `.sheet-head .link { min-height: var(--tap); padding-inline: .5rem }` | coarse 44px, 1440 변화 없음(18px) |
+| 11 | reduced-motion 전역 규칙에 `animation-delay: 0s !important; transition-delay: 0s !important` | `animation: rise 1s 300ms` 요소의 계산값 delay 0s |
+| 12 | `theme.ts apply()`: `data-theme-switch` 켬 → 테마 바꿈 → `offsetWidth` 로 스타일 확정 → 다음 rAF 에서 끔. `index.css` `:root[data-theme-switch] *… { transition: none !important }` | 상단 바·카드 배경/테두리가 클릭 직후·40ms·300ms 모두 같은 값(보간 0), 속성은 다음 프레임에 제거됨 |
+| 15 | `vite.config.ts globIgnores` 에 `'**/AdminPage-*.css'` | `dist/sw.js` 에 `AdminPage` 0건, `fonts/` 0건 |
+| 24 | `Avatar` 가 인라인 `--avatar-size` 대신 `data-size`(24·32·36·72) → `.avatar:where([data-size])` 특이성 0 규칙. 화면 CSS 의 `--avatar-size`(SH `.share-avatar` 24px) 가 이긴다 | `data-size=24` → 24px, `data-size=32` + `.share-x{--avatar-size:24px}` → 24px |
+| 판정 | 테마 칸 데스크톱 36×32 유지(`flex: none` 추가 — 1px 칸 사이 선 때문에 35.3px 로 줄던 것 수정), coarse 높이 44 | 1440: 36×32, 390 coarse: 44 |
+
+typecheck(`tsc -b` + server) 0 · lint 0 · check 7 ok · build 통과. 머지 후 `npm ci` 필요(서버 의존성 hono).
