@@ -2,10 +2,11 @@
 import type { Provider } from '../../core/api'
 
 // oxlint-disable-next-line react/only-export-components -- 라벨 상수와 로고를 한 파일에
-export const PROVIDER_LABEL: Record<Provider, string> = { google: 'Google', kakao: '카카오' }
+export const PROVIDER_LABEL: Record<Provider, string> = { google: 'Google', kakao: '카카오', fake: '개발용' }
 
 /** fill: 카카오 말풍선 색. 버튼 안은 브랜드 검정(#000000), 그 밖(표·연결 행)은 currentColor 로 다크에서도 보이게 */
 export function ProviderLogo({ provider, size = 18, fill = 'currentColor' }: { provider: Provider; size?: number; fill?: string }) {
+  if (provider === 'fake') return null
   if (provider === 'google') {
     return (
       <svg width={size} height={size} viewBox="0 0 48 48" aria-hidden>

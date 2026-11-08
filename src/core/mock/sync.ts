@@ -1,7 +1,7 @@
 // [mock] 동기화 상태 스토어 — 공유 계약 orchestration_ui_first.md §3.4 (SH 소유). 상태 집합은 04 §3.10.
 // 서버 구현 때 src/core/sync.ts 가 같은 useSyncState 를 내보낸다.
 import { useSyncExternalStore } from 'react'
-import { getMe } from './me'
+import { getMe } from '../me'
 
 export type SyncState =
   | { kind: 'saved' }
