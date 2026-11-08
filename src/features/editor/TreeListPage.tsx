@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { initialOf, toneOf } from '../../core/avatar'
 import { exportEvents, logEvent } from '../../core/events'
 import { useMe } from '../../core/me'
-import { createTree, listTrees, markTreeDeleted, purgeDeletedTrees, renameTree, restoreTree } from '../../core/repo'
+import { createTree, listTreeMeta, markTreeDeleted, matchTitle, purgeDeletedTrees, renameTree, restoreTree, type TreeMeta } from '../../core/repo'
 import { CAP, type Tree } from '../../core/types'
 import { href } from '../../router'
 import { Icon } from '../../ui/Icon'
@@ -23,17 +23,38 @@ const MODES = [
   { icon: I.file, short: '백지', label: '백지 퀴즈', to: href.blank },
 ]
 const coarse = () => matchMedia('(pointer: coarse)').matches
+/** 검색칸을 보일 최소 트리 수(U42), 한도 안내를 시작할 수(U02) */
+const SEARCH_MIN = 10
+const WARN_AT = 190
+const endOfToday = () => new Date().setHours(23, 59, 59, 999)
+const rtf = new Intl.RelativeTimeFormat('ko')
+/** '방금' · 'n분 전' · 'n시간 전' · 'n일 전' · 'n개월 전' · 'n년 전' */
+function ago(t: number): string {
+  const s = (Date.now() - t) / 1000
+  if (s < 60) return '방금'
+  for (const [u, sec] of [['year', 31_536_000], ['month', 2_592_000], ['day', 86_400], ['hour', 3_600]] as const)
+    if (s >= sec) return rtf.format(-Math.floor(s / sec), u)
+  return rtf.format(-Math.floor(s / 60), 'minute')
+}
+let persistAsked = false // U05: 세션당 1회
+const isTyping = (el: EventTarget | null) => el instanceof HTMLElement && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))
 
 export default function TreeListPage() {
-  const [trees, setTrees] = useState<Tree[] | null>(null)
+  const [trees, setTrees] = useState<TreeMeta[] | null>(null)
   const [title, setTitle] = useState('')
+  const [q, setQ] = useState('')
+  const search = useRef<HTMLInputElement>(null)
   const [newId, setNewId] = useState<string>()
   const [editing, setEditing] = useState<string>()
   const [sharing, setSharing] = useState<Tree>()
   const [goneId, setGoneId] = useState<string>()
   const input = useRef<HTMLInputElement>(null)
   const me = useMe()
-  const reload = useCallback(() => listTrees().then(setTrees), [])
+  const reload = useCallback(() => listTreeMeta(endOfToday()).then((ts) => {
+    setTrees(ts)
+    // U05: 트리가 생기면 저장소 영구 보존 요청(비로그인 데이터 보호). 실패·미지원 무시
+    if (ts.length && !persistAsked) { persistAsked = true; navigator.storage?.persist?.().catch(() => {}) }
+  }), [])
   useEffect(() => {
     startViewport()
     purgeDeletedTrees().then(reload) // 휴지통에서 7일 지난 트리만 하드 삭제
@@ -44,6 +65,16 @@ export default function TreeListPage() {
   useEffect(() => {
     if (trees?.length === 0 && !coarse()) input.current?.focus()
   }, [trees])
+  // U42: '/' 로 검색칸 포커스(입력 중이 아닐 때)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey || isTyping(e.target) || !search.current) return
+      e.preventDefault()
+      search.current.focus()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [])
   // 열린 ⋯ 메뉴는 바깥을 누르면 닫는다 (네이티브 <details> 는 스스로 닫히지 않음)
   useEffect(() => {
     const close = (e: PointerEvent) =>
@@ -53,7 +84,9 @@ export default function TreeListPage() {
   }, [])
 
   // C5: 로그인 사용자는 서버 한도(200)에 닿으면 만들기를 막는다. 비로그인은 막지 않음
-  const full = !!me && (trees?.length ?? 0) >= CAP.treesPerUser
+  const count = trees?.length ?? 0
+  const full = !!me && count >= CAP.treesPerUser
+  const shown = trees && q.trim() ? trees.filter((x) => matchTitle(q, x.tree.title)) : trees
   const create = async (e: React.FormEvent) => {
     e.preventDefault()
     const t = title.trim()
@@ -113,16 +146,24 @@ export default function TreeListPage() {
         <input ref={input} aria-label="새 트리 제목" placeholder="새 트리 제목 (예: 노동법)" value={title} onChange={(e) => setTitle(e.target.value)} />
         <button type="submit" className="primary" disabled={full}><Icon d={I.plus} />만들기</button>
       </form>
-      {full && <p className="trees-full" role="status">트리는 200개까지 저장할 수 있습니다</p>}
-      {trees === null ? null : trees.length === 0 ? (
+      {full ? <p className="trees-full" role="status">트리는 200개까지 저장할 수 있습니다</p>
+        : !!me && count >= WARN_AT && <p className="trees-full" role="status">트리 {count}/{CAP.treesPerUser}</p>}
+      <p className="trees-gallery"><a href={href.gallery()}>공개 트리 둘러보기</a></p>
+      {count >= SEARCH_MIN && (
+        <input ref={search} type="search" className="trees-search" aria-label="트리 검색" placeholder="트리 이름 검색  /"
+          value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === 'Escape' && (setQ(''), e.currentTarget.blur())} />
+      )}
+      {shown === null ? null : count === 0 ? (
         <button type="button" className="empty trees-empty" onClick={() => input.current?.focus()}>
           <Icon d={I.plus} size={64} />
           <span>첫 트리 만들기</span>
         </button>
+      ) : shown.length === 0 ? (
+        <p className="trees-none">'{q.trim()}' 와 일치하는 트리가 없습니다</p>
       ) : (
         <ul className="tree-cards">
-          {trees.map((t) => (
-            <TreeCard key={t.id} t={t} isNew={t.id === newId} gone={t.id === goneId} editing={t.id === editing}
+          {shown.map(({ tree: t, ...meta }) => (
+            <TreeCard key={t.id} t={t} meta={meta} isNew={t.id === newId} gone={t.id === goneId} editing={t.id === editing}
               onEdit={() => setEditing(t.id)} onRename={(v) => rename(t, v)} onCancel={() => setEditing(undefined)}
               onShare={() => setSharing(t)} onRemove={() => remove(t)} />
           ))}
@@ -134,11 +175,11 @@ export default function TreeListPage() {
 }
 
 type CardProps = {
-  t: Tree; isNew: boolean; gone: boolean; editing: boolean
+  t: Tree; meta: Omit<TreeMeta, 'tree'>; isNew: boolean; gone: boolean; editing: boolean
   onEdit: () => void; onRename: (v: string) => void; onCancel: () => void; onShare: () => void; onRemove: () => void
 }
 
-function TreeCard({ t, isNew, gone, editing, onEdit, onRename, onCancel, onShare, onRemove }: CardProps) {
+function TreeCard({ t, meta, isNew, gone, editing, onEdit, onRename, onCancel, onShare, onRemove }: CardProps) {
   const timer = useRef(0)
   const menu = useRef<HTMLDetailsElement>(null)
   const done = useRef(false) // Esc/Enter 처리 뒤 blur 로 한 번 더 확정되지 않게
@@ -177,10 +218,14 @@ function TreeCard({ t, isNew, gone, editing, onEdit, onRename, onCancel, onShare
         </details>
       </div>
       {/* stretched link: 제목과 모드 사이 빈칸이 링크 본체, ::after 가 카드 전체를 덮는다. 제목·메뉴·모드 링크는 z-index 로 위에 */}
-      <a className="tree-open" href={href.edit(t.id)} aria-label="편집" onClick={() => haptic('tap')} />
-      <nav className="tree-modes" aria-label="학습 모드">
+      {/* U44: 노드 수 · 오늘 복습(학습한 트리만) · 최근 사용 */}
+      <p className="tree-meta">
+        노드 {meta.nodes}{meta.studiedAt !== undefined && ` · 복습 ${meta.due}`} · {ago(meta.usedAt)}
+      </p>
+      <a className="tree-open" href={href.edit(t.id)} aria-label={`${t.title} 편집`} onClick={() => haptic('tap')} />
+      <nav className="tree-modes" aria-label={`${t.title} 학습 모드`}>
         {MODES.map((m) => (
-          <a key={m.label} href={m.to(t.id)} aria-label={m.label} onClick={() => haptic('tap')}><Icon d={m.icon} />{m.short}</a>
+          <a key={m.label} href={m.to(t.id)} aria-label={`${t.title} ${m.label}`} onClick={() => haptic('tap')}><Icon d={m.icon} />{m.short}</a>
         ))}
       </nav>
     </li>

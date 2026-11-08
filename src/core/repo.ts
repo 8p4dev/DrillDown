@@ -2,7 +2,7 @@
 import { api, type SharedTree } from './api'
 import { db, newId, track, type OutboxRow } from './db'
 import { flush } from './sync'
-import type { ID, Tree, TreeNode, Visibility } from './types'
+import type { ID, NodeSrs, Tree, TreeNode, Visibility } from './types'
 
 /** 쓰기 훅 트랜잭션에 들어가는 테이블 */
 const W = () => [db.trees, db.nodes, db.outbox, db.meta]
@@ -67,10 +67,43 @@ export async function purgeDeletedTrees(now = Date.now()): Promise<void> {
   for (const t of victims) await deleteTree(t.id)
 }
 
-/** 소프트 삭제된 트리는 제외 */
-export async function listTrees(): Promise<Tree[]> {
-  return (await db.trees.orderBy('updatedAt').reverse().toArray()).filter((t) => !t.deletedAt)
+/** 목록 카드 한 줄 메타(U44). studiedAt 은 그 트리 srs 의 마지막 학습 시각(없으면 학습 안 함) */
+export interface TreeMeta { tree: Tree; nodes: number; due: number; studiedAt?: number; usedAt: number }
+type SrsLite = Pick<NodeSrs, 'treeId' | 'due' | 'card'>
+
+/** 순수 집계: 소프트 삭제 제외, 최근 사용 = max(편집, 학습) 내림차순(U43). nodeTreeIds = 노드마다 treeId 하나 */
+export function summarizeTrees(trees: Tree[], srs: SrsLite[], nodeTreeIds: ID[], dueBy: number): TreeMeta[] {
+  const m = new Map<ID, TreeMeta>()
+  for (const t of trees) if (!t.deletedAt) m.set(t.id, { tree: t, nodes: 0, due: 0, usedAt: t.updatedAt })
+  for (const id of nodeTreeIds) { const x = m.get(id); if (x) x.nodes++ }
+  for (const s of srs) {
+    const x = m.get(s.treeId)
+    if (!x) continue
+    if (s.due <= dueBy) x.due++
+    // card 는 로컬이면 Date, 서버에서 받은 행이면 JSON 문자열 → new Date 가 둘 다 받는다
+    const at = +new Date((s.card as { lastReviewAt?: Date | string | null }).lastReviewAt ?? 0)
+    if (at > (x.studiedAt ?? 0)) x.studiedAt = at
+  }
+  const out = [...m.values()]
+  for (const x of out) x.usedAt = Math.max(x.usedAt, x.studiedAt ?? 0)
+  return out.sort((a, b) => b.usedAt - a.usedAt)
 }
+
+/** 목록 화면용. 쿼리 3회(trees, srs 전체, nodes treeId 인덱스 키만) — 트리별 루프 쿼리 없음 */
+export async function listTreeMeta(dueBy = Infinity): Promise<TreeMeta[]> {
+  const [trees, srs, keys] = await Promise.all([db.trees.toArray(), db.srs.toArray(), db.nodes.orderBy('treeId').keys()])
+  return summarizeTrees(trees, srs, keys as ID[], dueBy)
+}
+
+/** 소프트 삭제 제외, 최근 사용(편집·학습 중 늦은 쪽) 순 */
+export async function listTrees(): Promise<Tree[]> {
+  const [trees, srs] = await Promise.all([db.trees.toArray(), db.srs.toArray()])
+  return summarizeTrees(trees, srs, [], 0).map((x) => x.tree)
+}
+
+/** 목록 검색(U42): 대소문자·공백 무시 부분 일치 */
+const fold = (s: string) => s.toLowerCase().replace(/\s+/g, '')
+export const matchTitle = (q: string, title: string) => fold(title).includes(fold(q))
 
 export function getTreeNodes(treeId: ID): Promise<TreeNode[]> {
   return db.nodes.where('treeId').equals(treeId).toArray()
