@@ -63,3 +63,39 @@ Google Fonts CSS 요청 UA: Chrome 130 데스크톱(woff2 분할본). Noto Sans 
 | 시스템 폰트(Malgun Gothic·Apple SD Gothic Neo·Noto Sans CJK on Android) | OS 번들 | — | 앱이 배포하지 않으므로 라이선스 의무 없음 |
 
 OFL 1.1 공통: 상업 사용·임베딩·수정·재배포 허용, 폰트 **단독 판매 금지**, 수정본은 Reserved Font Name 사용 금지(서브셋 생성 시 family 이름을 바꿔야 하는지는 OFL FAQ 상 "Reserved Font Name 을 쓰려면 원본 그대로"가 원칙 — 공식 배포 서브셋 파일을 그대로 쓰면 문제 없음) [출처: https://scripts.sil.org/OFL].
+
+## E. 글꼴 메트릭 실측 (3차, RV M12 — `fontmetrics.py`, fontTools 4.68, 2026-11-08)
+
+파일: Pretendard-Regular.ttf(v1.3.9 `dist/public/static/alternative`), SUIT-Regular.ttf(sun-typeface/SUIT HEAD `fonts/static/ttf`), `C:\Windows\Fonts\malgun.ttf`(Malgun Gothic, 이 PC), NotoSansKR-Regular.otf(notofonts/noto-cjk `Sans/SubsetOTF/KR`). **Apple SD Gothic Neo 는 macOS 번들이라 이 PC 에서 잴 수 없었다(미측정).** 모든 값은 em 비율(= 단위/unitsPerEm). "실측 x" 는 글리프 `x` 의 yMax, 한글 높이는 `한` 의 bounds. 숫자 등폭 = 0~9 advance 가 모두 같은가. tnum/pnum = GSUB FeatureList 에 태그가 있는가.
+
+| 폰트 | upm | x-height/em (OS/2 sxHeight · 실측 x) | cap/em | 한글 자폭/em (가·한·뷁) | 한글 글리프 높이/em(한) | 숫자 폭/em (0·1·7) | 숫자 등폭 | tnum/pnum | 한글 음절 수 | 라틴 a 폭/em |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Pretendard-Regular.ttf | 2048 | 0.530 · 0.530 | 0.707 | 0.864/0.864/0.864 | 0.849 | 0.596/0.438/0.552 | 아니오(9종) | tnum/pnum | 11,172 | 0.535 |
+| SUIT-Regular.ttf | 1000 | 0.461 · 0.461 | 0.722 | 0.874/0.874/0.874 | 0.854 | 0.622/0.373/0.552 | 아니오(8종) | tnum/pnum | 11,172 | 0.575 |
+| malgun.ttf (Windows 시스템) | 2048 | 0.513 · 0.513 | 0.718 | 1.000/1.000/1.000 | 0.925 | 0.551/0.551/0.551 | 예 | —/— | 11,172 | 0.520 |
+| NotoSansKR-Regular.otf (Android 시스템 계열) | 1000 | 0.543 · 0.543 | 0.733 | 0.920/0.920/0.920 | 0.884 | 0.555/0.555/0.555 | 예 | —/— | 11,172 | 0.563 |
+
+읽는 법: 한글 자폭이 작을수록 같은 카드 폭에 더 많은 글자가 들어간다(Pretendard 0.864 vs Malgun 1.000 → 15px 에서 글자당 2.0px, 20자 제목에서 41px 차이). 숫자는 Malgun·Noto 가 기본 등폭, Pretendard·SUIT 는 기본 비례폭이지만 `tnum` 으로 등폭 전환 가능(0.552/em 로 통일됨 — `7` 의 폭이 tnum 폭).
+
+## F. 서브셋 파일의 실제 글리프 수 (`fontcount.py`)
+
+| 파일 | 바이트 | cmap 문자 수 | 한글 음절 수 | 가변 |
+|---|---|---|---|---|
+| SUIT-Regular.woff2 (공식 배포) | 167,672 | 2,933 | **2,668** | 정적 |
+| SUIT-Variable.woff2 (공식 배포) | 624,536 | 2,933 | 2,668 | fvar |
+| Pretendard-Regular.subset.woff2 (공식 배포) | 267,096 | 3,728 | **2,780** | 정적 |
+| Pretendard-SemiBold.subset.woff2 (공식 배포) | 268,752 | 3,728 | 2,780 | 정적 |
+| PretendardVariable.woff2 (완전본) | 2,057,688 | 14,336 | 11,172 | fvar |
+
+→ §A 의 "SUIT 글리프 수 [가정]" 해소: SUIT 웹폰트는 2,668자 서브셋이다. Pretendard 서브셋은 KS X 1001 2,350 + 430자 = 2,780자.
+
+## G. 직접 만든 가변 서브셋 (`fontsubset.py`, pyftsubset + woff2)
+
+공식 서브셋 cmap(3,728자)을 유니코드 목록으로 써서 PretendardVariable.woff2 를 잘라 봤다(힌팅 제거, kern/liga/calt/tnum/pnum/lnum/ccmp/locl 유지).
+
+| 산출 파일 | 바이트 | wght 축 | 문자 수 |
+|---|---|---|---|
+| PretendardVariable.subset-full.woff2 | **601,876** | 45–920 전체 | 3,728 |
+| (400–700 축 제한) | 실패 — instancer 가 폰트 내부의 깨진 글리프 참조(`uni2004`)에서 KeyError | | |
+
+→ 가변 서브셋 1개(602 KB)가 정적 2개(Regular+SemiBold ≈ 536 KB)보다 크다. **정적 서브셋 2개가 최소다.**
