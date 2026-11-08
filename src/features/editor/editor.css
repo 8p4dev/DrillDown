@@ -204,7 +204,7 @@ mark.hl-b { background: #6cc8ff66; }
 .detail .note-edit:focus { box-shadow: inset 0 0 0 1px var(--text); }
 
 .side details { font-size: var(--fs-sm); }
-.side summary { display: flex; align-items: center; gap: .4rem; cursor: pointer; color: var(--muted); font-weight: 600; padding: .2rem 0; }
+.side summary { display: flex; align-items: center; gap: .4rem; min-height: var(--tap); box-sizing: border-box; cursor: pointer; color: var(--muted); font-weight: 600; padding: .2rem 0; } /* QA #16: coarse 44px */
 .io textarea {
   width: 100%; box-sizing: border-box; margin: .4rem 0; font-family: ui-monospace, monospace; font-size: .8rem;
   scroll-margin-bottom: calc(var(--kb) + 1rem);
