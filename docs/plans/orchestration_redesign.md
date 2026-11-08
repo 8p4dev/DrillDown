@@ -131,8 +131,8 @@ A6 보강: 초록·빨강 외 유채색 금지는 UI 색에 한한다. 사용자
 상태: **완료(설계 문서 단계).** 2026-11-08. 구현(L4에 해당하는 코드 작업)은 다음 오케스트레이션.
 
 - 완료: R0(0차, E2E 13/13) · R1~R10 설계 문서 `docs/specs/01~04` · R11 교차 검증 `05` + 3차 반영(RV 높음 2·중간 15·낮음 20 전부 처리) · 종합 `00_overview.md`.
-- 머지 순서: 0차 e52f5b0 → 1차 AA 2ce98a2·SH 81a16a0·DS e809ebb·LM d4b5361 → 2차 RV 16e4218 → 3차 LM 5f775ac·AA 953c9e3·SH 2d63e53·DS 61d74cc. 충돌 0건. 매 머지 typecheck·lint·build 통과.
-- 계획 대비 변경: ① 3차 웨이브가 추가됐다(RV 발견 반영, `send`로 같은 워크트리 재개). ② DS·SH 워커가 사용량 한도로 중단돼 SH 3차는 오케스트레이터가 미커밋 수정을 검토·커밋했다. ③ 계약 §3.2 예외로 `--shadow-*` 삭제 승인, §3.3에 AA `reports`·`settings` 테이블과 필드 3개 추가. ④ A6에 데이터 색·브랜드 색 예외.
+- 머지 순서: 0차 e52f5b0 → 1차 AA 2ce98a2·SH 81a16a0·DS e809ebb·LM d4b5361 → 2차 RV 16e4218 → 3차 LM 5f775ac·AA 953c9e3·SH 2d63e53+7004eae·DS 61d74cc. 충돌 0건. 매 머지 typecheck·lint·build 통과.
+- 계획 대비 변경: ① 3차 웨이브가 추가됐다(RV 발견 반영, `send`로 같은 워크트리 재개). ② DS·SH 워커가 사용량 한도로 중단됐다가 재개돼 스스로 마무리했다(SH는 오케스트레이터 선커밋 78f7bf3 위에 3f83796). ③ 계약 §3.2 예외로 `--shadow-*` 삭제 승인, §3.3에 AA `reports`·`settings` 테이블과 필드 3개 추가. ④ A6에 데이터 색·브랜드 색 예외.
 - 미완료·범위 밖: 구현, 실기기 검증, ARM 메모리 실측, 사용성 검증. 기존 버그 4건(접힌 가지 빈칸, 배지 탭, attempts 미기록, childrenOf 정렬)은 구현 단계에 포함 제안.
 - 사용자 결정 19개: `00_overview.md` §6. 기본값 없는 것은 D14(회선 약관)·D18(이메일·도메인).
 - 남은 정리: 워크트리 agent-DS-design·agent-LM-layout·agent-AA-account·agent-SH-sharing·agent-RV-review(및 이전 GL·GD·GF)는 사용자가 확인한 뒤 해제.

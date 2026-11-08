@@ -124,7 +124,7 @@
 
 ## 9. 3차 수정 반영 상태
 
-- LM(5f775ac) 8/8, AA(953c9e3) 15/15, SH(2d63e53) 14/14 + AA 요청 3건(`since` 인자·7일·events 제외), DS(61d74cc) 11/11. 각 문서 §8에 기록.
-- DS·SH 워커는 사용량 한도로 중단됐다가 재개됐다. DS는 스스로 커밋(1c848b0)했고, SH는 워크트리의 미커밋 수정을 오케스트레이터가 검토해 커밋(78f7bf3, `since` 인자 한 줄 추가)했다.
+- LM(5f775ac) 8/8, AA(953c9e3) 15/15, SH(2d63e53·7004eae) 14/14 + AA 요청 3건(`restoreTreesOfUser(ownerId, since)`·톰스톤·커서 만료 7일·`purgeUser`에서 events 제외) + LM 요청, DS(61d74cc) 11/11. 각 문서 §8에 기록.
+- DS·SH 워커는 사용량 한도로 중단됐다가 재개됐다. 둘 다 결국 스스로 마무리했다(DS 1c848b0, SH 3f83796). 그 사이 오케스트레이터가 SH의 미커밋 수정을 먼저 커밋(78f7bf3)했는데 충돌 없이 합쳐졌다.
 - 3차 뒤 남은 교차 요청: SH `sync.ts`를 동적 import로(첫 화면 gzip 120KB 예산 조건, DS §3.9) → 구현 P3 완료 기준에 포함. Apple SD Gothic Neo 메트릭은 macOS가 없어 미측정.
 - 최종 검증: typecheck 0 오류, lint 0 경고(evidence 스크립트의 미사용 import 1건 정리), build 통과, evidence 링크 누락 0건, `docs/specs` 합계 약 1.6MB(스크린샷 포함).
