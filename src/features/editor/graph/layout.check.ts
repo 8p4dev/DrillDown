@@ -2,6 +2,7 @@
 import type { TreeNode } from '../../../core/types'
 import { HGAP, isOpen, layout, type Box } from './layout'
 import { searchNodes } from '../search'
+import { changedNode } from '../edit'
 
 // node:assert 대신 (앱 tsconfig 에 node 타입 없음)
 function assert(ok: unknown, msg = '점검 실패'): asserts ok {
@@ -95,5 +96,18 @@ assert.equal(searchNodes(base, ' 해고 ').map((n) => n.id).join(','), ['해고'
 assert.equal(searchNodes(base, '해고', 2).length, 2)
 assert.equal(searchNodes([mk('TCP SYN', null)], 'syn').length, 1)
 assert.equal(searchNodes(base, '  ').length, 0)
+
+// U09: 실행 취소가 바꾼 곳 — 가져오기(대상 패치 + 하위 추가)는 대상, 지우기만 했으면 남은 부모, 되살린 가지는 그 꼭대기
+{
+  const r = mk('R', null), a = mk('A', 'R'), b = mk('B', 'A'), c = mk('C', 'A')
+  const before = [r, a, b, c]
+  const ra = { ...r, title: 'R2' }
+  assert.equal(changedNode(before, [ra, a, b, c, mk('X', 'R'), mk('Y', 'X')]), 'R', '가져오기 다시 실행')
+  assert.equal(changedNode([ra, a, b, c, mk('X', 'R')], before), 'R', '가져오기 되돌림')
+  assert.equal(changedNode([{ ...r, collapsed: true }], before), 'A', '접은 뒤 실행 취소 → 접기는 바뀐 곳이 아님')
+  assert.equal(changedNode([r], before), 'A', '삭제 되돌림 → 가지 꼭대기')
+  assert.equal(changedNode(before, [r]), 'R', '삭제 다시 실행 → 남은 부모')
+  assert.equal(changedNode(before, before), undefined)
+}
 
 console.log('layout.check: ok')
