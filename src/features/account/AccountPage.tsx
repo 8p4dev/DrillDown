@@ -1,12 +1,13 @@
 // 계정 화면 #/account — 03 §3.3 요소 표, 02 §3.1 계정 와이어(560px 중앙 1열), 01 §3.5 계정 행·§3.6 #22.
-// 닉네임·사진 토글 PATCH /api/me, 기기 /api/me/sessions, 휴지통 = 로컬 db.trees.deletedAt + 서버 POST /api/trees/:id/restore, 내보내기 = 로컬 + /api/me/export, 탈퇴 POST /api/me/delete.
+// 닉네임·사진 토글 PATCH /api/me, 기기 /api/me/sessions, 휴지통 = 로컬 db.trees.deletedAt + 서버 POST /api/trees/:id/restore, 내보내기 = 로컬(events·trees·nodes·srs) + /api/me/export, 탈퇴 POST /api/me/delete.
+// 비로그인은 휴지통·내보내기만 보인다(P0 #4·#5).
 // 아바타 파일 업로드는 없다(서버는 이미지 저장 안 함, 03 §3.3).
 import { useEffect, useRef, useState } from 'react'
 import { api, ApiError } from '../../core/api'
 import { db } from '../../core/db'
 import { exportEvents } from '../../core/events'
 import { deleteAccount, exportServer, loadSessions, login, logout, patchMe, revokeOtherSessions, revokeSession, useMe, useMeReady, useSessions } from '../../core/me'
-import { deleteTree, listTrees, restoreTree } from '../../core/repo'
+import { deleteTree, listTrees, restoreTree, TRASH_MS } from '../../core/repo'
 import { retrySync } from '../../core/sync'
 import type { Tree } from '../../core/types'
 import { href } from '../../router'
@@ -23,6 +24,7 @@ const rel = (t: number) => {
   const m = Math.round((Date.now() - t) / 60000)
   return m < 1 ? '방금' : m < 60 ? `${m}분 전` : m < 1440 ? `${Math.round(m / 60)}시간 전` : `${Math.round(m / 1440)}일 전`
 }
+const daysLeft = (deletedAt: number) => Math.max(1, Math.ceil((deletedAt + TRASH_MS - Date.now()) / 86_400_000))
 const okNick = (s: string) => s.length >= 1 && s.length <= 20 && !/[\p{Cc}]/u.test(s)
 const fail = (e: unknown) => toast(e instanceof ApiError && e.status === 0 ? '오프라인이에요' : '실패했어요 · 다시 시도해 주세요')
 
@@ -38,7 +40,6 @@ export default function AccountPage() {
   const [trash, setTrash] = useState<Tree[]>([])
   const done = useRef(false)
 
-  useEffect(() => { if (ready && !me) location.hash = href.login(href.account()) }, [ready, me])
   const loggedIn = !!me
   useEffect(() => { if (loggedIn) loadSessions().catch(() => { /* 목록 비움 */ }) }, [loggedIn])
   const reload = () => {
@@ -46,7 +47,55 @@ export default function AccountPage() {
     void db.trees.toArray().then((ts) => setTrash(ts.filter((t) => t.deletedAt)))
   }
   useEffect(reload, [])
-  if (!me) return null
+  // 휴지통·내보내기는 비로그인도 쓴다(로컬 데이터). 서버 호출은 로그인일 때만
+  const restore = async (t: Tree) => {
+    await restoreTree(t.id)
+    // 서버 7일 휴지통 — 동기화 안 된 로컬 트리는 404 라 무시
+    if (me) await api(`/api/trees/${t.id}/restore`, { method: 'POST', body: {} }).catch(() => undefined)
+    retrySync()
+    reload()
+  }
+  const exportData = async () => {
+    const [local, server, all, nodes, srs] = await Promise.all([
+      exportEvents(), me ? exportServer().catch(() => null) : null, db.trees.toArray(), db.nodes.toArray(), db.srs.toArray(),
+    ])
+    const trees = all.filter((t) => !t.deletedAt)
+    const live = new Set(trees.map((t) => t.id))
+    const json = JSON.stringify({
+      exported_at: Date.now(), events: JSON.parse(local) as unknown, account: server,
+      trees, nodes: nodes.filter((n) => live.has(n.treeId)), srs: srs.filter((r) => live.has(r.treeId)),
+    }, null, 2)
+    const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([json], { type: 'application/json' })), download: 'drilldown-export.json' })
+    a.click()
+    URL.revokeObjectURL(a.href)
+  }
+  const trashSection = (
+    <section aria-labelledby="trash">
+      <h2 id="trash">휴지통 (7일)</h2>
+      {trash.length === 0 ? <span className="empty-line">비어 있음</span> : (
+        <ul>
+          {trash.map((t) => (
+            <li key={t.id}>
+              <span className="grow">{t.title}<br /><span className="muted">{rel(t.deletedAt!)} 삭제 · {daysLeft(t.deletedAt!)}일 뒤 영구 삭제</span></span>
+              <button type="button" className="icon-btn" onClick={() => void restore(t)}><Icon d={undo2} /> 복구</button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  )
+  const exportBtn = <button type="button" className="icon-btn" onClick={() => void exportData()}><Icon d={I.download} /> 데이터 내보내기</button>
+  if (!ready) return null
+  if (!me) {
+    return (
+      <section className="account">
+        <h1>휴지통·내보내기</h1>
+        <span className="stat">이 기기에만 저장돼 있어요 · <a href={href.login(href.account())}>로그인</a>하면 계정에 저장됩니다</span>
+        {trashSection}
+        <div className="actions">{exportBtn}</div>
+      </section>
+    )
+  }
   const u = me.user
   const providerPic = u.use_provider_avatar ?? !!u.avatar_url
 
@@ -62,20 +111,6 @@ export default function AccountPage() {
   }
   const togglePic = (on: boolean) =>
     patchMe({ use_provider_avatar: on }).then((r) => setRelogin(on && !!r.relogin_required), fail)
-  const restore = async (t: Tree) => {
-    await restoreTree(t.id)
-    // 서버 7일 휴지통 — 동기화 안 된 로컬 트리는 404 라 무시
-    await api(`/api/trees/${t.id}/restore`, { method: 'POST', body: {} }).catch(() => undefined)
-    retrySync()
-    reload()
-  }
-  const exportData = async () => {
-    const [local, server] = await Promise.all([exportEvents(), exportServer().catch(() => null)])
-    const json = JSON.stringify({ exported_at: Date.now(), events: JSON.parse(local) as unknown, account: server }, null, 2)
-    const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([json], { type: 'application/json' })), download: 'drilldown-export.json' })
-    a.click()
-    URL.revokeObjectURL(a.href)
-  }
   const signOut = () => logout().then(() => { location.hash = href.trees() }, fail)
   const quit = async () => {
     try { await deleteAccount() } catch (e) { fail(e); return }
@@ -143,22 +178,10 @@ export default function AccountPage() {
         )}
       </section>
 
-      <section aria-labelledby="trash">
-        <h2 id="trash">휴지통 (7일)</h2>
-        {trash.length === 0 ? <span className="empty-line">비어 있음</span> : (
-          <ul>
-            {trash.map((t) => (
-              <li key={t.id}>
-                <span className="grow">{t.title}<br /><span className="muted">{rel(t.deletedAt!)} 삭제</span></span>
-                <button type="button" className="icon-btn" onClick={() => void restore(t)}><Icon d={undo2} /> 복구</button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      {trashSection}
 
       <div className="actions">
-        <button type="button" className="icon-btn" onClick={() => void exportData()}><Icon d={I.download} /> 데이터 내보내기</button>
+        {exportBtn}
         <button type="button" className="icon-btn" onClick={() => void signOut()}><Icon d={logOut} /> 로그아웃</button>
       </div>
 

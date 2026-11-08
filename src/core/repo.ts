@@ -43,7 +43,7 @@ export async function deleteTree(treeId: ID): Promise<void> {
   })
 }
 
-/** 소프트 삭제: 목록에서 숨기고 되돌리기 토스트(10초) 동안 보존 (04 §3.10, 02 D9). outbox 는 tree del 1행만 */
+/** 소프트 삭제: 목록에서 숨기고 휴지통에 7일 보존 (04 §3.10, 02 D9, P0 C2). outbox 는 tree del 1행만 */
 export function markTreeDeleted(treeId: ID): Promise<number> {
   return db.transaction('rw', W(), async () => {
     const n = await db.trees.update(treeId, { deletedAt: Date.now() })
@@ -59,9 +59,11 @@ export function restoreTree(treeId: ID): Promise<number> {
     return n
   })
 }
-/** 토스트 종료·앱 시작 때 호출: deletedAt 이 있는 트리를 하드 삭제. treeId 를 주면 그 트리만 */
-export async function purgeDeletedTrees(treeId?: ID): Promise<void> {
-  const victims = (await db.trees.toArray()).filter((t) => t.deletedAt && (!treeId || t.id === treeId))
+/** 휴지통 보존 기간(C2). 이보다 오래 전에 지운 트리만 하드 삭제된다 */
+export const TRASH_MS = 7 * 86_400_000
+/** 앱 시작 때 호출: deletedAt 이 7일보다 오래된 트리만 하드 삭제 */
+export async function purgeDeletedTrees(now = Date.now()): Promise<void> {
+  const victims = (await db.trees.toArray()).filter((t) => t.deletedAt && t.deletedAt < now - TRASH_MS)
   for (const t of victims) await deleteTree(t.id)
 }
 

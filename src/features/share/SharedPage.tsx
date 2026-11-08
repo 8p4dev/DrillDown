@@ -2,10 +2,11 @@
 // 보기 탭 = 읽기 전용 목록 + 하단 복제 바. 플래시·빈칸·백지 = 기존 화면에 메모리 소스 주입(ephemeral). 신고·링크 복사는 헤더 ⋯ 메뉴.
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { api, ApiError, type ReportReason, type SharedTree } from '../../core/api'
-import { childrenOf, copyTree } from '../../core/repo'
+import { useMe } from '../../core/me'
+import { childrenOf, copyTree, listTrees } from '../../core/repo'
 import type { StudySource } from '../../core/source'
 import { applyGrade } from '../../core/srs'
-import type { ID, NodeSrs, TreeNode } from '../../core/types'
+import { CAP, type ID, type NodeSrs, type TreeNode } from '../../core/types'
 import { href, navigateShared, type Mode } from '../../router'
 import { Icon } from '../../ui/Icon'
 import { I } from '../../ui/icons'
@@ -77,6 +78,7 @@ const FAIL: Record<number, string> = { 404: '링크를 찾을 수 없습니다',
 type Load = ({ t: SharedTree } | { fail: string }) & { slug: string }
 
 export default function SharedPage({ slug, mode, rootId }: { slug: string; mode: ViewMode; rootId?: string }) {
+  const me = useMe()
   const [loaded, setLoad] = useState<Load | null>(null)
   useEffect(() => {
     const ac = new AbortController()
@@ -115,6 +117,8 @@ export default function SharedPage({ slug, mode, rootId }: { slug: string; mode:
   const url = location.origin + href.shared(slug)
 
   const doCopy = async () => {
+    // C5: 로그인 사용자는 서버 한도에 닿으면 복제를 막는다(비로그인은 막지 않음)
+    if (me && (await listTrees()).length >= CAP.treesPerUser) { toast('트리는 200개까지 저장할 수 있습니다'); return }
     const tree = await copyTree(t)
     void api(`/api/t/${slug}/copy`, { method: 'POST' }).catch(() => {}) // copy_count 용, 실패 무시
     toast('복제됨 · 원본이 바뀌어도 이 트리는 바뀌지 않습니다', { label: '열기', run: () => location.assign('/' + href.edit(tree.id)) }, 6000)
