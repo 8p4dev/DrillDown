@@ -1,5 +1,5 @@
 import { DefaultScheduler, Rating, type Grade } from 'ts-fsrs'
-import { db } from '../db'
+import { db, track } from '../db'
 import { logEvent } from '../events'
 import type { GradeSource, ID, NodeSrs, Structure, TreeNode } from '../types'
 
@@ -119,8 +119,13 @@ export function missHeat(s: NodeSrs | undefined): number {
 // ── DB 래퍼 ────────────────────────────────────────────────
 
 export async function recordGrade(nodeId: ID, treeId: ID, src: GradeSource, structure: Structure, now = new Date()): Promise<NodeSrs> {
-  const { next, recheckResolved } = applyGrade(await db.srs.get(nodeId), nodeId, treeId, src, structure, now)
-  await db.srs.put(next)
+  const next0 = await db.transaction('rw', [db.srs, db.outbox, db.meta], async () => {
+    const r = applyGrade(await db.srs.get(nodeId), nodeId, treeId, src, structure, now)
+    await db.srs.put(r.next)
+    await track([{ kind: 'srs', id: nodeId, treeId, op: 'put' }]) // 04 §3.1 쓰기 훅
+    return r
+  })
+  const { next, recheckResolved } = next0
   if (recheckResolved) await logEvent('self_graded_node_rechecked', { origNodeId: nodeId, nextGradeSource: src }, treeId)
   return next
 }

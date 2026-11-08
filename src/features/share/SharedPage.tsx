@@ -1,8 +1,7 @@
 // 공유 보기 /t/<slug>?m= — 04 §3.4·§3.10, 02 §3.1 공유 보기 와이어.
 // 보기 탭 = 읽기 전용 목록 + 하단 복제 바. 플래시·빈칸·백지 = 기존 화면에 메모리 소스 주입(ephemeral). 신고·링크 복사는 헤더 ⋯ 메뉴.
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
-import type { ReportReason, SharedTree } from '../../core/api'
-import { getSharedTree, recordCopy, submitReport } from '../../core/mock/shared'
+import { api, ApiError, type ReportReason, type SharedTree } from '../../core/api'
 import { childrenOf, copyTree } from '../../core/repo'
 import type { StudySource } from '../../core/source'
 import { applyGrade } from '../../core/srs'
@@ -10,11 +9,12 @@ import type { ID, NodeSrs, TreeNode } from '../../core/types'
 import { href, navigateShared, type Mode } from '../../router'
 import { Icon } from '../../ui/Icon'
 import { I } from '../../ui/icons'
-import { copy as copyIcon, eye } from '../../ui/icons.all'
+import { copy as copyIcon, eye, x } from '../../ui/icons.all'
 import { parse, toHtml } from '../editor/content/format'
 import { toast } from '../Toast'
 import { Avatar } from '../../ui/Avatar'
 import { Sheet } from '../../ui/Sheet'
+import './share-list.css'
 import './share.css'
 
 const FlashPage = lazy(() => import('../flash/FlashPage'))
@@ -72,8 +72,22 @@ function Branch({ nodes, items, level }: { nodes: TreeNode[]; items: TreeNode[];
   )
 }
 
+// 서버 오류 코드 → 한 줄 화면 (04 §3.3·§3.6: 404 / 410 deleted / 403 hidden)
+const FAIL: Record<number, string> = { 404: '링크를 찾을 수 없습니다', 410: '삭제된 트리입니다', 403: '운영 정책으로 숨김', 0: '네트워크에 연결할 수 없습니다' }
+type Load = ({ t: SharedTree } | { fail: string }) & { slug: string }
+
 export default function SharedPage({ slug, mode, rootId }: { slug: string; mode: ViewMode; rootId?: string }) {
-  const t = useMemo(() => getSharedTree(slug), [slug])
+  const [loaded, setLoad] = useState<Load | null>(null)
+  useEffect(() => {
+    const ac = new AbortController()
+    api<SharedTree>(`/api/t/${slug}`, { signal: ac.signal }).then(
+      (t) => setLoad({ slug, t }),
+      (e) => !ac.signal.aborted && setLoad({ slug, fail: FAIL[e instanceof ApiError ? e.status : -1] ?? FAIL[404] }),
+    )
+    return () => ac.abort()
+  }, [slug])
+  const load = loaded?.slug === slug ? loaded : null
+  const t = load && 't' in load ? load.t : null
   const source = useMemo(() => (t ? memorySource(t) : null), [t])
   const [menu, setMenu] = useState(false)
   const [report, setReport] = useState(false)
@@ -88,10 +102,11 @@ export default function SharedPage({ slug, mode, rootId }: { slug: string; mode:
     return () => removeEventListener('pointerdown', close)
   }, [menu])
 
+  if (!load) return <div className="route-loading" aria-busy="true" />
   if (!t) {
     return (
-      <section className="shared">
-        <h1>링크를 찾을 수 없습니다</h1>
+      <section className="shared share-error">
+        <h1>{'fail' in load ? load.fail : FAIL[404]}</h1>
         <p><a href="/#/">내 트리 ›</a></p>
       </section>
     )
@@ -101,7 +116,7 @@ export default function SharedPage({ slug, mode, rootId }: { slug: string; mode:
 
   const doCopy = async () => {
     const tree = await copyTree(t)
-    recordCopy(slug)
+    void api(`/api/t/${slug}/copy`, { method: 'POST' }).catch(() => {}) // copy_count 용, 실패 무시
     toast('복제됨 · 원본이 바뀌어도 이 트리는 바뀌지 않습니다', { label: '열기', run: () => location.assign('/' + href.edit(tree.id)) }, 6000)
   }
   const copyLink = async () => {
@@ -109,9 +124,13 @@ export default function SharedPage({ slug, mode, rootId }: { slug: string; mode:
     await navigator.clipboard.writeText(url)
     toast('링크 복사됨')
   }
-  const sendReport = (e: React.FormEvent) => {
+  const sendReport = async (e: React.FormEvent) => {
     e.preventDefault()
-    submitReport(slug, reason, note)
+    try {
+      await api(`/api/t/${slug}/report`, { body: { reason, note: note.trim() || undefined } })
+    } catch (err) {
+      return toast(err instanceof ApiError ? err.message : '신고하지 못했습니다')
+    }
     setReport(false)
     setNote('')
     toast('신고 접수됨')
@@ -121,7 +140,7 @@ export default function SharedPage({ slug, mode, rootId }: { slug: string; mode:
     <section className="shared" data-mode={mode}>
       <header className="share-head">
         <div className="share-title">
-          <h1>{t.title}</h1>
+          <div className="share-title-row"><h1>{t.title}</h1><span className="badge">읽기 전용</span></div>
           <p className="muted share-owner"><Avatar name={t.owner.nickname} url={t.owner.avatar_url} size={32} className="share-avatar" />{t.owner.nickname} · 노드 {t.node_count}개</p>
         </div>
         <nav aria-label="학습 모드" className="share-tabs">
@@ -172,7 +191,7 @@ export default function SharedPage({ slug, mode, rootId }: { slug: string; mode:
         <form className="share-sheet share-report" onSubmit={sendReport}>
           <header className="sheet-head">
             <h2>신고</h2>
-            <button type="button" className="link" onClick={() => setReport(false)}>닫기</button>
+            <button type="button" className="ghost sheet-x" aria-label="닫기" data-tip="닫기" onClick={() => setReport(false)}><Icon d={x} /></button>
           </header>
           <fieldset>
             <legend className="muted">사유</legend>
