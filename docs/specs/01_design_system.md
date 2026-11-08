@@ -472,6 +472,20 @@ E2E 로 확인할 항목 [제안]: (1) 저장값 없음 + `colorScheme: dark` �
 5. 로그인 버튼의 Google·Kakao 브랜드 색(파랑·노랑). **기본값 = A6 예외로 허용**(plan §3.5 A6 보강 "외부 브랜드 색은 예외"). 버튼 모양(반경 2px·1px 테두리·44px)만 DS 규칙을 따른다. 이견이 있는가?
 6. 테마 토글을 상단 바 오른쪽에 두는 것(LM §3.1 확정)에 이견이 없는지.
 
+## 7. 출처 (확인일 2026-11-08)
+
+1. `docs/research/R5_liquid_glass.md` 2단계(NN/g "Motion for motion's sake is not usability", https://www.nngroup.com/articles/liquid-glass/)·3단계(유혹적 세부 메타분석 — 2차 요약) — 장식 금지 근거로 재사용.
+2. `docs/plans/orchestration_modes.md` §0 — 에디터는 오답 붉은 농도만, 숙련도 색은 플래시만(사용자 결정 2026-11-01).
+3. Machado, Oliveira & Fernandes, "A Physiologically-based Model for Simulation of Color Vision Deficiency", IEEE TVCG 2009. 심도 1.0 행렬 값은 저자 공개 표에서 가져옴(https://www.inf.ufrgs.br/~oliveira/pubs_files/CVD_Simulation/CVD_Simulation.html). WCAG 2.2 1.4.3/1.4.11: https://www.w3.org/TR/WCAG22/
+4. Pretendard LICENSE: https://github.com/orioncactus/pretendard/blob/main/LICENSE ; 배포 파일: https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/packages/pretendard/dist/web/ ; Std README(라틴 전용): https://github.com/orioncactus/pretendard/blob/v1.3.9/packages/pretendard-std/README.md
+5. SUIT LICENSE: https://github.com/sun-typeface/SUIT/blob/main/LICENSE ; README(OFL 문구): https://github.com/sun-typeface/SUIT/blob/main/README.md
+6. Wanted Sans OFL.txt: https://github.com/wanteddev/wanted-sans/blob/v1.0.3/OFL.txt ; README 라이선스 절·Std README(라틴 전용): https://github.com/wanteddev/wanted-sans/tree/main/packages
+7. IBM Plex LICENSE.txt: https://github.com/IBM/plex/blob/master/LICENSE.txt
+8. Noto Sans CJK LICENSE: https://github.com/notofonts/noto-cjk/blob/main/Sans/LICENSE
+9. Google Fonts CSS API(청크 측정): https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400..700&display=swap , `…family=IBM+Plex+Sans+KR:wght@400;700` ; SIL OFL FAQ: https://scripts.sil.org/OFL
+10. Lucide LICENSE(ISC): https://github.com/lucide-icons/lucide/blob/main/LICENSE , 패키지 lucide-static 1.70.0: https://cdn.jsdelivr.net/npm/lucide-static@1.70.0/ ; Tabler MIT: https://github.com/tabler/tabler-icons/blob/main/LICENSE ; Phosphor MIT: https://github.com/phosphor-icons/core/blob/main/LICENSE
+11. 사업 맥락: `../drilldown-biz/brief/decisions.md` 6~9(수익화 폐기, 자체 호스팅 Pi, LLM 채점 없음) — 클라이언트 바이트·CDN 비의존 근거.
+
 ## 8. 3차 변경 기록 (RV `05_review.md` 반영, 2026-11-08)
 
 | RV # | 변경 위치 | 내용 |
@@ -488,16 +502,4 @@ E2E 로 확인할 항목 [제안]: (1) 저장값 없음 + `colorScheme: dark` �
 | L6 | §3.1 `--shadow-*` 행 | 변경 없음. 계약 §3.2 예외로 오케스트레이터 승인(plan §3.5) 한 줄 |
 | L16 | §3.1 `--warn` 행, §3.2, §5(c) 최저 대비 행 | "연두 틴트" → "초록 8% 틴트"(스크립트 라벨과 일치), `nodeColor` 는 red 도 반환(`:73`)으로 수정 |
 
-## 7. 출처 (확인일 2026-11-08)
-
-1. `docs/research/R5_liquid_glass.md` 2단계(NN/g "Motion for motion's sake is not usability", https://www.nngroup.com/articles/liquid-glass/)·3단계(유혹적 세부 메타분석 — 2차 요약) — 장식 금지 근거로 재사용.
-2. `docs/plans/orchestration_modes.md` §0 — 에디터는 오답 붉은 농도만, 숙련도 색은 플래시만(사용자 결정 2026-11-01).
-3. Machado, Oliveira & Fernandes, "A Physiologically-based Model for Simulation of Color Vision Deficiency", IEEE TVCG 2009. 심도 1.0 행렬 값은 저자 공개 표에서 가져옴(https://www.inf.ufrgs.br/~oliveira/pubs_files/CVD_Simulation/CVD_Simulation.html). WCAG 2.2 1.4.3/1.4.11: https://www.w3.org/TR/WCAG22/
-4. Pretendard LICENSE: https://github.com/orioncactus/pretendard/blob/main/LICENSE ; 배포 파일: https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/packages/pretendard/dist/web/ ; Std README(라틴 전용): https://github.com/orioncactus/pretendard/blob/v1.3.9/packages/pretendard-std/README.md
-5. SUIT LICENSE: https://github.com/sun-typeface/SUIT/blob/main/LICENSE ; README(OFL 문구): https://github.com/sun-typeface/SUIT/blob/main/README.md
-6. Wanted Sans OFL.txt: https://github.com/wanteddev/wanted-sans/blob/v1.0.3/OFL.txt ; README 라이선스 절·Std README(라틴 전용): https://github.com/wanteddev/wanted-sans/tree/main/packages
-7. IBM Plex LICENSE.txt: https://github.com/IBM/plex/blob/master/LICENSE.txt
-8. Noto Sans CJK LICENSE: https://github.com/notofonts/noto-cjk/blob/main/Sans/LICENSE
-9. Google Fonts CSS API(청크 측정): https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400..700&display=swap , `…family=IBM+Plex+Sans+KR:wght@400;700` ; SIL OFL FAQ: https://scripts.sil.org/OFL
-10. Lucide LICENSE(ISC): https://github.com/lucide-icons/lucide/blob/main/LICENSE , 패키지 lucide-static 1.70.0: https://cdn.jsdelivr.net/npm/lucide-static@1.70.0/ ; Tabler MIT: https://github.com/tabler/tabler-icons/blob/main/LICENSE ; Phosphor MIT: https://github.com/phosphor-icons/core/blob/main/LICENSE
-11. 사업 맥락: `../drilldown-biz/brief/decisions.md` 6~9(수익화 폐기, 자체 호스팅 Pi, LLM 채점 없음) — 클라이언트 바이트·CDN 비의존 근거.
+3차 커밋은 워커가 사용량 한도로 중단된 뒤 오케스트레이터가 워크트리의 미커밋 수정을 검토해 마무리했다(내용 변경 없음, §8을 문서 끝으로 이동).
