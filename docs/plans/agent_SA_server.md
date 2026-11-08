@@ -20,15 +20,15 @@
 ## 단계
 
 - [x] 1. plan 작성
-- [ ] 2. `session.ts`: sid 발급·해시·쿠키, 미들웨어(만료·절대 180일/관리자 24h·슬라이딩·last_seen 1분·정지/탈퇴 무효), UA 축약
-- [ ] 3. `oauth.ts`: start/callback(google·kakao), PKCE·state 쿠키, 토큰·userinfo 주입형, `signIn`(UPSERT·허용목록·복구·정지·세션·302), fake start, providers
-- [ ] 4. `me.ts`: `/api/me` GET/PATCH, sessions, revoke-others, export, delete, logout, kakao unlink webhook
-- [ ] 5. `admin.ts`: stats·users·user 상세·suspend/unsuspend·delete·trees·hide/unhide/restore·reports·resolve·settings·audit + 신고 POST
-- [ ] 6. `index.ts`: 미들웨어 export, 점검 모드, 레이트 리밋 배치, `registerAccount`
-- [ ] 7. `daily.ts` `runDaily` + CLI, `backup.ts` `runBackup` + CLI
-- [ ] 8. `account.check.ts` (지시 13 항목 전부)
-- [ ] 9. 배포 파일·런북
-- [ ] 10. typecheck·lint·check·build, 서버 3011 기동 확인, 커밋
+- [x] 2. `session.ts`: sid 발급·해시·쿠키, 미들웨어(만료·절대 180일/관리자 24h·슬라이딩·last_seen 1분·정지/탈퇴 무효), UA 축약
+- [x] 3. `oauth.ts`: start/callback(google·kakao), PKCE·state 쿠키, 토큰·userinfo 주입형, `signIn`(UPSERT·허용목록·복구·정지·세션·302), fake start, providers
+- [x] 4. `me.ts`: `/api/me` GET/PATCH, sessions, revoke-others, export, delete, logout, kakao unlink webhook
+- [x] 5. `admin.ts`: stats·users·user 상세·suspend/unsuspend·delete·trees·hide/unhide/restore·reports·resolve·settings·audit + 신고 POST
+- [x] 6. `index.ts`: 미들웨어 export, 점검 모드, 레이트 리밋 배치, `registerAccount`
+- [x] 7. `daily.ts` `runDaily` + CLI, `backup.ts` `runBackup` + CLI
+- [x] 8. `account.check.ts` (지시 13 항목 전부)
+- [x] 9. 배포 파일·런북
+- [x] 10. typecheck·lint·check·build, 서버 3011 기동 확인, 커밋
 
 ## 검증 방법
 
@@ -46,3 +46,9 @@
 - `GET /api/admin/trees` 는 기본 공개 트리, `?deleted=1` 이면 삭제 유예 트리(SH `listTreesForAdmin({deleted:true})`). `GET /api/admin/reports?status=open|resolved|all`(기본 open).
 - 신고 처리 `hidden` 은 같은 트리의 열린 신고를 전부 `hidden` 으로 닫는다.
 - 백업 업로드 경로는 `<BACKUP_RCLONE_REMOTE>/app-YYYYMMDD.db.age`(B2 쓰기 전용 키라 `latest/` 덮어쓰기 대신 날짜 파일, 버킷 수명주기 14일). 런북도 그 경로.
+
+## 결과
+
+- check: `account.check ok`(assert 약 120개: fake 로그인·쿠키 속성·sid 해시 저장·PATCH 21자 400·세션 목록/revoke-others·export·로그아웃 401·탈퇴 401→재로그인 복구·CSRF 교차 출처/Origin 403·return_to 오픈 리디렉트 차단·state 불일치/쿠키 없음/거부 302·설정 없는 제공자 404·가짜 fetch Google 토큰(PKCE verifier=challenge 확인)·userinfo→허용목록 admin·비관리자 404/관리자 200 모양·사용자 검색/커서·정지(자기 자신 403·reason 201자 400·세션 401·재로그인 e=suspended)·공지 81자 400·점검 503+Retry-After 300(관리자·/api/me·health 통과)·감사 로그 action·신고 400/201(미저장)/6번째 429·관리자 restore 410·카카오 웹훅 401/200 유예/INCOMPLETE purge·세션 슬라이딩·관리자 24h·runDaily 8일 전 탈퇴 purge+daily.json).
+- 실서버 3011: fake admin 로그인 302 → `/api/me` 200 → stats 200 → logout 204 → 401. `backup.ts`·`daily.ts` CLI ok.
+- typecheck·lint(경고 0)·check·build 통과.
