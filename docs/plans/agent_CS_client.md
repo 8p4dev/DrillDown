@@ -18,17 +18,18 @@
 
 ## 단계
 
-- [ ] 1 db.ts v2 + OutboxRow/MetaRow + track/kick
-- [ ] 2 repo.ts 훅(쓰기 훅 표) + setVisibility/reissueSlug API화, bump/mock 제거
-- [ ] 3 srs/index.ts recordGrade 트랜잭션 + track
-- [ ] 4 sync.ts 공개 API(작게) + 동적 import
-- [ ] 5 engine push/superseded/id_taken
-- [ ] 6 engine pull/톰스톤/고아/410
-- [ ] 7 engine 병합 onLogin/applyMerge/onLogout, 트리거·폴링·상태
-- [ ] 8 share 화면 실연결, mock 디렉터리 삭제(me·admin 은 CA 소유라 남으면 그대로)
-- [ ] 9 typecheck·lint·check·build
-- [ ] 10 임시 Playwright(가짜 /api) ①~⑦ + v1 데이터 보존 + gzip 측정
-- [ ] 11 커밋·보고
+- [x] 1 db.ts v2 + OutboxRow/MetaRow + track/kick
+- [x] 2 repo.ts 훅(쓰기 훅 표) + setVisibility/reissueSlug API화, bump/mock 제거
+- [x] 3 srs/index.ts recordGrade 트랜잭션 + track
+- [x] 4 sync.ts 공개 API(작게) + 동적 import
+- [x] 5 engine push/superseded/id_taken
+- [x] 6 engine pull/톰스톤/고아/410
+- [x] 7 engine 병합 onLogin/applyMerge/onLogout, 트리거·폴링·상태
+- [x] 8 share 화면 실연결, mock 디렉터리 삭제(CA 머지 후 디렉터리 전체 없음)
+- [x] 8b QA 추가(오케스트레이터 msg): #7 시트 닫기 아이콘 x 44px, #9 탭 밑줄 제거, #10 '읽기 전용' .badge, #20 예외(작업 없음), #23 갤러리 카드 밑줄 제거, share.css → share-list.css 분리
+- [x] 9 typecheck·lint·check·build
+- [x] 10 임시 Playwright(가짜 /api) ①~⑦ + v1 데이터 보존 + gzip 측정
+- [x] 11 커밋·보고
 
 ## 검증 방법
 
@@ -36,8 +37,27 @@
 
 ## 변경 사항
 
-(진행 중 기록)
+- **push 뒤 cursor 를 올리지 않는다**(sequences S1 의 `meta.cursor = seq` 와 다름). push 응답 seq 는 사용자 현재 seq 라 다른 기기 행을 건너뛸 수 있다(SS 확인). 다음 pull 이 내 행을 되받지만 `updatedAt` 같으면 건너뛴다(메아리 무시).
+- **M4 는 기본값 '올리기' 자동 + 토스트**(오케스트레이터 확정): 410 뒤 스냅샷에서 서버에 없는 로컬 트리 → outbox → push, "이 기기에만 있던 트리 n개를 계정에 올렸습니다".
+- **이미 병합된 기기**(`meta.userId == userId`)의 `onLogin` 은 `{local:0, server:0, otherAccount:null}` 을 돌려 대화가 다시 뜨지 않게 하고 엔진만 시작.
+- **`restoreTree` 가 `updatedAt=now`** 로 올린다: 이미 올라간 트리 톰스톤보다 나중 쓰기여야 서버 LWW 를 이긴다. 되돌린 카드가 목록 맨 위로 온다(정렬 기준 updatedAt).
+- **outbox `at` 단조 증가**(같은 ms 두 쓰기 구분) — "보낸 뒤 다시 바뀐 행" 판정용.
+- **쓰기 훅은 `db.track()` 1곳**: repo·srs·엔진이 같은 헬퍼를 쓴다. `track` 은 호출자 트랜잭션 안에서 `meta.userId` 를 읽는다(비로그인 0행).
+- **공유 시트 hidden 배너**는 기존 `.share-notice` 모양 재사용(CSS 추가 없음). 신고는 SA `POST /api/t/:slug/report` 를 SharedPage 가 직접 호출.
+- **CSS 분리**: 목록이 받는 규칙(동기화 상태·공개 배지·공유 시트·xfade)을 `share-list.css` 로. `ShareSheet` 가 TreeListPage 에 정적 import 라 시트 규칙도 함께 옮겼다.
 
 ## 검증 결과
 
-(진행 중 기록)
+- typecheck·lint(경고 0)·check(account·sync·server ok)·build 통과. `src/core/mock/` 없음, `fetch(` 는 `src/core/api.ts` 만.
+- 임시 Playwright(msedge, Vite :5182, `page.route('/api/**')` 메모리 가짜 서버) **14/14 PASS**:
+  ⓪ v1(IDB ver 10) 데이터 → v2 열기 후 트리 1개 유지, 테이블 7개 · ⑦ 비로그인 쓰기 2회 outbox 0행, engine 요청 0, /api/sync 0회 · ⑤ M1 로컬 2개 → `onLogin` `{local:2,server:0}` → engine 청크 로드 → `applyMerge('upload')` 트리 2·노드 2 업로드, outbox 0, pull since=0 · ① 쓰기 → outbox 2행 → 2,044ms 뒤 push → 0행, 표시 동기화 중→저장됨 · ② superseded → 로컬 SERVER-WIN + 토스트 "다른 기기 변경 반영됨 1건" → [내 버전 유지] → 서버에 내 제목 · ③ id_taken → 새 트리 id(노드 treeId 매핑) 재전송, 옛 id 서버에 없음 · ④ setOffline → "2건 대기" → online → 저장됨 · 503 Retry-After 1 → 오프라인 → 자동 재시도 → 저장됨 · 403 tree_limit → 오류 → 탭 "트리가 너무 많습니다(200개)" · pull: 고아 → 루트, 트리 톰스톤 → 로컬 삭제, `dd:remote` 발행 · 410 → since=0 스냅샷 + M4 올리기 · M3 otherAccount=u1 → wipe_other → meta.userId=u2 · ⑥ /t/ 404·410·403 한 줄 화면.
+- QA DOM(390 coarse): 배지 "읽기 전용", 탭 text-decoration none, 시트 닫기 44×44 aria "닫기", 갤러리 카드 링크 밑줄 없음, "더 보기" 표시.
+- **첫 화면 gzip(목록, QA §5 방식: rIC 차단·1.5초·level 9·폰트 제외) = 130,517 B — 목표 120 KB 초과(FAIL)**. 내 몫은 줄었다: mock 공유 데이터 −2,980, share CSS 1,648→540, sync.ts 544, engine 은 첫 화면에 없음. 큰 것은 `index-*.js` 69,252(앱 셸, CA·SA 머지 후 증가)·`db-*.js` 31,257(Dexie). 남은 초과 ≈ 10.5 KB 는 셸 측정(`--sourcemap`)이 필요 — 오케스트레이터 판단.
+- precache 587.24 KiB(68개) ≤ 600.
+
+## 미해결
+
+- 400 `invalid`(예: 제목 200자 초과 옛 데이터) 1행이 큐 전체를 막는다(오류 상태 유지). 행 단위 격리는 다음 단계.
+- `tree_limit` 때 "가장 오래된 것부터 n개 못 올림" 문구 대신 사유 1줄만.
+- id_taken 으로 트리 id 가 바뀌면 그 트리를 열어 둔 에디터 URL(#/tree/<옛 id>)은 빈 화면 — C17 드묾.
+- `dd:remote` 구독(EditorPage·TreeListPage)은 오케스트레이터가 머지 후 추가.

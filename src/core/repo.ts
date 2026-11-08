@@ -141,9 +141,7 @@ export async function addAlias(nodeId: ID, alias: string): Promise<void> {
 /** 공유 트리를 내 로컬 트리로 복제: 새 id·노드 id 재발급·parentId 매핑, private, slug 없음, SRS 비움. 로그인이면 outbox 가 올린다 */
 export async function copyTree(shared: SharedTree): Promise<Tree> {
   const now = Date.now()
-  // ponytail: slug 폴백은 api.ts SharedTree 에 id 가 들어오기 전(CA 머지 전)까지만
-  const sourceTreeId = (shared as SharedTree & { id?: ID }).id ?? shared.slug
-  const tree: Tree = { id: newId(), title: shared.title, createdAt: now, updatedAt: now, visibility: 'private', slug: null, sourceTreeId }
+  const tree: Tree = { id: newId(), title: shared.title, createdAt: now, updatedAt: now, visibility: 'private', slug: null, sourceTreeId: shared.id }
   const idMap = new Map(shared.nodes.map((n) => [n.id, newId()]))
   const nodes: TreeNode[] = shared.nodes.map((n) => ({ ...n, id: idMap.get(n.id)!, treeId: tree.id, parentId: n.parentId ? (idMap.get(n.parentId) ?? null) : null, updatedAt: now }))
   await db.transaction('rw', W(), async () => {
