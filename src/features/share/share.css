@@ -15,28 +15,8 @@
 /* ── 공개 배지: 16px muted ── */
 .vis-badge { display: inline-flex; align-items: center; color: var(--muted); }
 
-/* ── 시트 폴백(ds.tsx) — DS Sheet 머지 후 .sheet/.sheet-backdrop 는 삭제. 02 규칙 4(a): bottom var(--kb) ── */
-.sheet-backdrop { position: fixed; inset: 0; z-index: 40; background: color-mix(in srgb, var(--text) 30%, transparent); }
-.sheet {
-  position: fixed; left: 0; right: 0; bottom: var(--kb); z-index: 41; margin-inline: auto; max-width: 32rem; box-sizing: border-box;
-  max-height: calc(100dvh - var(--kb) - var(--nav-h)); overflow: auto; overscroll-behavior: contain;
-  padding: 1rem 1.15rem calc(1rem + var(--safe-b)); background: var(--surface); border: 1px solid var(--border-strong); border-bottom: 0;
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0; animation: sh-up var(--t-med) var(--ease-out);
-}
-@keyframes sh-up { from { opacity: 0; transform: translateY(12px); } }
-.sheet-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: .75rem; }
-.sheet-head h2 { margin: 0; }
 .share-sheet { display: grid; gap: .75rem; }
 .share-sheet p { margin: 0; }
-
-/* ── 세그먼트 폴백(계약 .seg 는 DS 정의 — 여기는 share/gallery 범위 최소 모양, DS 머지 후 삭제 가능) ── */
-.share-sheet .seg, .gallery .seg { display: inline-flex; align-self: start; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); overflow: hidden; }
-.share-sheet .seg > button, .gallery .seg > button {
-  display: inline-flex; align-items: center; gap: .35rem; min-height: 40px; padding: .4rem .8rem;
-  border: 0; border-radius: 0; box-shadow: none; background: transparent; color: var(--muted);
-}
-.share-sheet .seg > button + button, .gallery .seg > button + button { border-left: 1px solid var(--border); }
-.share-sheet .seg > button[aria-pressed='true'], .gallery .seg > button[aria-pressed='true'] { background: var(--text); color: var(--on-fill); }
 
 /* ── 공유 시트 내용 ── */
 .share-notice { display: grid; gap: .6rem; padding: .75rem .85rem; background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: var(--radius); }
@@ -46,23 +26,12 @@
 .share-link .actions { margin: 0; }
 .share-link .actions button { display: inline-flex; align-items: center; gap: .35rem; min-height: 40px; }
 
-/* ── 아바타 폴백(01 §4 무채색 6톤) — DS Avatar 머지 후 삭제 ── */
-.shared .avatar {
-  display: inline-flex; align-items: center; justify-content: center; vertical-align: middle; margin-right: .4rem; overflow: hidden; flex: none;
-  border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-weight: 700; line-height: 1;
-}
-.shared .avatar img { width: 100%; height: 100%; object-fit: cover; }
-.shared .avatar[data-tone='1'] { background: var(--border); }
-.shared .avatar[data-tone='2'] { background: color-mix(in srgb, var(--muted) 25%, transparent); }
-.shared .avatar[data-tone='3'] { background: color-mix(in srgb, var(--muted) 45%, transparent); }
-.shared .avatar[data-tone='4'] { background: var(--muted); color: var(--bg); }
-.shared .avatar[data-tone='5'] { background: var(--text-2); color: var(--bg); }
-
 /* ── 공유 보기 헤더: 제목+소유자 · 탭 4 · 도구(복제·⋯) ── */
 .share-head { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1rem; margin-bottom: 1rem; }
 .share-title { flex: 1 1 auto; min-width: 0; }
 .share-title h1 { margin: 0; font-size: 1.35rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.share-owner { display: flex; align-items: center; margin: .15rem 0 0; font-size: var(--fs-sm); }
+.share-owner { display: flex; align-items: center; gap: .4rem; margin: .15rem 0 0; font-size: var(--fs-sm); }
+.share-avatar { --avatar-size: 24px; font-size: 12px; }
 .share-tabs { display: flex; gap: 0; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); overflow: hidden; }
 .share-tabs a {
   display: inline-flex; align-items: center; justify-content: center; gap: .35rem; min-height: 44px; padding: .4rem .85rem;
@@ -86,7 +55,8 @@
 .share-copy-text { display: none; }
 @media (max-width: 760px) {
   .share-head { gap: .6rem; }
-  .share-title { flex-basis: calc(100% - 6.5rem); }
+  .share-title { flex: 1 1 0; }
+  .share-tools { flex: none; }
   .share-tabs { flex: 1 0 100%; order: 3; }
   .share-tabs a { flex: 1 1 0; padding-inline: .3rem; }
   .shared[data-mode='view'] .share-copy { display: none; }
@@ -95,6 +65,10 @@
   .share-copy-text { display: inline; }
   .shared .share-bar { display: none; }
 }
+
+/* 플래시·빈칸·백지 페이지가 자체 TreeHeader(편집 링크 포함)를 그린다 — 공유 보기에서는 내 헤더가 탭을 제공하므로 숨긴다.
+   ponytail: CSS 숨김은 임시. LS 가 source(ephemeral) 일 때 TreeHeader 를 렌더하지 않게 바꾸면 이 규칙은 삭제 */
+.shared .tree-header { display: none; }
 
 /* ── 보기 탭: 들여쓰기 목록(접기 없음) ── */
 .share-tree { list-style: none; margin: 0; padding: 0 0 0 1rem; border-left: 1px solid var(--border); }
