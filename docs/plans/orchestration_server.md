@@ -85,3 +85,5 @@
 ## 진행 기록
 
 - groundwork: `hono`·`@hono/node-server` 추가, `server/{env,db,http,index,check}.ts`, 마이그레이션 001·002(스펙 DDL), `server/account/index.ts`·`server/sync/{index,owner}.ts` 스텁, `tsconfig.server.json`, `.env.example`, `config/admins.json.example`, `src/core/api.ts` `api()`·`ApiError`, `src/core/me.ts`·`src/core/sync.ts`(mock 재수출, 화면 import 경로 이전), `#/privacy` 라우트·스텁, Vite `/api` 프록시, Playwright 가 Node 서버로 실행. typecheck(클라+서버)·lint·check(server.check ok)·build 통과, 기존 E2E 13/13(Node 서버 위).
+- 1차 dispatch(시작 8947541): SA ctx_67cdc9bf76d1(agent-SA-server) · SS ctx_1d63a85a511c(agent-SS-server) · CA ctx_70729b1dadfa(agent-CA-client) · CS ctx_3807f182f266(agent-CS-client). 지시 원문 scratch `specs/spec_srv_*.txt`.
+- 오케스트레이터: `public/og.png`(1200×630, Pretendard OFL, 중앙 안전 영역) 추가 — SS 의 `og:image` 경로.
