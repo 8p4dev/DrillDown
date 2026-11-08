@@ -114,3 +114,5 @@ DS 의 스타일이 머지되기 전까지 다른 워커는 계약 §3.2 의 클
 - LM 미결: `hint('editor')` 2줄 주석(DS `hint` 머지 후 해제), `:root[data-kb] .toasts` 규칙은 DS 지시에 포함됨, `data-miss` 는 heat 유지 + 정수 miss prop 추가.
 - DS 완료 → **머지 f66e41d**. 오케스트레이터 후속 09b4cbc: App.tsx `<TooltipLayer/>`, 에디터 `hint` 주석 해제, 배율 `.tnum`. build 통과, precache 45개 516.11 KiB. DS 보고: 첫 화면 gzip ≈118.3KB(경계), CSS 합계 54.6KB(목표 44 초과 — 통합 후 재측정에서 판단). LS·AA·SH 에 main 머지 후 shim 제거 지시.
 - LS 완료 → **머지 633f1b5**(build 통과, precache 520.15 KiB). 아이콘 문자열 자식 사이 공백 제거(LS 요청). LS 미결: 메모리 source 의 IndexedDB 무변경 검사는 SH 머지 뒤 QA, 채점 뒤 테마 전환 시 stagger 색 전환 ≤600ms 보임.
+- AA 완료 → **머지 65ad52a**. 오케스트레이터 후속: `<Banners/>` 를 App 셸(nav 아래)로 옮기고 계정·관리자 화면 안의 사본 제거. build 통과, precache 55개 545.36 KiB, 관리자 청크 분리 확인(AdminPage js 16.08 kB·css 4.02 kB). AA 미결: 공지 배너는 mock Me 에 실려 비로그인에게 안 보임(서버 단계), MergeDialog M3·M4·exportAll 범위 밖, `index.css table{overflow:hidden}` 이 sticky 헤더를 막아 admin.css 에서 덮음(QA 확인).
+- SH: 재개 후 화면 밖 파일 읽기 권한 프롬프트에서 멈춤(사람 응답 필요) → 사용자에게 요청함.

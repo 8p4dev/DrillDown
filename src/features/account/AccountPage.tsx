@@ -11,7 +11,6 @@ import { I } from '../../ui/icons'
 import { image, logOut, undo2 } from '../../ui/icons.all'
 import { Icon } from '../../ui/Icon'
 import { toast } from '../Toast'
-import Banners from './Banners'
 import { Avatar } from '../../ui/Avatar'
 import { TwoStep } from '../../ui/TwoStep'
 import { PROVIDER_LABEL, ProviderLogo } from './providers'
@@ -71,7 +70,6 @@ export default function AccountPage() {
 
   return (
     <section className="account">
-      <Banners />
       <h1>계정</h1>
 
       <div className="row profile">

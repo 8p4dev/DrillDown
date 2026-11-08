@@ -8,7 +8,6 @@ import { href, type AdminTab } from '../../router'
 import { I } from '../../ui/icons'
 import { ban, database, eye, eyeOff, hardDrive, megaphone, search, undo2 } from '../../ui/icons.all'
 import { Icon } from '../../ui/Icon'
-import Banners from '../account/Banners'
 import { TwoStep } from '../../ui/TwoStep'
 import { ProviderLogo } from '../account/providers'
 import { toast } from '../Toast'
@@ -29,7 +28,6 @@ export default function AdminPage({ tab }: { tab: AdminTab }) {
   if (!ok) return null
   return (
     <section className="admin" data-tab={tab}>
-      <Banners />
       <header className="admin-head">
         <h1>관리자</h1>
         <nav className="seg admin-tabs" aria-label="관리자 탭">
