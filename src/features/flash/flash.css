@@ -72,7 +72,7 @@
 .flash-kid-body { display: flex; flex-direction: column; gap: .3rem; }
 .flash-kid strong { font-size: var(--fs-lg); font-weight: 650; letter-spacing: -.01em; }
 .flash-dive { position: relative; align-self: flex-start; min-height: 0; padding: .25rem .6rem; font-size: var(--fs-sm); color: var(--text); font-variant-numeric: tabular-nums; }
-.flash-dive::after { content: ''; position: absolute; inset: -8px; } /* 작은 배지의 터치 영역만 넓힌다 */
+.flash-dive::after { content: ''; position: absolute; inset: -10px -8px; } /* 26px 배지 → 46px 표적 */ /* 작은 배지의 터치 영역만 넓힌다 */
 @keyframes flash-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
 
 /* 평가 버튼(01 §3.3 버튼 ok/danger 행): surface 면 + 색 글자·테두리, 호버·눌림은 채움 + --on-fill */
@@ -119,7 +119,7 @@
 
 /* 미니맵(01 §3.1.2 미니맵 열): 사각 노드, 4단계 채움, 현재 위치 --text 3px 외곽 */
 .minimap { margin: 0; padding: .6rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); }
-.minimap svg { display: block; width: 100%; height: auto; max-height: 260px; }
+.minimap > svg { display: block; width: 100%; height: auto; max-height: 260px; }
 .minimap path { fill: none; stroke: var(--border); stroke-width: 2; }
 .minimap path.lit { stroke: var(--text); stroke-width: 3; }
 .minimap-toggle { display: none; } /* 접기는 모바일 전용 */
@@ -162,14 +162,14 @@
   /* 접힌 미니맵: 실제 크기의 .6 배로 그린 트리를 현재 위치가 띠 가운데 오도록 옮긴다 (높이 ≤ 72px) */
   .minimap { position: relative; overflow: hidden; padding: 0; }
   .minimap:not(.open) { height: 64px; }
-  .minimap:not(.open) svg {
+  .minimap:not(.open) > svg {
     position: absolute; left: 50%; top: 50%; max-height: none;
     width: calc(var(--mm-w) * .6px); height: calc(var(--mm-h) * .6px);
     transform: translate(calc(var(--mm-x) * -.6px), calc(var(--mm-y) * -.6px));
     transition: transform var(--t-slow) var(--ease-out);
   }
   .minimap.open { padding: .6rem; }
-  .minimap.open svg { animation: rise var(--t-med) var(--ease-out); }
+  .minimap.open > svg { animation: rise var(--t-med) var(--ease-out); }
   /* 띠 전체가 펼침 버튼. 양끝은 면 색으로 흐려 잘림을 부드럽게 */
   .minimap-toggle, .minimap-toggle:hover:not(:disabled) {
     display: flex; align-items: center; justify-content: flex-end;
