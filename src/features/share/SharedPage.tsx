@@ -6,7 +6,7 @@ import { useMe } from '../../core/me'
 import { childrenOf, copyTree, listTrees } from '../../core/repo'
 import type { StudySource } from '../../core/source'
 import { applyGrade } from '../../core/srs'
-import { CAP, type ID, type NodeSrs, type TreeNode } from '../../core/types'
+import { CAP, type ID, type NodeSrs, type Tree, type TreeNode } from '../../core/types'
 import { href, navigateShared, type Mode } from '../../router'
 import { Icon } from '../../ui/Icon'
 import { I } from '../../ui/icons'
@@ -53,19 +53,32 @@ function memorySource(t: SharedTree): StudySource {
   }
 }
 
-function Branch({ nodes, items, level }: { nodes: TreeNode[]; items: TreeNode[]; level: number }) {
+// 목록 의미(ul/li) + 네이티브 <details> 접기(U55, E1: role=tree 대신). 깊이 ≤2 는 펼친 채 시작. 가지마다 '여기부터 학습' = ?root=
+function Branch({ nodes, items, level, slug }: { nodes: TreeNode[]; items: TreeNode[]; level: number; slug: string }) {
   return (
-    <ul role={level === 1 ? 'tree' : 'group'} className="share-tree" aria-label={level === 1 ? '트리' : undefined}>
+    <ul className={level === 1 ? 'share-tree share-top' : 'share-tree'}>
       {items.map((n) => {
         const kids = childrenOf(nodes, n.id)
+        const body = (
+          <div className="share-node">
+            <strong>{n.title}</strong>
+            {n.aliases.length > 0 && <span className="muted"> · {n.aliases.join(', ')}</span>}
+            {n.note && <div className="share-note" dangerouslySetInnerHTML={{ __html: toHtml(parse(n.note)) }} />}
+          </div>
+        )
         return (
-          <li key={n.id} role="treeitem" aria-level={level} aria-expanded={kids.length ? true : undefined} data-node-id={n.id}>
-            <div className="share-node">
-              <strong>{n.title}</strong>
-              {n.aliases.length > 0 && <span className="muted"> · {n.aliases.join(', ')}</span>}
-              {n.note && <div className="share-note" dangerouslySetInnerHTML={{ __html: toHtml(parse(n.note)) }} />}
-            </div>
-            {kids.length > 0 && <Branch nodes={nodes} items={kids} level={level + 1} />}
+          <li key={n.id} data-node-id={n.id}>
+            {kids.length > 0 ? (
+              <details open={level <= 2}>
+                <summary>
+                  {body}
+                  {level > 1 && (
+                    <a className="share-from" href={href.shared(slug, 'flash', n.id)} aria-label={`${n.title}부터 학습`} onClick={(e) => (e.preventDefault(), navigateShared(slug, 'flash', n.id))}>여기부터 학습</a>
+                  )}
+                </summary>
+                <Branch nodes={nodes} items={kids} level={level + 1} slug={slug} />
+              </details>
+            ) : body}
           </li>
         )
       })}
@@ -96,6 +109,8 @@ export default function SharedPage({ slug, mode, rootId }: { slug: string; mode:
   const [reason, setReason] = useState<ReportReason>('copyright')
   const [note, setNote] = useState('')
   const moreRef = useRef<HTMLDivElement>(null)
+  const treeRef = useRef<HTMLDivElement>(null)
+  const [dup, setDup] = useState<Tree | null>(null)
 
   useEffect(() => {
     if (!menu) return
@@ -116,13 +131,20 @@ export default function SharedPage({ slug, mode, rootId }: { slug: string; mode:
   const root = t.nodes.find((n) => n.parentId === null)
   const url = location.origin + href.shared(slug)
 
-  const doCopy = async () => {
+  const doCopy = async (again = false) => {
+    setDup(null)
+    const mine = await listTrees()
+    // U57: 이미 복제한 트리가 있으면 먼저 묻는다(삭제된 것은 listTrees 가 뺀다)
+    const prev = !again && mine.find((x) => x.sourceTreeId === t.id)
+    if (prev) { setDup(prev); return }
     // C5: 로그인 사용자는 서버 한도에 닿으면 복제를 막는다(비로그인은 막지 않음)
-    if (me && (await listTrees()).length >= CAP.treesPerUser) { toast('트리는 200개까지 저장할 수 있습니다'); return }
+    if (me && mine.length >= CAP.treesPerUser) { toast('트리는 200개까지 저장할 수 있습니다'); return }
     const tree = await copyTree(t)
     void api(`/api/t/${slug}/copy`, { method: 'POST' }).catch(() => {}) // copy_count 용, 실패 무시
     toast('복제됨 · 원본이 바뀌어도 이 트리는 바뀌지 않습니다', { label: '열기', run: () => location.assign('/' + href.edit(tree.id)) }, 6000)
   }
+  // 접기는 DOM 상태(<details>) — React 상태 없음. 루트는 늘 펼친다
+  const fold = (open: boolean) => treeRef.current?.querySelectorAll<HTMLDetailsElement>('.share-tree:not(.share-top) details').forEach((d) => (d.open = open))
   const copyLink = async () => {
     setMenu(false)
     await navigator.clipboard.writeText(url)
@@ -159,7 +181,7 @@ export default function SharedPage({ slug, mode, rootId }: { slug: string; mode:
           ))}
         </nav>
         <div className="share-tools">
-          <button type="button" className="ghost share-copy" aria-label="내 트리로 복제" data-tip="내 트리로 복제" onClick={doCopy}>
+          <button type="button" className="ghost share-copy" aria-label="내 트리로 복제" data-tip="내 트리로 복제" onClick={() => void doCopy()}>
             <Icon d={copyIcon} size={20} /><span className="share-copy-text">내 트리로 복제</span>
           </button>
           <div className="share-more" ref={moreRef}>
@@ -176,7 +198,15 @@ export default function SharedPage({ slug, mode, rootId }: { slug: string; mode:
         </div>
       </header>
 
-      {mode === 'view' && root && <Branch nodes={t.nodes} items={[root]} level={1} />}
+      {mode === 'view' && root && (
+        <div ref={treeRef}>
+          <div className="share-fold">
+            <button type="button" className="ghost" onClick={() => fold(true)}>모두 펼치기</button>
+            <button type="button" className="ghost" onClick={() => fold(false)}>모두 접기</button>
+          </div>
+          <Branch nodes={t.nodes} items={[root]} level={1} slug={slug} />
+        </div>
+      )}
       {mode !== 'view' && source && (
         <Suspense fallback={<div className="route-loading" aria-busy="true" />}>
           {mode === 'flash' && <FlashPage key={slug} treeId={slug} rootId={rootId} source={source} />}
@@ -187,9 +217,23 @@ export default function SharedPage({ slug, mode, rootId }: { slug: string; mode:
 
       {mode === 'view' && (
         <div className="share-bar">
-          <button type="button" className="primary" onClick={doCopy}><Icon d={copyIcon} />내 트리로 복제</button>
+          <button type="button" className="primary" onClick={() => void doCopy()}><Icon d={copyIcon} />내 트리로 복제</button>
         </div>
       )}
+
+      <Sheet open={!!dup} onClose={() => setDup(null)} label="이미 복제한 트리">
+        <div className="share-sheet">
+          <header className="sheet-head">
+            <h2>이미 복제한 트리가 있습니다</h2>
+            <button type="button" className="ghost sheet-x" aria-label="닫기" data-tip="닫기" onClick={() => setDup(null)}><Icon d={x} /></button>
+          </header>
+          <p className="muted">‘{dup?.title}’ · 학습 기록은 그 트리에 있습니다</p>
+          <div className="actions">
+            <button type="button" onClick={() => void doCopy(true)}>새로 복제</button>
+            <button type="button" className="primary" onClick={() => dup && location.assign('/' + href.edit(dup.id))}>그 트리 열기</button>
+          </div>
+        </div>
+      </Sheet>
 
       <Sheet open={report} onClose={() => setReport(false)} label="신고">
         <form className="share-sheet share-report" onSubmit={sendReport}>

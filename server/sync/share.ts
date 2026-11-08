@@ -95,13 +95,15 @@ export function sharedTree(db: DB, t: ShareRow): SharedTree & { id: string } {
 const galleryCache = new Map<string, { at: number; v: { items: GalleryItem[]; page: number; hasMore: boolean } }>()
 export const clearGalleryCache = () => galleryCache.clear()
 
-export function gallery(db: DB, sort: 'recent' | 'copies', page: number, now: number) {
-  const key = `${sort}:${page}`
+/** q = 제목 부분 검색(LIKE, 와일드카드 이스케이프, 50자 상한, 빈 값 무시) */
+export function gallery(db: DB, sort: 'recent' | 'copies', page: number, now: number, q = '') {
+  q = q.trim().slice(0, 50)
+  const key = `${sort}:${page}:${q}`
   const hit = galleryCache.get(key)
   if (hit && now - hit.at < 60_000) return hit.v
   const rows = db.prepare(`SELECT t.slug, t.title, t.node_count, t.copy_count, t.updated_at, u.nickname FROM trees t JOIN users u ON u.id = t.owner_id
-    WHERE t.visibility = 'public' AND t.deleted_at IS NULL AND t.hidden_by_admin_at IS NULL AND u.deleted_at IS NULL AND t.slug IS NOT NULL
-    ORDER BY ${sort === 'copies' ? 't.copy_count DESC, ' : ''}t.updated_at DESC, t.id LIMIT 21 OFFSET ?`).all((page - 1) * 20) as { slug: string; title: string; node_count: number; copy_count: number; updated_at: number; nickname: string }[]
+    WHERE t.visibility = 'public' AND t.deleted_at IS NULL AND t.hidden_by_admin_at IS NULL AND u.deleted_at IS NULL AND t.slug IS NOT NULL${q ? " AND t.title LIKE ? ESCAPE '!'" : ''}
+    ORDER BY ${sort === 'copies' ? 't.copy_count DESC, ' : ''}t.updated_at DESC, t.id LIMIT 21 OFFSET ?`).all(...(q ? [`%${q.replace(/[!%_]/g, '!$&')}%`] : []), (page - 1) * 20) as { slug: string; title: string; node_count: number; copy_count: number; updated_at: number; nickname: string }[]
   const v = {
     items: rows.slice(0, 20).map((r) => ({ slug: r.slug, title: r.title, nodeCount: r.node_count, copyCount: r.copy_count, ownerNickname: r.nickname, updatedAt: r.updated_at })),
     page, hasMore: rows.length > 20,
