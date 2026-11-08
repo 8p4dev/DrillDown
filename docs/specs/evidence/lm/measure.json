@@ -1,0 +1,1730 @@
+{
+ "kb": 336,
+ "screens": [
+  {
+   "screen": "trees",
+   "width": 390,
+   "height": 844,
+   "ctx": "mobile",
+   "vw": 390,
+   "vh": 844,
+   "scrollW": 390,
+   "scrollH": 844,
+   "scrollY": 0,
+   "els": {
+    ".topnav": {
+     "x": 0,
+     "y": 0,
+     "w": 390,
+     "h": 48,
+     "pos": "sticky"
+    },
+    ".toasts": {
+     "x": 16,
+     "y": 825,
+     "w": 359,
+     "h": 0,
+     "pos": "fixed"
+    }
+   }
+  },
+  {
+   "screen": "editor",
+   "width": 390,
+   "height": 844,
+   "ctx": "mobile",
+   "vw": 390,
+   "vh": 844,
+   "scrollW": 390,
+   "scrollH": 884,
+   "scrollY": 0,
+   "els": {
+    ".topnav": {
+     "x": 0,
+     "y": 0,
+     "w": 390,
+     "h": 48,
+     "pos": "sticky"
+    },
+    ".zoom-tools": {
+     "x": 123,
+     "y": 525,
+     "w": 243,
+     "h": 52,
+     "pos": "absolute"
+    },
+    ".toasts": {
+     "x": 16,
+     "y": 825,
+     "w": 359,
+     "h": 0,
+     "pos": "fixed"
+    },
+    ".canvas": {
+     "x": 13,
+     "y": 159,
+     "w": 365,
+     "h": 428,
+     "pos": "relative"
+    },
+    ".side": {
+     "x": 13,
+     "y": 599,
+     "w": 365,
+     "h": 255,
+     "pos": "static"
+    },
+    ".tree-header": {
+     "x": 13,
+     "y": 63,
+     "w": 365,
+     "h": 85,
+     "pos": "static"
+    }
+   },
+   "active": {
+    "tag": "div.outline",
+    "label": "아웃라이너",
+    "y": 159,
+    "bottom": 588,
+    "h": 428,
+    "fontSize": "15px"
+   }
+  },
+  {
+   "screen": "flash",
+   "width": 390,
+   "height": 844,
+   "ctx": "mobile",
+   "vw": 390,
+   "vh": 844,
+   "scrollW": 390,
+   "scrollH": 917,
+   "scrollY": 0,
+   "els": {
+    ".topnav": {
+     "x": 0,
+     "y": 0,
+     "w": 390,
+     "h": 48,
+     "pos": "sticky"
+    },
+    ".flash-nav": {
+     "x": 0,
+     "y": 784,
+     "w": 390,
+     "h": 60,
+     "pos": "fixed"
+    },
+    ".toasts": {
+     "x": 16,
+     "y": 57,
+     "w": 359,
+     "h": 0,
+     "pos": "fixed"
+    },
+    ".minimap": {
+     "x": 13,
+     "y": 190,
+     "w": 365,
+     "h": 66,
+     "pos": "relative"
+    },
+    ".tree-header": {
+     "x": 13,
+     "y": 63,
+     "w": 365,
+     "h": 114,
+     "pos": "static"
+    },
+    ".flash-aside": {
+     "x": 13,
+     "y": 190,
+     "w": 365,
+     "h": 66,
+     "pos": "static"
+    }
+   },
+   "active": {
+    "tag": "button.flash-concept",
+    "label": null,
+    "y": 267,
+    "bottom": 381,
+    "h": 114,
+    "fontSize": "15px"
+   }
+  },
+  {
+   "screen": "review",
+   "width": 390,
+   "height": 844,
+   "ctx": "mobile",
+   "vw": 390,
+   "vh": 844,
+   "scrollW": 390,
+   "scrollH": 844,
+   "scrollY": 0,
+   "els": {
+    ".topnav": {
+     "x": 0,
+     "y": 0,
+     "w": 390,
+     "h": 48,
+     "pos": "sticky"
+    },
+    ".flash-nav": {
+     "x": 0,
+     "y": 784,
+     "w": 390,
+     "h": 60,
+     "pos": "fixed"
+    },
+    ".toasts": {
+     "x": 16,
+     "y": 57,
+     "w": 359,
+     "h": 0,
+     "pos": "fixed"
+    }
+   },
+   "active": {
+    "tag": "button.flash-concept",
+    "label": null,
+    "y": 132,
+    "bottom": 246,
+    "h": 114,
+    "fontSize": "15px"
+   }
+  },
+  {
+   "screen": "dnd",
+   "width": 390,
+   "height": 844,
+   "ctx": "mobile",
+   "vw": 390,
+   "vh": 844,
+   "scrollW": 390,
+   "scrollH": 1138,
+   "scrollY": 0,
+   "els": {
+    ".topnav": {
+     "x": 0,
+     "y": 0,
+     "w": 390,
+     "h": 48,
+     "pos": "sticky"
+    },
+    ".dnd-dock": {
+     "x": 0,
+     "y": 523,
+     "w": 390,
+     "h": 321,
+     "pos": "sticky"
+    },
+    ".dnd-bar": {
+     "x": 0,
+     "y": 784,
+     "w": 390,
+     "h": 61,
+     "pos": "static"
+    },
+    ".toasts": {
+     "x": 16,
+     "y": 57,
+     "w": 359,
+     "h": 0,
+     "pos": "fixed"
+    },
+    ".tree-header": {
+     "x": 13,
+     "y": 63,
+     "w": 365,
+     "h": 138,
+     "pos": "static"
+    },
+    ".dnd-canvas": {
+     "x": 13,
+     "y": 214,
+     "w": 365,
+     "h": 589,
+     "pos": "static"
+    }
+   }
+  },
+  {
+   "screen": "blank",
+   "width": 390,
+   "height": 844,
+   "ctx": "mobile",
+   "vw": 390,
+   "vh": 844,
+   "scrollW": 390,
+   "scrollH": 844,
+   "scrollY": 0,
+   "els": {
+    ".topnav": {
+     "x": 0,
+     "y": 0,
+     "w": 390,
+     "h": 48,
+     "pos": "sticky"
+    },
+    ".dnd-dock": {
+     "x": 0,
+     "y": 523,
+     "w": 390,
+     "h": 321,
+     "pos": "sticky"
+    },
+    ".dnd-bar": {
+     "x": 0,
+     "y": 784,
+     "w": 390,
+     "h": 61,
+     "pos": "static"
+    },
+    ".toasts": {
+     "x": 16,
+     "y": 57,
+     "w": 359,
+     "h": 0,
+     "pos": "fixed"
+    },
+    ".tree-header": {
+     "x": 13,
+     "y": 63,
+     "w": 365,
+     "h": 138,
+     "pos": "static"
+    },
+    ".dnd-canvas": {
+     "x": 13,
+     "y": 214,
+     "w": 365,
+     "h": 250,
+     "pos": "static"
+    }
+   }
+  },
+  {
+   "screen": "trees",
+   "width": 768,
+   "height": 1024,
+   "ctx": "tablet",
+   "vw": 768,
+   "vh": 1024,
+   "scrollW": 768,
+   "scrollH": 1024,
+   "scrollY": 0,
+   "els": {
+    ".topnav": {
+     "x": 0,
+     "y": 0,
+     "w": 768,
+     "h": 52,
+     "pos": "sticky"
+    },
+    ".toasts": {
+     "x": 174,
+     "y": 1005,
+     "w": 420,
+     "h": 0,
+     "pos": "fixed"
+    }
+   }
+  },
+  {
+   "screen": "editor",
+   "width": 768,
+   "height": 1024,
+   "ctx": "tablet",
+   "vw": 768,
+   "vh": 1024,
+   "scrollW": 768,
+   "scrollH": 1150,
+   "scrollY": 0,
+   "els": {
+    ".topnav": {
+     "x": 0,
+     "y": 0,
+     "w": 768,
+     "h": 52,
+     "pos": "sticky"
+    },
+    ".zoom-tools": {
+     "x": 495,
+     "y": 780,
+     "w": 243,
+     "h": 52,
+     "pos": "absolute"
+    },
+    ".toasts": {
+     "x": 174,
+     "y": 1005,
+     "w": 420,
+     "h": 0,
+     "pos": "fixed"
+    },
+    ".canvas": {
+     "x": 19,
+     "y": 127,
+     "w": 731,
+     "h": 717,
+     "pos": "relative"
+    },
+    ".side": {
+     "x": 19,
+     "y": 859,
+     "w": 731,
+     "h": 247,
+     "pos": "static"
+    },
+    ".tree-header": {
+     "x": 19,
+     "y": 75,
+     "w": 731,
+     "h": 37,
+     "pos": "static"
+    }
+   },
+   "active": {
+    "tag": "div.outline",
+    "label": "아웃라이너",
+    "y": 127,
+    "bottom": 844,
+    "h": 717,
+    "fontSize": "15px"
+   }
+  },
+  {
+   "screen": "flash",
+   "width": 768,
+   "height": 1024,
+   "ctx": "tablet",
+   "vw": 768,
+   "vh": 1024,
+   "scrollW": 768,
+   "scrollH": 1024,
+   "scrollY": 0,
+   "els": {
+    ".topnav": {
+     "x": 0,
+     "y": 0,
+     "w": 768,
+     "h": 52,
+     "pos": "sticky"
+    },
+    ".flash-nav": {
+     "x": 19,
+     "y": 603,
+     "w": 488,
+     "h": 44,
+     "pos": "static"
+    },
+    ".toasts": {
+     "x": 174,
+     "y": 1005,
+     "w": 420,
+     "h": 0,
+     "pos": "fixed"
+    },
+    ".minimap": {
+     "x": 529,
+     "y": 127,
+     "w": 220,
+     "h": 100,
+     "pos": "static"
+    },
+    ".tree-header": {
+     "x": 19,
+     "y": 75,
+     "w": 731,
+     "h": 37,
+     "pos": "static"
+    },
+    ".flash-aside": {
+     "x": 529,
+     "y": 127,
+     "w": 220,
+     "h": 100,
+     "pos": "sticky"
+    }
+   },
+   "active": {
+    "tag": "button.flash-concept",
+    "label": null,
+    "y": 127,
+    "bottom": 267,
+    "h": 140,
+    "fontSize": "15px"
+   }
+  },
+  {
+   "screen": "review",
+   "width": 768,
+   "height": 1024,
+   "ctx": "tablet",
+   "vw": 768,
+   "vh": 1024,
+   "scrollW": 768,
+   "scrollH": 1024,
+   "scrollY": 0,
+   "els": {
+    ".topnav": {
+     "x": 0,
+     "y": 0,
+     "w": 768,
+     "h": 52,
+     "pos": "sticky"
+    },
+    ".flash-nav": {
+     "x": 19,
+     "y": 278,
+     "w": 731,
+     "h": 44,
+     "pos": "static"
+    },
+    ".toasts": {
+     "x": 174,
+     "y": 1005,
+     "w": 420,
+     "h": 0,
+     "pos": "fixed"
+    }
+   },
+   "active": {
+    "tag": "button.flash-concept",
+    "label": null,
+    "y": 116,
+    "bottom": 256,
+    "h": 140,
+    "fontSize": "15px"
+   }
+  },
+  {
+   "screen": "dnd",
+   "width": 768,
+   "height": 1024,
+   "ctx": "tablet",
+   "vw": 768,
+   "vh": 1024,
+   "scrollW": 768,
+   "scrollH": 1182,
+   "scrollY": 0,
+   "els": {
+    ".topnav": {
+     "x": 0,
+     "y": 0,
+     "w": 768,
+     "h": 52,
+     "pos": "sticky"
+    },
+    ".dnd-dock": {
+     "x": 19,
+     "y": 771,
+     "w": 731,
+     "h": 253,
+     "pos": "sticky"
+    },
+    ".dnd-bar": {
+     "x": 19,
+     "y": 973,
+     "w": 731,
+     "h": 52,
+     "pos": "static"
+    },
+    ".toasts": {
+     "x": 174,
+     "y": 1005,
+     "w": 420,
+     "h": 0,
+     "pos": "fixed"
+    },
+    ".tree-header": {
+     "x": 19,
+     "y": 75,
+     "w": 731,
+     "h": 44,
+     "pos": "static"
+    },
+    ".dnd-canvas": {
+     "x": 19,
+     "y": 134,
+     "w": 731,
+     "h": 750,
+     "pos": "static"
+    }
+   }
+  },
+  {
+   "screen": "blank",
+   "width": 768,
+   "height": 1024,
+   "ctx": "tablet",
+   "vw": 768,
+   "vh": 1024,
+   "scrollW": 768,
+   "scrollH": 1024,
+   "scrollY": 0,
+   "els": {
+    ".topnav": {
+     "x": 0,
+     "y": 0,
+     "w": 768,
+     "h": 52,
+     "pos": "sticky"
+    },
+    ".dnd-dock": {
+     "x": 19,
+     "y": 384,
+     "w": 731,
+     "h": 358,
+     "pos": "sticky"
+    },
+    ".dnd-bar": {
+     "x": 19,
+     "y": 690,
+     "w": 731,
+     "h": 52,
+     "pos": "static"
+    },
+    ".toasts": {
+     "x": 174,
+     "y": 1005,
+     "w": 420,
+     "h": 0,
+     "pos": "fixed"
+    },
+    ".tree-header": {
+     "x": 19,
+     "y": 75,
+     "w": 731,
+     "h": 44,
+     "pos": "static"
+    },
+    ".dnd-canvas": {
+     "x": 19,
+     "y": 134,
+     "w": 731,
+     "h": 250,
+     "pos": "static"
+    }
+   }
+  },
+  {
+   "screen": "trees",
+   "width": 1440,
+   "height": 900,
+   "ctx": "desktop",
+   "vw": 1440,
+   "vh": 900,
+   "scrollW": 1440,
+   "scrollH": 900,
+   "scrollY": 0,
+   "els": {
+    ".topnav": {
+     "x": 0,
+     "y": 0,
+     "w": 1440,
+     "h": 52,
+     "pos": "sticky"
+    },
+    ".toasts": {
+     "x": 510,
+     "y": 881,
+     "w": 420,
+     "h": 0,
+     "pos": "fixed"
+    }
+   }
+  },
+  {
+   "screen": "editor",
+   "width": 1440,
+   "height": 900,
+   "ctx": "desktop",
+   "vw": 1440,
+   "vh": 900,
+   "scrollW": 1440,
+   "scrollH": 900,
+   "scrollY": 0,
+   "els": {
+    ".topnav": {
+     "x": 0,
+     "y": 0,
+     "w": 1440,
+     "h": 52,
+     "pos": "sticky"
+    },
+    ".zoom-tools": {
+     "x": 888,
+     "y": 839,
+     "w": 187,
+     "h": 38,
+     "pos": "absolute"
+    },
+    ".toasts": {
+     "x": 510,
+     "y": 881,
+     "w": 420,
+     "h": 0,
+     "pos": "fixed"
+    },
+    ".canvas": {
+     "x": 19,
+     "y": 127,
+     "w": 1068,
+     "h": 761,
+     "pos": "relative"
+    },
+    ".side": {
+     "x": 1101,
+     "y": 127,
+     "w": 320,
+     "h": 761,
+     "pos": "static"
+    },
+    ".tree-header": {
+     "x": 19,
+     "y": 75,
+     "w": 1403,
+     "h": 37,
+     "pos": "static"
+    }
+   },
+   "active": {
+    "tag": "div.outline",
+    "label": "아웃라이너",
+    "y": 127,
+    "bottom": 888,
+    "h": 761,
+    "fontSize": "15px"
+   }
+  },
+  {
+   "screen": "flash",
+   "width": 1440,
+   "height": 900,
+   "ctx": "desktop",
+   "vw": 1440,
+   "vh": 900,
+   "scrollW": 1440,
+   "scrollH": 900,
+   "scrollY": 0,
+   "els": {
+    ".topnav": {
+     "x": 0,
+     "y": 0,
+     "w": 1440,
+     "h": 52,
+     "pos": "sticky"
+    },
+    ".flash-nav": {
+     "x": 240,
+     "y": 438,
+     "w": 718,
+     "h": 31,
+     "pos": "static"
+    },
+    ".toasts": {
+     "x": 510,
+     "y": 881,
+     "w": 420,
+     "h": 0,
+     "pos": "fixed"
+    },
+    ".minimap": {
+     "x": 980,
+     "y": 127,
+     "w": 220,
+     "h": 100,
+     "pos": "static"
+    },
+    ".tree-header": {
+     "x": 240,
+     "y": 75,
+     "w": 960,
+     "h": 37,
+     "pos": "static"
+    },
+    ".flash-aside": {
+     "x": 980,
+     "y": 127,
+     "w": 220,
+     "h": 100,
+     "pos": "sticky"
+    }
+   },
+   "active": {
+    "tag": "button.flash-concept",
+    "label": null,
+    "y": 126,
+    "bottom": 266,
+    "h": 140,
+    "fontSize": "15px"
+   }
+  },
+  {
+   "screen": "review",
+   "width": 1440,
+   "height": 900,
+   "ctx": "desktop",
+   "vw": 1440,
+   "vh": 900,
+   "scrollW": 1440,
+   "scrollH": 900,
+   "scrollY": 0,
+   "els": {
+    ".topnav": {
+     "x": 0,
+     "y": 0,
+     "w": 1440,
+     "h": 52,
+     "pos": "sticky"
+    },
+    ".flash-nav": {
+     "x": 240,
+     "y": 278,
+     "w": 960,
+     "h": 31,
+     "pos": "static"
+    },
+    ".toasts": {
+     "x": 510,
+     "y": 881,
+     "w": 420,
+     "h": 0,
+     "pos": "fixed"
+    }
+   },
+   "active": {
+    "tag": "button.flash-concept",
+    "label": null,
+    "y": 115,
+    "bottom": 255,
+    "h": 140,
+    "fontSize": "15px"
+   }
+  },
+  {
+   "screen": "dnd",
+   "width": 1440,
+   "height": 900,
+   "ctx": "desktop",
+   "vw": 1440,
+   "vh": 900,
+   "scrollW": 1440,
+   "scrollH": 1109,
+   "scrollY": 0,
+   "els": {
+    ".topnav": {
+     "x": 0,
+     "y": 0,
+     "w": 1440,
+     "h": 52,
+     "pos": "sticky"
+    },
+    ".dnd-dock": {
+     "x": 20,
+     "y": 712,
+     "w": 1400,
+     "h": 188,
+     "pos": "sticky"
+    },
+    ".dnd-bar": {
+     "x": 20,
+     "y": 862,
+     "w": 1400,
+     "h": 38,
+     "pos": "static"
+    },
+    ".toasts": {
+     "x": 510,
+     "y": 881,
+     "w": 420,
+     "h": 0,
+     "pos": "fixed"
+    },
+    ".tree-header": {
+     "x": 20,
+     "y": 75,
+     "w": 1400,
+     "h": 37,
+     "pos": "static"
+    },
+    ".dnd-canvas": {
+     "x": 20,
+     "y": 127,
+     "w": 1400,
+     "h": 750,
+     "pos": "static"
+    }
+   }
+  },
+  {
+   "screen": "blank",
+   "width": 1440,
+   "height": 900,
+   "ctx": "desktop",
+   "vw": 1440,
+   "vh": 900,
+   "scrollW": 1440,
+   "scrollH": 900,
+   "scrollY": 0,
+   "els": {
+    ".topnav": {
+     "x": 0,
+     "y": 0,
+     "w": 1440,
+     "h": 52,
+     "pos": "sticky"
+    },
+    ".dnd-dock": {
+     "x": 20,
+     "y": 377,
+     "w": 1400,
+     "h": 240,
+     "pos": "sticky"
+    },
+    ".dnd-bar": {
+     "x": 20,
+     "y": 578,
+     "w": 1400,
+     "h": 38,
+     "pos": "static"
+    },
+    ".toasts": {
+     "x": 510,
+     "y": 881,
+     "w": 420,
+     "h": 0,
+     "pos": "fixed"
+    },
+    ".tree-header": {
+     "x": 20,
+     "y": 75,
+     "w": 1400,
+     "h": 37,
+     "pos": "static"
+    },
+    ".dnd-canvas": {
+     "x": 20,
+     "y": 127,
+     "w": 1400,
+     "h": 250,
+     "pos": "static"
+    }
+   }
+  }
+ ],
+ "keyboard": [
+  {
+   "case": "dnd-scope",
+   "model": "A(resizes-content, 508)",
+   "kbTop": 508,
+   "vw": 390,
+   "vh": 508,
+   "scrollW": 390,
+   "scrollH": 1011,
+   "scrollY": 0,
+   "els": {
+    ".topnav": {
+     "x": 0,
+     "y": 0,
+     "w": 390,
+     "h": 48,
+     "pos": "sticky"
+    },
+    ".dnd-dock": {
+     "x": 0,
+     "y": 315,
+     "w": 390,
+     "h": 193,
+     "pos": "sticky"
+    },
+    ".dnd-bar": {
+     "x": 0,
+     "y": 448,
+     "w": 390,
+     "h": 61,
+     "pos": "static"
+    },
+    ".toasts": {
+     "x": 16,
+     "y": 57,
+     "w": 359,
+     "h": 0,
+     "pos": "fixed"
+    },
+    ".tree-header": {
+     "x": 13,
+     "y": 63,
+     "w": 365,
+     "h": 138,
+     "pos": "static"
+    },
+    ".dnd-canvas": {
+     "x": 13,
+     "y": 214,
+     "w": 365,
+     "h": 589,
+     "pos": "static"
+    }
+   },
+   "active": {
+    "tag": "select",
+    "label": "범위",
+    "y": 157,
+    "bottom": 201,
+    "h": 44,
+    "fontSize": "16px"
+   },
+   "hidden": {
+    "activeInput": "보임"
+   }
+  },
+  {
+   "case": "dnd-scope",
+   "model": "B(resizes-visual, 844)",
+   "kbTop": 508,
+   "vw": 390,
+   "vh": 844,
+   "scrollW": 390,
+   "scrollH": 1138,
+   "scrollY": 0,
+   "els": {
+    ".topnav": {
+     "x": 0,
+     "y": 0,
+     "w": 390,
+     "h": 48,
+     "pos": "sticky"
+    },
+    ".dnd-dock": {
+     "x": 0,
+     "y": 523,
+     "w": 390,
+     "h": 321,
+     "pos": "sticky"
+    },
+    ".dnd-bar": {
+     "x": 0,
+     "y": 784,
+     "w": 390,
+     "h": 61,
+     "pos": "static"
+    },
+    ".toasts": {
+     "x": 16,
+     "y": 57,
+     "w": 359,
+     "h": 0,
+     "pos": "fixed"
+    },
+    ".tree-header": {
+     "x": 13,
+     "y": 63,
+     "w": 365,
+     "h": 138,
+     "pos": "static"
+    },
+    ".dnd-canvas": {
+     "x": 13,
+     "y": 214,
+     "w": 365,
+     "h": 589,
+     "pos": "static"
+    }
+   },
+   "active": {
+    "tag": "select",
+    "label": "범위",
+    "y": 157,
+    "bottom": 201,
+    "h": 44,
+    "fontSize": "16px"
+   },
+   "hidden": {
+    "activeInput": "보임",
+    ".dnd-dock": "전부 가려짐 (y 523 ≥ 508)"
+   }
+  },
+  {
+   "case": "editor-card-title",
+   "model": "A(resizes-content, 508)",
+   "kbTop": 508,
+   "vw": 390,
+   "vh": 508,
+   "scrollW": 390,
+   "scrollH": 755,
+   "scrollY": 0,
+   "els": {
+    ".topnav": {
+     "x": 0,
+     "y": 0,
+     "w": 390,
+     "h": 48,
+     "pos": "sticky"
+    },
+    ".zoom-tools": {
+     "x": 123,
+     "y": 396,
+     "w": 243,
+     "h": 52,
+     "pos": "absolute"
+    },
+    ".toasts": {
+     "x": 16,
+     "y": 489,
+     "w": 359,
+     "h": 0,
+     "pos": "fixed"
+    },
+    ".canvas": {
+     "x": 13,
+     "y": 159,
+     "w": 365,
+     "h": 300,
+     "pos": "relative"
+    },
+    ".side": {
+     "x": 13,
+     "y": 471,
+     "w": 365,
+     "h": 255,
+     "pos": "static"
+    },
+    ".tree-header": {
+     "x": 13,
+     "y": 63,
+     "w": 365,
+     "h": 85,
+     "pos": "static"
+    }
+   },
+   "active": {
+    "tag": "input.title-input",
+    "label": "노드 제목",
+    "y": 177,
+    "bottom": 195,
+    "h": 18,
+    "fontSize": "16px"
+   },
+   "hidden": {
+    "activeInput": "보임"
+   }
+  },
+  {
+   "case": "editor-card-title",
+   "model": "B(resizes-visual, 844)",
+   "kbTop": 508,
+   "vw": 390,
+   "vh": 844,
+   "scrollW": 390,
+   "scrollH": 884,
+   "scrollY": 0,
+   "els": {
+    ".topnav": {
+     "x": 0,
+     "y": 0,
+     "w": 390,
+     "h": 48,
+     "pos": "sticky"
+    },
+    ".zoom-tools": {
+     "x": 123,
+     "y": 525,
+     "w": 243,
+     "h": 52,
+     "pos": "absolute"
+    },
+    ".toasts": {
+     "x": 16,
+     "y": 825,
+     "w": 359,
+     "h": 0,
+     "pos": "fixed"
+    },
+    ".canvas": {
+     "x": 13,
+     "y": 159,
+     "w": 365,
+     "h": 428,
+     "pos": "relative"
+    },
+    ".side": {
+     "x": 13,
+     "y": 599,
+     "w": 365,
+     "h": 255,
+     "pos": "static"
+    },
+    ".tree-header": {
+     "x": 13,
+     "y": 63,
+     "w": 365,
+     "h": 85,
+     "pos": "static"
+    }
+   },
+   "active": {
+    "tag": "input.title-input",
+    "label": "노드 제목",
+    "y": 177,
+    "bottom": 195,
+    "h": 18,
+    "fontSize": "16px"
+   },
+   "hidden": {
+    "activeInput": "보임",
+    ".zoom-tools": "전부 가려짐 (y 525 ≥ 508)",
+    ".toasts": "전부 가려짐 (y 825 ≥ 508)"
+   }
+  },
+  {
+   "case": "editor-outline",
+   "model": "A(resizes-content, 508)",
+   "kbTop": 508,
+   "vw": 390,
+   "vh": 508,
+   "scrollW": 390,
+   "scrollH": 980,
+   "scrollY": 248,
+   "els": {
+    ".topnav": {
+     "x": 0,
+     "y": 0,
+     "w": 390,
+     "h": 48,
+     "pos": "sticky"
+    },
+    ".zoom-tools": {
+     "x": 123,
+     "y": 148,
+     "w": 243,
+     "h": 52,
+     "pos": "absolute"
+    },
+    ".toasts": {
+     "x": 16,
+     "y": 489,
+     "w": 359,
+     "h": 0,
+     "pos": "fixed"
+    },
+    ".canvas": {
+     "x": 13,
+     "y": -89,
+     "w": 365,
+     "h": 300,
+     "pos": "relative"
+    },
+    ".side": {
+     "x": 13,
+     "y": 223,
+     "w": 365,
+     "h": 479,
+     "pos": "static"
+    },
+    ".tree-header": {
+     "x": 13,
+     "y": -185,
+     "w": 365,
+     "h": 85,
+     "pos": "static"
+    }
+   },
+   "active": {
+    "tag": "textarea",
+    "label": "개요 텍스트",
+    "y": 483,
+    "bottom": 595,
+    "h": 111,
+    "fontSize": "12px"
+   },
+   "hidden": {
+    "activeInput": "가려짐 (bottom 595 > 508)"
+   }
+  },
+  {
+   "case": "editor-outline",
+   "model": "B(resizes-visual, 844)",
+   "kbTop": 508,
+   "vw": 390,
+   "vh": 844,
+   "scrollW": 390,
+   "scrollH": 1108,
+   "scrollY": 264,
+   "els": {
+    ".topnav": {
+     "x": 0,
+     "y": 0,
+     "w": 390,
+     "h": 48,
+     "pos": "sticky"
+    },
+    ".zoom-tools": {
+     "x": 123,
+     "y": 261,
+     "w": 243,
+     "h": 52,
+     "pos": "absolute"
+    },
+    ".toasts": {
+     "x": 16,
+     "y": 825,
+     "w": 359,
+     "h": 0,
+     "pos": "fixed"
+    },
+    ".canvas": {
+     "x": 13,
+     "y": -105,
+     "w": 365,
+     "h": 428,
+     "pos": "relative"
+    },
+    ".side": {
+     "x": 13,
+     "y": 335,
+     "w": 365,
+     "h": 479,
+     "pos": "static"
+    },
+    ".tree-header": {
+     "x": 13,
+     "y": -201,
+     "w": 365,
+     "h": 85,
+     "pos": "static"
+    }
+   },
+   "active": {
+    "tag": "textarea",
+    "label": "개요 텍스트",
+    "y": 596,
+    "bottom": 707,
+    "h": 111,
+    "fontSize": "12px"
+   },
+   "hidden": {
+    "activeInput": "가려짐 (bottom 707 > 508)",
+    ".toasts": "전부 가려짐 (y 825 ≥ 508)"
+   }
+  },
+  {
+   "case": "editor-panel-note",
+   "model": "A(resizes-content, 508)",
+   "kbTop": 508,
+   "vw": 390,
+   "vh": 508,
+   "scrollW": 390,
+   "scrollH": 755,
+   "scrollY": 247,
+   "els": {
+    ".topnav": {
+     "x": 0,
+     "y": 0,
+     "w": 390,
+     "h": 48,
+     "pos": "sticky"
+    },
+    ".zoom-tools": {
+     "x": 123,
+     "y": 149,
+     "w": 243,
+     "h": 52,
+     "pos": "absolute"
+    },
+    ".toasts": {
+     "x": 16,
+     "y": 489,
+     "w": 359,
+     "h": 0,
+     "pos": "fixed"
+    },
+    ".canvas": {
+     "x": 13,
+     "y": -88,
+     "w": 365,
+     "h": 300,
+     "pos": "relative"
+    },
+    ".side": {
+     "x": 13,
+     "y": 224,
+     "w": 365,
+     "h": 255,
+     "pos": "static"
+    },
+    ".tree-header": {
+     "x": 13,
+     "y": -184,
+     "w": 365,
+     "h": 85,
+     "pos": "static"
+    }
+   },
+   "active": {
+    "tag": "div.note-edit",
+    "label": "패널 내용",
+    "y": 320,
+    "bottom": 440,
+    "h": 121,
+    "fontSize": "13.5px"
+   },
+   "hidden": {
+    "activeInput": "보임"
+   }
+  },
+  {
+   "case": "editor-panel-note",
+   "model": "B(resizes-visual, 844)",
+   "kbTop": 508,
+   "vw": 390,
+   "vh": 844,
+   "scrollW": 390,
+   "scrollH": 884,
+   "scrollY": 0,
+   "els": {
+    ".topnav": {
+     "x": 0,
+     "y": 0,
+     "w": 390,
+     "h": 48,
+     "pos": "sticky"
+    },
+    ".zoom-tools": {
+     "x": 123,
+     "y": 525,
+     "w": 243,
+     "h": 52,
+     "pos": "absolute"
+    },
+    ".toasts": {
+     "x": 16,
+     "y": 825,
+     "w": 359,
+     "h": 0,
+     "pos": "fixed"
+    },
+    ".canvas": {
+     "x": 13,
+     "y": 159,
+     "w": 365,
+     "h": 428,
+     "pos": "relative"
+    },
+    ".side": {
+     "x": 13,
+     "y": 599,
+     "w": 365,
+     "h": 255,
+     "pos": "static"
+    },
+    ".tree-header": {
+     "x": 13,
+     "y": 63,
+     "w": 365,
+     "h": 85,
+     "pos": "static"
+    }
+   },
+   "active": {
+    "tag": "div.note-edit",
+    "label": "패널 내용",
+    "y": 695,
+    "bottom": 816,
+    "h": 121,
+    "fontSize": "13.5px"
+   },
+   "hidden": {
+    "activeInput": "가려짐 (bottom 816 > 508)",
+    ".zoom-tools": "전부 가려짐 (y 525 ≥ 508)",
+    ".toasts": "전부 가려짐 (y 825 ≥ 508)"
+   }
+  },
+  {
+   "case": "editor-panel-title",
+   "model": "A(resizes-content, 508)",
+   "kbTop": 508,
+   "vw": 390,
+   "vh": 508,
+   "scrollW": 390,
+   "scrollH": 755,
+   "scrollY": 10,
+   "els": {
+    ".topnav": {
+     "x": 0,
+     "y": 0,
+     "w": 390,
+     "h": 48,
+     "pos": "sticky"
+    },
+    ".zoom-tools": {
+     "x": 123,
+     "y": 386,
+     "w": 243,
+     "h": 52,
+     "pos": "absolute"
+    },
+    ".toasts": {
+     "x": 16,
+     "y": 489,
+     "w": 359,
+     "h": 0,
+     "pos": "fixed"
+    },
+    ".canvas": {
+     "x": 13,
+     "y": 149,
+     "w": 365,
+     "h": 300,
+     "pos": "relative"
+    },
+    ".side": {
+     "x": 13,
+     "y": 461,
+     "w": 365,
+     "h": 255,
+     "pos": "static"
+    },
+    ".tree-header": {
+     "x": 13,
+     "y": 53,
+     "w": 365,
+     "h": 85,
+     "pos": "static"
+    }
+   },
+   "active": {
+    "tag": "input.detail-title",
+    "label": "패널 제목",
+    "y": 462,
+    "bottom": 508,
+    "h": 47,
+    "fontSize": "16.5px"
+   },
+   "hidden": {
+    "activeInput": "보임"
+   }
+  },
+  {
+   "case": "editor-panel-title",
+   "model": "B(resizes-visual, 844)",
+   "kbTop": 508,
+   "vw": 390,
+   "vh": 844,
+   "scrollW": 390,
+   "scrollH": 884,
+   "scrollY": 0,
+   "els": {
+    ".topnav": {
+     "x": 0,
+     "y": 0,
+     "w": 390,
+     "h": 48,
+     "pos": "sticky"
+    },
+    ".zoom-tools": {
+     "x": 123,
+     "y": 525,
+     "w": 243,
+     "h": 52,
+     "pos": "absolute"
+    },
+    ".toasts": {
+     "x": 16,
+     "y": 825,
+     "w": 359,
+     "h": 0,
+     "pos": "fixed"
+    },
+    ".canvas": {
+     "x": 13,
+     "y": 159,
+     "w": 365,
+     "h": 428,
+     "pos": "relative"
+    },
+    ".side": {
+     "x": 13,
+     "y": 599,
+     "w": 365,
+     "h": 255,
+     "pos": "static"
+    },
+    ".tree-header": {
+     "x": 13,
+     "y": 63,
+     "w": 365,
+     "h": 85,
+     "pos": "static"
+    }
+   },
+   "active": {
+    "tag": "input.detail-title",
+    "label": "패널 제목",
+    "y": 600,
+    "bottom": 647,
+    "h": 47,
+    "fontSize": "16.5px"
+   },
+   "hidden": {
+    "activeInput": "가려짐 (bottom 647 > 508)",
+    ".zoom-tools": "전부 가려짐 (y 525 ≥ 508)",
+    ".toasts": "전부 가려짐 (y 825 ≥ 508)"
+   }
+  },
+  {
+   "case": "trees-new",
+   "model": "A(resizes-content, 508)",
+   "kbTop": 508,
+   "vw": 390,
+   "vh": 508,
+   "scrollW": 390,
+   "scrollH": 508,
+   "scrollY": 0,
+   "els": {
+    ".topnav": {
+     "x": 0,
+     "y": 0,
+     "w": 390,
+     "h": 48,
+     "pos": "sticky"
+    },
+    ".toasts": {
+     "x": 16,
+     "y": 489,
+     "w": 359,
+     "h": 0,
+     "pos": "fixed"
+    }
+   },
+   "active": {
+    "tag": "input",
+    "label": "새 트리 제목",
+    "y": 132,
+    "bottom": 176,
+    "h": 44,
+    "fontSize": "16px"
+   },
+   "hidden": {
+    "activeInput": "보임"
+   }
+  },
+  {
+   "case": "trees-new",
+   "model": "B(resizes-visual, 844)",
+   "kbTop": 508,
+   "vw": 390,
+   "vh": 844,
+   "scrollW": 390,
+   "scrollH": 844,
+   "scrollY": 0,
+   "els": {
+    ".topnav": {
+     "x": 0,
+     "y": 0,
+     "w": 390,
+     "h": 48,
+     "pos": "sticky"
+    },
+    ".toasts": {
+     "x": 16,
+     "y": 825,
+     "w": 359,
+     "h": 0,
+     "pos": "fixed"
+    }
+   },
+   "active": {
+    "tag": "input",
+    "label": "새 트리 제목",
+    "y": 132,
+    "bottom": 176,
+    "h": 44,
+    "fontSize": "16px"
+   },
+   "hidden": {
+    "activeInput": "보임",
+    ".toasts": "전부 가려짐 (y 825 ≥ 508)"
+   }
+  },
+  {
+   "case": "trees-rename",
+   "model": "A(resizes-content, 508)",
+   "kbTop": 508,
+   "vw": 390,
+   "vh": 508,
+   "scrollW": 390,
+   "scrollH": 508,
+   "scrollY": 0,
+   "els": {
+    ".topnav": {
+     "x": 0,
+     "y": 0,
+     "w": 390,
+     "h": 48,
+     "pos": "sticky"
+    },
+    ".toasts": {
+     "x": 16,
+     "y": 489,
+     "w": 359,
+     "h": 0,
+     "pos": "fixed"
+    }
+   },
+   "active": {
+    "tag": "input.tree-rename",
+    "label": "트리 이름",
+    "y": 216,
+    "bottom": 260,
+    "h": 44,
+    "fontSize": "16px"
+   },
+   "hidden": {
+    "activeInput": "보임"
+   }
+  },
+  {
+   "case": "trees-rename",
+   "model": "B(resizes-visual, 844)",
+   "kbTop": 508,
+   "vw": 390,
+   "vh": 844,
+   "scrollW": 390,
+   "scrollH": 844,
+   "scrollY": 0,
+   "els": {
+    ".topnav": {
+     "x": 0,
+     "y": 0,
+     "w": 390,
+     "h": 48,
+     "pos": "sticky"
+    },
+    ".toasts": {
+     "x": 16,
+     "y": 825,
+     "w": 359,
+     "h": 0,
+     "pos": "fixed"
+    }
+   },
+   "active": {
+    "tag": "input.tree-rename",
+    "label": "트리 이름",
+    "y": 216,
+    "bottom": 260,
+    "h": 44,
+    "fontSize": "16px"
+   },
+   "hidden": {
+    "activeInput": "보임",
+    ".toasts": "전부 가려짐 (y 825 ≥ 508)"
+   }
+  }
+ ]
+}
