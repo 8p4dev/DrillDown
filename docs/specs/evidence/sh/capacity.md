@@ -1,41 +1,41 @@
 # 용량·요청 계산 (SH, 2026-11-08)
 
-측정 스크립트: [`measure_size.mjs`](measure_size.mjs) (`node docs/specs/evidence/sh/measure_size.mjs`), 출력 원본: [`measure_output.txt`](measure_output.txt).
+측정 스크립트: [`measure_size.mjs`](measure_size.mjs) (`node docs/specs/evidence/sh/measure_size.mjs`), 출력 원본: [`measure_output.txt`](measure_output.txt). SQLite 실측: [`measure_sqlite.mjs`](measure_sqlite.mjs) → [`measure_sqlite_output.txt`](measure_sqlite_output.txt) (3차 추가, RV M5: 서버는 `node:sqlite`).
 가정: 노무사 2차 목차 수준 한글 제목(평균 9~13자), 노드 30%에 별칭 1~2개, 15%에 note(60자), 15%에 offset, 10%에 width. 어휘 40단어라 압축률은 실제보다 좋게 나온다 → 압축 수치는 "무작위 음절" 상한과 함께 본다.
 
 ## 1. 트리 1개(노드 300개)
 | 항목 | 측정값 | 비고 |
 |---|---|---|
 | 클라이언트 JSON(`{tree, nodes}` 전체, id 포함) | **76,457 B (74.7 KB)**, 노드당 255 B | UUID 3개(id·treeId·parentId)가 108 B로 노드의 42% |
-| 전송(gzip -9) | 10,552 B (10.3 KB) | 어휘 편향 있음. 무작위 음절 기준 축약 포맷 압축률 56% → 전체 JSON도 ~35 KB로 보는 게 안전 [가정] |
+| 전송(gzip -9) | **≈10.5 KB**(이 실행 10,552 B. 실행마다 ±0.5%, zlib 구현 차 — RV 재현 10,545·10,497 B) | 어휘 편향 있음. 무작위 음절 기준 축약 포맷 압축률 56% → 전체 JSON도 ~35 KB로 보는 게 안전 [가정] |
 | 전송(brotli) | 8,400 B | 서버 `Content-Encoding` 협상에 맡김 |
-| Postgres `nodes` 1행 | 본문 176 B + 인덱스(pk, (owner_id,seq)) 64 B ≈ **240 B** | 튜플 헤더 24 B 포함. jsonb 오버헤드는 근사 |
-| `nodes` 300행 DB 점유 | **≈ 70 KB** | + `trees` 1행 ≈ 0.2 KB |
-| `srs` 1행 | ≈ **430 B** | ts-fsrs Card 객체 jsonb ≈ 220 B가 절반 |
-| `srs` 300행(완전 학습 시) | ≈ **129 KB** | 노드보다 크다. 학습한 노드만 행이 생김 |
+| **SQLite** `nodes` 1행 (실측) | **361 B**(pk + 인덱스 2개 포함, 6,000행 VACUUM 후 파일 크기 ÷ 행 수) | UUID 3개가 TEXT 36자(108 B). 이전 Postgres 추정 240 B(uuid 16 B 바이너리 기준)는 폐기 |
+| `nodes` 300행 DB 점유 | **≈ 106 KB** | + `trees` 1행 ≈ 0.3 KB |
+| **SQLite** `srs` 1행 (실측) | **458 B**(WITHOUT ROWID pk + (user_id,seq) 인덱스 포함) | ts-fsrs Card JSON ≈ 220 B가 절반 |
+| `srs` 300행(완전 학습 시) | ≈ **134 KB** | 노드보다 크다. 학습한 노드만 행이 생김 |
 | `attempts` 1행 | ≈ 120 B | 백지 1회당 1행 |
 
 ## 2. 사용자 1명
 04_tech §7 가정(트리 5개 × 300노드) 유지.
 | 항목 | 계산 | 결과 |
 |---|---|---|
-| nodes | 5 × 70 KB | 350 KB |
-| srs (학습 비율 50% [가정]) | 5 × 129 KB × 0.5 | 323 KB |
-| attempts (연 100회) | 100 × 120 B | 12 KB |
-| **합계** | | **≈ 0.7 MB** (04 §7 "1 MB" 가정 안) |
+| nodes | 5 × 106 KB | 530 KB |
+| srs (학습 비율 50% [가정]) | 5 × 134 KB × 0.5 | 335 KB |
+| attempts (연 100회) | 100 × 150 B [가정, SQLite TEXT UUID 4개] | 15 KB |
+| **합계** | | **≈ 0.9 MB** (04 §7 "1 MB" 가정 안) |
 | events (서버 미저장 결정 시 0) | 참고: 활성일 50건 × 150 B × 100일/년 | 750 KB/년 — 미저장 결정의 근거(04 §3.2) |
 
 ## 3. 1천 명 규모
 | 항목 | 계산 | 결과 |
 |---|---|---|
-| DB 총량 | 1,000 × 0.7 MB | **0.7 GB** (여유 포함 1 GB) |
+| DB 총량 | 1,000 × 0.9 MB | **0.9 GB** (여유 포함 1.1 GB) |
 | 톰스톤·outbox 잔여 | 삭제 30일 보존, 월 삭제율 10% [가정] | +70 MB |
 | MAU | 30% [04 §7 가정] | 300명 |
 | 일 요청 수 | 활성 1명/일: push 10회 + pull(열 때·포커스·60초 폴링 20분 사용 ≈ 25회) + 공유 보기 3회 ≈ 40회 | 300 × 40 = **12,000/일 ≈ 0.14 req/s 평균** |
 | 피크 | 동시 50명, 60초 폴링 + 편집 push 10초 1회 | **≈ 6 req/s** |
 | Pi 여유 | 11 §2.3: Pi 3B 기준 200 TPS, Pi 5+NVMe는 그 이상 | 30배 이상 여유 [추론] |
 | 가정 회선 업로드 | 공유 보기 1회 ≈ 35 KB(압축), 피크 6 req/s 중 1/3 공유 보기 | 70 KB/s ≈ 0.6 Mbps — 병목 아님 |
-| 백업(pg_dump + gzip 30%) | 1 GB × 0.3 | 300 MB/일, 14일 보관 4.2 GB < B2 무료 10 GB [11 §2.1] |
+| 백업(`sqlite.backup()` 파일 + gzip 30% [가정]) | 1 GB × 0.3 | 300 MB/일, 14일 보관 4.2 GB < B2 무료 10 GB [11 §2.1]. 파이프라인(backup → age → rclone)은 AA §2 |
 
 ## 4. 상한(페이로드·레이트 리밋) 근거
 | 상한 | 값 | 근거 |
@@ -51,7 +51,7 @@
 | `/api/sync` | 60/분/사용자 | 폴링 1회/분 + 편집 push |
 | `/api/t/*`·갤러리 | 60/분/IP | 열거 공격 억제(04 §5 d W2) |
 | `/api/t/:slug/copy` | 20/일/IP | 복제 수 부풀리기 방지 |
-| 신고 | 5/일/IP | |
+| 신고(AA 소유 API) | anon 5/시/IP · user 20/시 | AA 확정값(RV H1) |
 
 ## 5. URL 해시 전송(R4 #10) 측정
 | 트리 | 축약 포맷(id 없음, 전위 순회) → deflate → base64url | 비고 |
