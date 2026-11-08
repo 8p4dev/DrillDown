@@ -1,0 +1,70 @@
+/* 관리자 — 02 §3.1 관리자 와이어: PC 표 + sticky 헤더, ≤760 표→카드·숫자 카드 2열. 토큰만(01 §3.1). lazy 청크 */
+.admin { display: flex; flex-direction: column; gap: 1rem; }
+.admin-head { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.admin-head h1 { margin: 0; }
+/* 탭은 DS .seg(a[aria-current=page]) 그대로. 모바일 가로 스크롤만 */
+.admin-tabs { overflow-x: auto; max-width: 100%; }
+.admin h2 { margin: .75rem 0 0; font-size: var(--fs-md); color: var(--muted); font-weight: 600; }
+
+/* 대시보드 숫자 카드 */
+.stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: .6rem; }
+@media (max-width: 1100px) { .stat-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 760px) { .stat-grid { grid-template-columns: repeat(2, 1fr); } }
+.stat-card { display: flex; flex-direction: column; gap: .25rem; padding: .75rem .85rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); min-width: 0; }
+.stat-label { display: inline-flex; align-items: center; gap: .35rem; font-size: var(--fs-xs); color: var(--muted); }
+.stat-card strong { font-size: var(--fs-xl); font-weight: 700; letter-spacing: -.02em; line-height: 1.2; }
+.stat-sub { font-size: var(--fs-xs); color: var(--text-2); display: inline-flex; align-items: center; gap: .3rem; flex-wrap: wrap; }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--danger); vertical-align: 0; }
+.dot[data-ok='true'] { background: var(--ok); }
+/* 14일 가입 막대: --text 채움, 높이 비례, 숫자는 툴팁 */
+.signups { margin: 0; padding: .75rem .85rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+.signups figcaption { font-size: var(--fs-xs); color: var(--muted); margin-bottom: .5rem; }
+.bars { display: flex; align-items: flex-end; gap: 4px; height: 72px; }
+.bar { flex: 1; background: var(--text); border-radius: var(--radius-sm); min-height: 2px; }
+.bar:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+
+/* 검색·공지 입력(상단, 키보드 안전) */
+.search { display: flex; align-items: center; gap: .5rem; max-width: 420px; color: var(--muted); }
+.search input { flex: 1; min-width: 0; border-radius: var(--radius); }
+.notice-form { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+.notice-form .search { flex: 1; min-width: 220px; }
+.notice-form button { display: inline-flex; align-items: center; gap: .35rem; }
+.admin .toggle { display: inline-flex; align-items: center; gap: .4rem; font-size: var(--fs-sm); color: var(--text-2); cursor: pointer; }
+
+/* 표: PC sticky 헤더(861+), 셀 숫자 tnum, 동작 열 오른쪽 */
+.admin table { border-radius: var(--radius); box-shadow: none; overflow: visible; } /* index.css 의 overflow:hidden 은 sticky 헤더를 막는다(스크롤 컨테이너가 표 자신이 됨) */
+.admin th { white-space: nowrap; }
+.admin td.name { font-weight: 600; }
+.admin td.name svg { vertical-align: -2px; margin-right: .2rem; }
+.admin td.act { text-align: right; white-space: nowrap; }
+.admin td.act > * { vertical-align: middle; margin-left: .35rem; }
+.admin td.act .reason { width: 11em; border-radius: var(--radius); min-height: 32px; padding: .25rem .5rem; font-size: var(--fs-sm); }
+.admin td.act .two-step { min-height: 32px; padding: .25rem .6rem; font-size: var(--fs-sm); min-width: 5.5em; }
+@media (min-width: 861px) { .admin thead th { position: sticky; top: var(--nav-h); z-index: 1; } }
+.admin td button { display: inline-flex; align-items: center; gap: .3rem; }
+.admin .audit td { font-size: var(--fs-sm); }
+
+/* 신고·삭제 트리 목록 */
+.reports { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+.reports li { display: flex; align-items: center; gap: .6rem; padding: .5rem .75rem; min-height: 44px; border-bottom: 1px solid var(--border); font-size: var(--fs-sm); }
+.reports li:last-child { border-bottom: none; }
+.reports .grow { flex: 1; min-width: 0; }
+.reports button { display: inline-flex; align-items: center; gap: .3rem; }
+.admin p.muted { display: inline-flex; align-items: center; gap: .35rem; font-size: var(--fs-sm); margin: 0; }
+
+/* ≤760: 표 행 → 카드(display:grid). 파괴 버튼은 카드 마지막 줄 오른쪽, 사유 입력은 그 윗줄 */
+@media (max-width: 760px) {
+  .admin table, .admin tbody { display: block; }
+  .admin thead { display: none; }
+  .admin tr { display: grid; grid-template-columns: 1fr 1fr; gap: .35rem .75rem; padding: .65rem .75rem; border-bottom: 1px solid var(--border); }
+  .admin tr:last-child { border-bottom: none; }
+  .admin td { display: block; padding: 0; border: none; }
+  .admin td::before { content: attr(data-l); display: block; font-size: var(--fs-xs); color: var(--muted); }
+  .admin td.name { grid-column: 1 / -1; }
+  .admin td.name::before { display: none; }
+  .admin td.act { grid-column: 1 / -1; display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: .35rem; margin-top: .25rem; }
+  .admin td.act::before { display: none; }
+  .admin td.act > * { margin-left: 0; }
+  .admin td.act .reason { flex-basis: 100%; width: auto; scroll-margin-bottom: calc(var(--kb) + 1rem); }
+  .admin .audit td[data-l='메모'] { grid-column: 1 / -1; }
+}
