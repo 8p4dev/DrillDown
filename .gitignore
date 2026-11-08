@@ -30,3 +30,4 @@ data/
 .e2e-data/
 config/admins.json
 .env
+.preview-data/
