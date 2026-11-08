@@ -12,8 +12,7 @@ import NodeRow from './NodeRow'
 import NoteEditor, { type NoteApi, type NoteOp } from './content/NoteEditor'
 import GraphView from './graph/GraphView'
 import TreeHeader from '../TreeHeader'
-import { toast } from '../Toast'
-// import { hint } from '../Toast' // DS 가 hint 를 내보내면 주석을 푼다 (plan 변경 사항)
+import { hint, toast } from '../Toast'
 import { haptic } from '../feel'
 import { ensureVisible, startViewport, subscribeViewport } from '../viewport'
 import './editor.css'
@@ -116,7 +115,7 @@ export default function EditorPage({ treeId }: { treeId: string }) {
   // 키보드(--kb)·시각 뷰포트 추적. 키보드가 열리면 단축키 시트는 닫는다(02 규칙 4(b))
   useEffect(() => {
     startViewport()
-    // if (matchMedia('(pointer: coarse)').matches) hint('editor', '카드 두 번 탭 = 제목') // 1회성 힌트 — DS hint 머지 뒤
+    if (matchMedia('(pointer: coarse)').matches) hint('editor', '카드 두 번 탭 = 제목') // 1회성 힌트
     return subscribeViewport((v) => {
       if (v.open) document.getElementById(KEYS_ID)?.hidePopover()
     })
@@ -547,7 +546,7 @@ export default function EditorPage({ treeId }: { treeId: string }) {
         <span className="zoom-group" role="group" aria-label="확대·축소">
           <button type="button" aria-label="축소" data-tip="축소 (-)" onClick={() => zoomBy(1 / 1.2)}><Icon d={zoomOut} size={20} /></button>
           <button type="button" className="zoom-reset" data-tip="100%로 (0)" onClick={() => zoomTo(1)}>
-            <output aria-label="배율">{Math.round(zoom * 100)}%</output>
+            <output className="tnum" aria-label="배율">{Math.round(zoom * 100)}%</output>
           </button>
           <button type="button" aria-label="확대" data-tip="확대 (=)" onClick={() => zoomBy(1.2)}><Icon d={zoomIn} size={20} /></button>
         </span>

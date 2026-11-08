@@ -2,6 +2,7 @@
 import { lazy, Suspense, useEffect } from 'react'
 import { href, useRoute } from './router'
 import { Toaster } from './features/Toast'
+import { TooltipLayer } from './ui/Tooltip'
 import ThemeToggle from './ui/ThemeToggle'
 import NavUser from './features/account/NavUser'
 import { useMe } from './core/mock/me'
@@ -72,6 +73,7 @@ export default function App() {
         </Suspense>
       </main>
       <Toaster />
+      <TooltipLayer />
     </>
   )
 }
