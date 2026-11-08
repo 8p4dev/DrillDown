@@ -15,7 +15,7 @@ export interface Tree {
   slug?: string | null
   /** 복제 계보: 원본 트리 id */
   sourceTreeId?: ID
-  /** 로컬 소프트 삭제 시각(되돌리기 토스트 동안). listTrees 는 이 값이 있는 트리를 숨긴다 */
+  /** 소프트 삭제 시각. 로컬은 7일 보존(휴지통) 뒤 purgeDeletedTrees 가 하드 삭제. listTrees 는 이 값이 있는 트리를 숨긴다 */
   deletedAt?: number
 }
 
