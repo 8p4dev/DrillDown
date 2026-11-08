@@ -1,87 +1,74 @@
+/* 빈칸·백지 퀴즈 — index.css 토큰만(01 §3.1). 그림자 없음: 떠 있는 것은 1px --border-strong + outline */
 .dnd { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .dnd.grabbing, .dnd.grabbing * { cursor: grabbing !important; }
 main:has(.dnd) { max-width: 1400px; } /* 넓은 트리: 에디터처럼 폭 제한 완화 */
 .dnd button:disabled { opacity: 1; }
+.dnd-bar button { display: inline-flex; align-items: center; justify-content: center; gap: .35rem; }
 
-/* 범위: 알약 + 토큰 색 셰브론(그라데이션 두 조각) */
-.dnd-scope { display: inline-flex; align-items: center; gap: .4rem; font-size: var(--fs-sm); }
+/* 범위: crosshair 아이콘 + 네이티브 select(화살표는 브라우저 것) */
+.dnd-scope { display: inline-flex; align-items: center; gap: .4rem; font-size: var(--fs-sm); color: var(--muted); }
 .dnd-scope select {
-  appearance: none; -webkit-appearance: none; max-width: 14rem; height: 2.3rem; padding: 0 2rem 0 .85rem; border-radius: 999px; font-weight: 550; cursor: pointer;
-  background:
-    linear-gradient(45deg, transparent 50%, var(--muted) 50% 65%, transparent 65%) right 1rem center / 6px 6px no-repeat,
-    linear-gradient(-45deg, transparent 50%, var(--muted) 50% 65%, transparent 65%) right calc(1rem - 5px) center / 6px 6px no-repeat,
-    var(--surface);
-  box-shadow: var(--shadow);
+  appearance: auto; max-width: 14rem; height: 2.3rem; padding: 0 .5rem; border-radius: var(--radius); font-weight: 550; cursor: pointer;
+  background: var(--surface); border: 1px solid var(--border-strong);
 }
 
 /* 캔버스: 점 격자. padding 은 kit.tsx CANVAS_PAD 와 같게 */
 .dnd-canvas {
   overflow: auto; padding: 4px; border: 1px solid var(--border); border-radius: var(--radius-lg);
   background: radial-gradient(circle, color-mix(in srgb, var(--muted) 14%, transparent) 1px, transparent 1.2px) 0 0 / 18px 18px, var(--surface);
-  box-shadow: var(--shadow);
 }
 .dnd-graph { margin: 0 auto; }
 .dnd-plane { position: relative; transform-origin: 0 0; }
 .dnd-plane svg { position: absolute; inset: 0; pointer-events: none; }
 .dnd-plane path { fill: none; stroke: color-mix(in srgb, var(--muted) 45%, transparent); stroke-width: 1.5; }
-.dnd-plane path.from-root { stroke: color-mix(in srgb, var(--accent) 35%, transparent); }
+.dnd-plane path.from-root { stroke: color-mix(in srgb, var(--text) 35%, transparent); }
 .dnd-pos { position: absolute; display: flex; border-radius: var(--radius-lg); }
+/* 빈 범위 안내: 캔버스 자리 상단 중앙(02 §3.5) */
+.dnd-empty { text-align: center; margin: 1.5rem 0; }
 
-/* 칸 공통: 노드(제목)·슬롯(빈칸)·카드 — 에디터 카드와 같은 언어(라운드, 1px 테두리, 그림자 단계) */
+/* 칸 공통: 노드(제목)·슬롯(빈칸)·카드 */
 .dnd-node, .dnd-slot, .dnd-card {
   box-sizing: border-box; width: 100%; height: 100%; min-height: 44px; border-radius: var(--radius-lg);
-  display: flex; align-items: center; justify-content: center; text-align: center;
+  display: flex; align-items: center; justify-content: center; text-align: center; position: relative;
   font-size: var(--fs-sm); line-height: 1.25; padding: .2rem .55rem; margin: 0;
-  transition: transform var(--t-fast) var(--ease-spring), box-shadow var(--t-fast), opacity var(--t-fast), border-color var(--t-fast), background var(--t-fast);
+  transition: transform var(--t-fast) var(--ease-out), opacity var(--t-fast), border-color var(--t-fast), background var(--t-fast);
 }
 .dnd-node, .dnd-card { overflow: hidden; overflow-wrap: anywhere; }
-.dnd-node { background: var(--surface); border: 1px solid var(--border); font-weight: 650; box-shadow: var(--shadow); }
-.dnd-node.root { background: color-mix(in srgb, var(--accent) 11%, var(--surface)); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); color: var(--text); font-weight: 750; }
-.dnd-slot {
-  padding: 0; background: var(--surface-2);
-  border: 1.5px dashed color-mix(in srgb, var(--muted) 38%, transparent);
-  box-shadow: inset 0 1px 3px color-mix(in srgb, var(--text) 9%, transparent);
-}
-.dnd-slot.filled { border-style: solid; border-color: transparent; background: none; box-shadow: none; }
-.dnd-card {
-  cursor: grab; touch-action: none; font-weight: 550;
-  background: var(--surface); color: var(--text); border: 1px solid var(--border); box-shadow: var(--shadow);
-}
+.dnd-node { background: var(--surface); border: 1px solid var(--border-strong); font-weight: 650; }
+.dnd-node.root { border: 2px solid var(--text); color: var(--text); font-weight: 750; }
+.dnd-slot { padding: 0; background: var(--surface-2); border: 1.5px dashed var(--border-strong); }
+.dnd-slot.filled { border-style: solid; border-color: transparent; background: none; }
+.dnd-card { cursor: grab; touch-action: none; font-weight: 550; background: var(--surface); color: var(--text); border: 1px solid var(--border-strong); }
 @media (hover: hover) {
-  .dnd-card:hover:not(:disabled) { border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); background: var(--surface); transform: translateY(-2px); box-shadow: var(--shadow-lift); }
+  .dnd-card:hover:not(:disabled) { border-color: var(--text); background: var(--surface); transform: translateY(-1px); }
 }
 .dnd-card span, .dnd-node span, .dnd-ghost span {
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
-.dnd-card.sel { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft), var(--shadow-lift); transform: translateY(-2px); }
-.dnd-card.dragging { opacity: .3; transform: scale(.96); }
+.dnd-card.sel { outline: 2px solid var(--text); outline-offset: 2px; }
+.dnd-card.dragging { opacity: .3; }
 .dnd.locked .dnd-card { cursor: default; }
 
-/* 착지 pop · 트레이 복귀 rise (마운트 시 1회) */
-.dnd-slot > .dnd-card, .dnd-pos > .dnd-card { animation: pop var(--t-med) var(--ease-spring); }
+/* 착지 scale(.96)→1(#9) · 트레이 복귀 rise (마운트 시 1회) */
+.dnd-slot > .dnd-card, .dnd-pos > .dnd-card { animation: dnd-land var(--t-fast) var(--ease-out); }
+@keyframes dnd-land { from { transform: scale(.96); } }
 .dnd-tray > .dnd-card { animation: rise var(--t-med) var(--ease-out); }
 
-/* 집은 동안: 놓을 수 있는 곳만 점선 강조 + 래퍼에 pulse-ring 1회 (카드 animation 을 건드리지 않게 래퍼에) */
-.target { outline: 2px dashed color-mix(in srgb, var(--accent) 60%, transparent); outline-offset: 2px; }
-.dnd-slot.target:not(.filled) { border-color: transparent; background: var(--accent-soft); }
-.dnd-pos:has(> .target), .dnd-tray.target { animation: pulse-ring calc(var(--t-slow) * 2) var(--ease-out); }
-/* 포인터 아래 대상: 자석처럼 커지고 링 + 옅은 글로우 */
-.over {
-  outline: 2px solid var(--accent); outline-offset: 1px;
-  background: color-mix(in srgb, var(--accent) 14%, var(--surface)) !important;
-  box-shadow: 0 0 0 5px var(--accent-soft), var(--shadow-lift);
-}
+/* 집은 동안: 놓을 수 있는 곳만 점선 outline(정적, #7) */
+.target { outline: 2px dashed color-mix(in srgb, var(--text) 60%, transparent); outline-offset: 2px; }
+/* 포인터 아래 대상: 실선 --text + outline, 살짝 커짐(#8) */
+.over { outline: 2px solid var(--text); outline-offset: 1px; border-color: var(--text) !important; border-style: solid !important; background: var(--surface) !important; }
 .dnd-pos > .over { transform: scale(1.04); }
-.dnd-tray.over { box-shadow: 0 0 0 3px var(--accent-soft); }
 
-/* 결과: 왼쪽 위부터 stagger(--i) — 정답 pop, 오답 shake */
+/* 결과(#10): 왼쪽 위부터 stagger(--i) — 정답 ok 실선 + ✓, 오답 danger 점선 + ✕ + shake. 마크는 opacity 0→1 */
 [data-result] { --d: calc(min(var(--i, 0) * 35ms, 600ms)); }
-[data-result='ok'] { border-color: var(--ok) !important; background: color-mix(in srgb, var(--ok) 13%, var(--surface)) !important; }
-[data-result='wrong'] { border-color: var(--danger) !important; background: color-mix(in srgb, var(--danger) 12%, var(--surface)) !important; }
-.dnd [data-result='ok'] { animation: pop var(--t-med) var(--ease-spring) var(--d) backwards; }
+[data-result='ok'] { border: 1px solid var(--ok) !important; background: color-mix(in srgb, var(--ok) 8%, var(--surface)) !important; }
+[data-result='wrong'] { border: 1px dashed var(--danger) !important; background: color-mix(in srgb, var(--danger) 8%, var(--surface)) !important; }
 .dnd [data-result='wrong'] { animation: shake var(--t-slow) var(--ease-out) var(--d) backwards; }
 .dnd.locked [data-result] { transition: background var(--t-med) var(--d), border-color var(--t-med) var(--d); }
-.dnd-slot[data-result='wrong']:not(.filled) { border-style: dashed; }
+.dnd-mark { position: absolute; top: 2px; right: 2px; line-height: 0; color: var(--ok); animation: dnd-mark var(--t-med) var(--ease-out) var(--d) backwards; }
+[data-result='wrong'] > .dnd-mark { color: var(--danger); }
+@keyframes dnd-mark { from { opacity: 0; } }
 
 /* 트레이 */
 .dnd-tray {
@@ -89,41 +76,40 @@ main:has(.dnd) { max-width: 1400px; } /* 넓은 트리: 에디터처럼 폭 제�
   margin-top: .9rem; padding: .8rem; border-radius: var(--radius-lg); box-sizing: border-box;
   background: var(--surface-2); border: 1px solid var(--border);
 }
+.dnd-tray.over { outline: 2px solid var(--text); }
 .dnd-tray > .dnd-card { width: 148px; height: 44px; }
 .dnd-bar { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; margin: .9rem 0 .4rem; }
 .dnd-bar [role='status'] { margin: 0 auto 0 0; }
-.dnd-bar button.ready { animation: pulse-ring calc(var(--t-slow) * 2) var(--ease-out); }
+.dnd-bar button.ready { outline: 2px solid var(--text); outline-offset: 2px; } /* 카드를 다 놓으면 [채점] 강조 */
 
 /* 진행: 얇은 막대 + n/m */
 .dnd-progress { margin-right: auto; display: inline-flex; align-items: center; gap: .55rem; font-size: var(--fs-sm); color: var(--muted); font-variant-numeric: tabular-nums; }
-.dnd-progress > span { width: 140px; height: 4px; border-radius: 999px; overflow: hidden; background: var(--border); }
-.dnd-progress i { display: block; height: 100%; background: var(--accent); border-radius: inherit; transition: width var(--t-med) var(--ease-out); }
+.dnd-progress > span { width: 140px; height: 4px; overflow: hidden; background: color-mix(in srgb, var(--text) 8%, transparent); }
+.dnd-progress i { display: block; height: 100%; background: var(--text); transition: width var(--t-med) var(--ease-out); }
 
-/* 점수: pop, 만점은 칩 + pulse-ring */
-.dnd-score { padding: 0; border: none; background: none; color: var(--text); font-size: var(--fs-md); animation: pop var(--t-med) var(--ease-spring); }
+/* 점수(#12): 숫자 scale 등장, 만점은 ok 테두리 카드 + ✓ */
+.dnd-score { display: inline-flex; align-items: center; gap: .35rem; padding: 0; border: none; background: none; color: var(--text); font-size: var(--fs-md); font-variant-numeric: tabular-nums; animation: pop var(--t-med) var(--ease-out); }
 .dnd-score b { font-size: var(--fs-lg); }
-.dnd-score.perfect {
-  padding: .3rem .8rem; border-radius: 999px; color: var(--ok); background: color-mix(in srgb, var(--ok) 13%, var(--surface));
-  animation: pop var(--t-med) var(--ease-spring), pulse-ring calc(var(--t-slow) * 2) var(--ease-out) var(--t-med);
-}
+.dnd-score.perfect { padding: .3rem .8rem; border: 1px solid var(--ok); border-radius: var(--radius); color: var(--ok); background: color-mix(in srgb, var(--ok) 8%, var(--surface)); }
+.dnd-score.perfect svg { color: var(--ok); }
 
 .dnd-compare { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr)); gap: .9rem; }
 .dnd-compare h2 { margin: 0 0 .4rem; font-size: var(--fs-md); color: var(--muted); font-weight: 600; }
+.dnd-compare .dnd-original { animation: rise var(--t-med) var(--ease-out); } /* 백지 채점 뒤 원본 트리(#11) */
 
-/* 고스트: 포인터를 따라가며 이동 속도만큼 기울어진다(--tilt, useDragDrop) */
+/* 고스트: 포인터를 따라간다. 떠 있음 = 1px --border-strong + outline + scale(1.02) */
 .dnd-ghost {
   position: fixed; z-index: 50; pointer-events: none; box-sizing: border-box;
   display: flex; align-items: center; justify-content: center; text-align: center; padding: .2rem .55rem;
   font-size: var(--fs-sm); font-weight: 550; line-height: 1.25; border-radius: var(--radius-lg);
-  background: var(--surface); border: 1px solid var(--accent); color: var(--text);
-  box-shadow: var(--shadow-pop); transform: rotate(var(--tilt, 0deg)) scale(1.04);
+  background: var(--surface); border: 1px solid var(--border-strong); color: var(--text);
+  outline: 2px solid var(--text); outline-offset: 1px; transform: scale(1.02);
 }
-@media (prefers-reduced-motion: reduce) { .dnd-ghost { transform: none; } }
 
 /* 넓은 화면의 좌→우 트리는 세로로 길다 → 끌어 놓을 수 있게 채점 전 트레이를 하단에 고정 */
 @media (min-width: 761px) {
   .dnd:not(.locked):has(.dnd-side) .dnd-dock {
-    position: sticky; bottom: 0; z-index: 5; display: flex; flex-direction: column; max-height: 38dvh; background: var(--bg);
+    position: sticky; bottom: 0; z-index: 5; display: flex; flex-direction: column; max-height: 38svh; background: var(--bg);
   }
   .dnd:not(.locked):has(.dnd-side) .dnd-tray { flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; }
   .dnd:not(.locked):has(.dnd-side) .dnd-bar { flex: none; margin-bottom: 0; padding-bottom: .5rem; }
@@ -139,31 +125,35 @@ main:has(.dnd) { max-width: 1400px; } /* 넓은 트리: 에디터처럼 폭 제�
   .dnd-node, .dnd-card { padding: .2rem .35rem; }
   .dnd-dock {
     position: sticky; bottom: 0; z-index: 5; display: flex; flex-direction: column;
-    max-height: 38dvh; box-sizing: border-box;
+    max-height: 38svh; box-sizing: border-box;
     margin: auto -.85rem calc(-2rem - var(--safe-b)); /* main 좌우·아래 여백을 덮어 화면 끝까지 */
     background: var(--surface); border-top: 1px solid var(--border);
-    border-radius: var(--radius-lg) var(--radius-lg) 0 0; box-shadow: var(--shadow-pop);
   }
-  /* 카드는 터치로 끌어야 해서 스크롤을 받지 않는다 → 좌우 여백·틈으로 스크롤 */
+  /* 카드는 터치로 끌어야 해서 스크롤을 받지 않는다 → 좌우 여백 12px·틈으로 스크롤 */
   .dnd-tray {
     flex: 1 1 auto; min-height: 56px; overflow-y: auto; overscroll-behavior: contain;
     display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; grid-auto-rows: min-content;
-    margin: 0; padding: .7rem 1rem .4rem; background: none; border: none; border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    margin: 0; padding: .7rem 12px .4rem; background: none; border: none; border-radius: 0;
   }
   .dnd-tray > .dnd-card { width: 100%; height: auto; min-height: 44px; }
-  .dnd-bar { flex: none; flex-wrap: nowrap; margin: 0; padding: .5rem 1rem calc(.6rem + var(--safe-b)); }
+  .dnd-bar { flex: none; flex-wrap: nowrap; margin: 0; padding: .5rem 12px calc(.6rem + var(--safe-b)); }
   .dnd-bar button { min-height: 44px; flex: none; }
   .dnd-progress { flex: 1; min-width: 0; }
   .dnd-progress > span { flex: 1; width: auto; }
 
-  /* 채점 후: 결과를 시트가 가리지 않게 트레이는 흐름으로, 막대만 고정 */
+  /* 채점 후: 결과를 시트가 가리지 않게 트레이는 흐름으로, 막대만 고정(키보드가 열리면 그만큼 위로) */
   .dnd.locked .dnd-dock { display: contents; }
   .dnd.locked .dnd-tray { flex: none; display: flex; flex-wrap: wrap; margin: 0; padding: .7rem; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: visible; }
   .dnd.locked .dnd-tray:empty { display: none; }
   .dnd.locked .dnd-tray > .dnd-card { width: calc(50% - .25rem); }
   .dnd.locked .dnd-bar {
-    position: sticky; bottom: 0; z-index: 5; flex: none; flex-wrap: wrap;
+    position: sticky; bottom: var(--kb); z-index: 5; flex: none; flex-wrap: wrap;
     margin: auto -.85rem calc(-2rem - var(--safe-b));
-    background: var(--surface); border-top: 1px solid var(--border); box-shadow: var(--shadow-pop);
+    background: var(--surface); border-top: 1px solid var(--border);
   }
+}
+/* 가로 모드 폰(02 D11): 시트는 절반까지, 채점 후 막대는 흐름으로 */
+@media (max-height: 500px) and (pointer: coarse) {
+  .dnd-dock { max-height: 50dvh; }
+  .dnd.locked .dnd-bar { position: static; }
 }
