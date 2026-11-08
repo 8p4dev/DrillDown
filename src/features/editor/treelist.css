@@ -91,3 +91,7 @@
 }
 /* 44px 입력칸(전역 터치 기본값)이 이름 변경 때 카드 높이를 밀지 않게 */
 @media (pointer: coarse) { .tree-cards .tree-rename { margin-block: -5px; } }
+
+/* C5 트리 200개 한도 안내, 비로그인 휴지통 진입점 */
+.trees-full { margin: -.75rem 0 1.25rem; color: var(--muted); font-size: var(--fs-sm); }
+.trees-head > .trees-trash { flex: none; width: 2.4rem; height: 2.4rem; display: inline-grid; place-items: center; color: var(--muted); }
