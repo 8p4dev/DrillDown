@@ -9,7 +9,8 @@ import { href } from '../../router'
 import { I } from '../../ui/icons'
 import { Icon } from '../../ui/Icon'
 import { toast } from '../Toast'
-import { Avatar, hint } from './ds-shim'
+import { Avatar } from '../../ui/Avatar'
+import { hint } from '../Toast'
 import './nav-user.css'
 
 const MergeDialog = lazy(() => import('./MergeDialog'))

@@ -1,13 +1,9 @@
 /* 관리자 — 02 §3.1 관리자 와이어: PC 표 + sticky 헤더, ≤760 표→카드·숫자 카드 2열. 토큰만(01 §3.1). lazy 청크 */
 .admin { display: flex; flex-direction: column; gap: 1rem; }
-.admin .tnum { font-variant-numeric: tabular-nums; }
 .admin-head { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
 .admin-head h1 { margin: 0; }
-.admin-tabs { display: flex; gap: 0; overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); }
-.admin-tabs a { padding: .4rem .85rem; min-height: var(--tap); display: inline-flex; align-items: center; color: var(--text-2); font-size: var(--fs-sm); font-weight: 600; white-space: nowrap; border-right: 1px solid var(--border); }
-.admin-tabs a:last-child { border-right: none; }
-.admin-tabs a[aria-current='page'] { color: var(--on-fill); background: var(--text); }
-@media (hover: hover) { .admin-tabs a:hover { text-decoration: none; background: color-mix(in srgb, var(--text) 8%, transparent); } .admin-tabs a[aria-current='page']:hover { background: var(--text); } }
+/* 탭은 DS .seg(a[aria-current=page]) 그대로. 모바일 가로 스크롤만 */
+.admin-tabs { overflow-x: auto; max-width: 100%; }
 .admin h2 { margin: .75rem 0 0; font-size: var(--fs-md); color: var(--muted); font-weight: 600; }
 
 /* 대시보드 숫자 카드 */
@@ -43,7 +39,7 @@
 .admin td.act { text-align: right; white-space: nowrap; }
 .admin td.act > * { vertical-align: middle; margin-left: .35rem; }
 .admin td.act .reason { width: 11em; border-radius: var(--radius); min-height: 32px; padding: .25rem .5rem; font-size: var(--fs-sm); }
-.admin .two-step > button { min-height: 32px; padding: .25rem .6rem; font-size: var(--fs-sm); display: inline-grid; }
+.admin td.act .two-step { min-height: 32px; padding: .25rem .6rem; font-size: var(--fs-sm); min-width: 5.5em; }
 @media (min-width: 861px) { .admin thead th { position: sticky; top: var(--nav-h); z-index: 1; } }
 .admin td button { display: inline-flex; align-items: center; gap: .3rem; }
 .admin .audit td { font-size: var(--fs-sm); }

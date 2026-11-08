@@ -9,7 +9,7 @@ import { I } from '../../ui/icons'
 import { ban, database, eye, eyeOff, hardDrive, megaphone, search, undo2 } from '../../ui/icons.all'
 import { Icon } from '../../ui/Icon'
 import Banners from '../account/Banners'
-import { TwoStep } from '../account/ds-shim'
+import { TwoStep } from '../../ui/TwoStep'
 import { ProviderLogo } from '../account/providers'
 import { toast } from '../Toast'
 import './admin.css'
@@ -32,7 +32,7 @@ export default function AdminPage({ tab }: { tab: AdminTab }) {
       <Banners />
       <header className="admin-head">
         <h1>관리자</h1>
-        <nav className="admin-tabs" aria-label="관리자 탭">
+        <nav className="seg admin-tabs" aria-label="관리자 탭">
           {TABS.map(([t, label]) => <a key={t} href={href.admin(t)} aria-current={t === tab ? 'page' : undefined}>{label}</a>)}
         </nav>
       </header>

@@ -56,17 +56,18 @@
 
 ## 변경 사항
 
-1. **DS shim** (위 접근 방식). 계약 §3.2 의 모듈 경로 대신 `./ds-shim` 에서 import. 머지 시 교체 지점: `NavUser.tsx` `AccountPage.tsx` `MergeDialog.tsx` `AdminPage.tsx` 의 import 1줄씩 + shim 2파일 삭제.
-2. **`hint('login', …)`** 도 shim 에 구현(Toast 계약: localStorage `hint:<id>` 1회성). DS `Toast.tsx` 에 `hint` 가 생기면 import 만 바꾼다.
+1. **DS shim** (위 접근 방식) → **해소됨(2026-11-08 main 09b4cbc 머지 후)**: shim 2파일 삭제, `src/ui/Avatar` `src/ui/TwoStep` `src/ui/Sheet` `features/Toast.hint` 로 교체. 실제 TwoStep 은 `button.two-step[data-armed]`(래퍼 없음)이라 `admin.css` 셀렉터를 맞췄다. 관리자 탭은 DS `.seg > a[aria-current]` 사용.
+2. **`hint('login', …)`** 는 DS `Toast.hint` 를 그대로 호출. DS 힌트는 [확인] 까지 토스트 큐를 막으므로 로그인 직후 "로그인됨" 토스트는 힌트를 닫은 뒤 보인다(설계대로).
 3. **MergeDialog 계정 전환(M3)·커서 만료(M4) 문구** 는 mock 에서 생략.
 4. **전체 백업 JSON(`exportAll`)** 범위 밖 — `exportEvents()` 그대로(`events.ts` 수정 금지).
 5. **공지 배너는 로그인 사용자에게만** 보인다 — mock `Me` 에 notice 가 실리기 때문(서버 단계에서 anon 도 `GET /api/me` 대신 공개 설정 엔드포인트가 필요하면 그때).
 
 ## 결과 (2026-11-08)
 
-- `npm run typecheck` 0 / `lint` 경고 0 / `check` ok / `build` ok — `dist/assets/AdminPage-*.js` + `AdminPage-*.css` 별도 청크. precache 55개 543.88 KiB(폰트 없음 기준).
+- `npm run typecheck` 0 / `lint` 경고 0 / `check` ok / `build` ok — `dist/assets/AdminPage-*.js` + `AdminPage-*.css` 별도 청크. precache 56개 546.19 KiB(main DS+LM 머지 후).
 - 검사: `fetch(` 0건(account·admin·mock·inapp). 하드코딩 hex 는 `account.css` 의 Google/Kakao 버튼 색(`#ffffff #1f1f1f #747775 #f2f2f2 #fee500 #f4dc00`)과 `providers.tsx` 로고뿐. `--accent --shadow --warn ease-spring pulse-ring spring-in backdrop-filter` 0건.
 - 임시 Playwright(Edge, scratch, 커밋 안 함) 35개 단언 전부 PASS: 로그인 → 토스트 "로그인됨" → MergeDialog(L=1,S=2 문구) → 계정 닉네임 변경(상단 바 반영) → 탈퇴 2단계 3초 뒤 복귀·2탭 시 로그아웃 → 기기 "다른 기기 모두 로그아웃" → 비관리자 `#/admin`→`#/` / 관리자 데모 로그인 → 대시보드 막대 14개 → 사용자 50명·검색·자기 자신 정지 비활성·정지 1탭 사유 input 표시·사유 포커스 3.5초 뒤에도 armed 유지·2탭 정지 반영 → 공개 트리 11+삭제 1·신고 5 기각·복구 → 시스템 공지 게시 → 배너, 점검 토글 → danger 배너, 감사 로그 추가 → PC `th` sticky(스크롤 600 후 top=52px) / 모바일 카드 / 인앱 UA 에서 Google 비활성 + `intent://` 링크 / `?e=denied` 토스트.
 - 스크린샷 8장 `docs/specs/evidence/ui/aa/`: `login-1440-light` `login-390-dark` `account-1440-light` `account-390-dark` `admin-dashboard-1440-light` `admin-dashboard-390-dark` `admin-users-1440-light` `admin-users-390-dark` (각 14~80 KB).
 - 발견: `index.css` 의 `table { overflow: hidden }` 은 sticky 헤더를 막는다(표가 스크롤 컨테이너가 됨) → `admin.css` 에서 `.admin table { overflow: visible }` 로 덮었다. DS 가 전역 표 규칙을 손볼 때 참고.
-- 미해결: 상단 바 `.nav-login`/`.nav-avatar` 는 index.css 의 `.topnav a`(알약 반경·`--accent-soft`) 규칙을 상속한다 — DS 소유라 안 건드림. 토스트가 동시에 3개 쌓이는 것은 DS Toast(동시 1개) 머지 후 해결. 테마 토글은 DS 스텁 그대로.
+- main(DS+LM) 머지 뒤 재검증: 35개 단언 PASS, 스크린샷 8장 재촬영(DS 토큰·버튼·토스트 적용 상태).
+- 미해결: App.tsx 에 `<Banners/>` 1줄 필요(오케스트레이터 소유) — 그때까지 계정·관리자 화면에서만 보임. 비로그인에게는 공지가 안 보임(mock `Me` 에 실림).

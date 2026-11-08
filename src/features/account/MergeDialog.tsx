@@ -1,6 +1,6 @@
 // 로그인 직후 로컬 트리 병합 확인 — 03 §3.3 "로그인 전 로컬 트리 UX", evidence/aa/flows.md §5. Sheet 1개, 버튼은 [저장] 하나(닫기 X 없음, "이 기기 것만 유지" 없음).
 // (L>0,S=0) 한 줄 / (L>0,S>0) 두 줄. (L=0,S>0) 은 호출자가 토스트만. mock: 저장 = 즉시 완료. 계정 전환(M3)·커서 만료(M4) 문구는 서버 단계.
-import { Sheet } from './ds-shim'
+import { Sheet } from '../../ui/Sheet'
 
 export default function MergeDialog({ local, server, onDone, onClose }: { local: number; server: number; onDone: () => void; onClose: () => void }) {
   return (
