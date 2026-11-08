@@ -1,0 +1,35 @@
+/* [임시 shim — DS 머지 후 삭제] .avatar / .two-step / .sheet 최소 모양. 토큰만 사용(01 §3.1). DS index.css 가 같은 클래스를 정의하면 이 파일은 지운다 */
+.avatar {
+  display: inline-grid; place-items: center; flex: none; overflow: hidden; box-sizing: border-box;
+  width: 32px; height: 32px; border-radius: var(--radius); border: 1px solid var(--border);
+  font-weight: 700; font-size: .9rem; line-height: 1; color: var(--text); background: var(--tone, var(--surface-2));
+}
+.avatar[data-size='36'] { width: 36px; height: 36px; }
+.avatar[data-size='72'] { width: 72px; height: 72px; font-size: 1.8rem; }
+.avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.avatar[data-tone='0'] { --tone: var(--surface-2); }
+.avatar[data-tone='1'] { --tone: var(--border); }
+.avatar[data-tone='2'] { --tone: color-mix(in srgb, var(--muted) 25%, var(--surface)); }
+.avatar[data-tone='3'] { --tone: color-mix(in srgb, var(--muted) 45%, var(--surface)); }
+.avatar[data-tone='4'] { --tone: var(--muted); color: var(--bg); }
+.avatar[data-tone='5'] { --tone: var(--text-2); color: var(--bg); }
+
+/* 2단계 버튼: 글자 2벌을 겹쳐 두고 opacity 교차, min-width 로 레이아웃 이동 0 (01 §3.6 #22) */
+.two-step { display: inline-grid; }
+.two-step > button { display: inline-grid; place-items: center; min-width: 6.5em; position: relative; }
+.two-step > button > .two-step-label, .two-step > button > .two-step-confirm { grid-area: 1 / 1; transition: opacity var(--t-fast); white-space: nowrap; }
+.two-step > button > .two-step-confirm { opacity: 0; }
+.two-step > button.armed > .two-step-label { opacity: 0; }
+.two-step > button.armed > .two-step-confirm { opacity: 1; }
+.two-step > button.armed { color: var(--on-fill); background: var(--danger); border-color: var(--danger); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* 하단 시트(02 §3.2 규칙 4(a)) */
+.sheet-backdrop { position: fixed; inset: 0; z-index: 60; background: color-mix(in srgb, var(--text) 35%, transparent); display: flex; align-items: flex-end; justify-content: center; }
+.sheet {
+  width: min(100%, 560px); box-sizing: border-box; margin-bottom: var(--kb);
+  max-height: calc(100dvh - var(--kb) - var(--nav-h)); overflow: auto;
+  padding: 1rem 1rem calc(1rem + var(--safe-b)); background: var(--surface); border: 1px solid var(--border-strong); border-bottom: none;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0; animation: rise var(--t-med) var(--ease-out);
+}
+@media (min-width: 761px) { .sheet-backdrop { align-items: center; } .sheet { border-bottom: 1px solid var(--border-strong); border-radius: var(--radius-lg); margin-bottom: 0; } }

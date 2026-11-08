@@ -1,0 +1,20 @@
+/* 상단 바 계정 슬롯(NavUser) + 공지·점검 배너(Banners). 토큰만(01 §3.1). 메인 청크에 실린다 */
+.topnav .nav-login { display: inline-flex; align-items: center; gap: .35rem; color: var(--text); }
+.topnav .nav-login-icon { display: none; }
+.topnav .nav-avatar { display: inline-flex; align-items: center; gap: .5rem; padding: .25rem .4rem; color: var(--text); }
+.topnav .nav-avatar.rise { animation: rise var(--t-med) var(--ease-out); }
+.topnav .nav-nick { font-size: var(--fs-sm); font-weight: 600; max-width: 9em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 동기화 점: 아바타 오른쪽 아래 모서리 겹침. offline = muted, error = danger (01 §3.6 #17) */
+.topnav .nav-sync-dot { position: relative; width: 10px; height: 10px; margin-left: -1.1rem; margin-top: 1.2rem; padding: 0; border-radius: 50%; border: 1px solid var(--surface); background: var(--muted); min-height: 0; }
+.topnav .nav-sync-dot[data-kind='error'] { background: var(--danger); }
+@media (max-width: 760px) {
+  .topnav .nav-login { padding: .4rem; min-width: var(--tap); justify-content: center; }
+  .topnav .nav-login-icon { display: inline; }
+  .topnav .nav-login-text, .topnav .nav-nick { display: none; }
+}
+
+/* 배너: 상단 바 아래 한 줄 (03 §4 목록 행). 점검은 danger 테두리 */
+.banner { display: flex; align-items: center; gap: .6rem; padding: .5rem .85rem; margin: -.5rem 0 1rem; font-size: var(--fs-sm); color: var(--text); background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); }
+.banner-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.banner[data-kind='maintenance'] { border-color: var(--danger); color: var(--danger); }
+.banner .ghost { min-height: 0; padding: .25rem; background: none; border: none; box-shadow: none; color: inherit; display: inline-grid; place-items: center; }
