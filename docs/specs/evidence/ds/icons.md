@@ -9,7 +9,7 @@
 | 후보 아이콘 수 | 65 |
 | 원문 SVG 합계 | 28,356 B |
 | path 만(인라인 기준) 합계 | 22,889 B (평균 352 B/개) |
-| 실제 채택 예정(§3.5 표, 신규 화면 포함) | 52개 ≈ **18.3 KB 비압축**, gzip 추정 ≈ 6 KB (path 문자열은 반복이 많아 1/3 수준으로 줄어든다 — [가정]) |
+| 실제 채택(§3.5 표, 신규 화면 + SH 상태 아이콘 5종 포함) | **53개 = 18,521 B 비압축, gzip 2,684 B** [측정 — 53개 path 문자열을 이어 `zlib.gzipSync`] |
 
 ## path-only 바이트 (개별)
 
@@ -50,3 +50,10 @@ export function Icon({ d, size = 16, label }: { d: string; size?: 16 | 20; label
 ```
 
 원본 SVG 는 여러 `<path>`/`<circle>`/`<rect>` 자식을 가질 수 있어 실제 테이블은 "자식 요소 문자열"을 그대로 둔다(위 바이트 합산 기준이 그것). 16px 에서 stroke 2 는 2/24·16 ≈ 1.33px 로 렌더되어 가늘어지므로 2 를 유지하고, 20px 은 1.75 로 낮춰 시각 굵기를 맞춘다.
+
+## 채택 목록 (3차 확정, 53개)
+
+plus download ellipsis pencil trash-2 layers square-dashed file sun moon sun-moon list-tree calendar-check user log-in log-out shield zoom-in zoom-out maximize network keyboard chevron-down chevron-up list highlighter eraser clipboard-paste undo-2 check x arrow-right corner-down-right rotate-ccw list-checks check-check eye eye-off crosshair image link globe lock copy cloud-off refresh-cw circle-alert ban search user-x megaphone hard-drive database
+
+SH 요청(04 §3.12 D5) 상태 아이콘 5종: 저장됨 `check` · 동기화 중 `refresh-cw` · 오프라인 `cloud-off` · 오류 `circle-alert` · 공개 상태 `link`(링크) / `globe`(공개). 모두 위 목록에 포함.
+화면별 분할(RV M6): 목록 화면(App 상단 바 + TreeListPage)이 쓰는 것만 메인 청크 — plus download ellipsis pencil trash-2 layers square-dashed file sun moon sun-moon list-tree calendar-check user log-in link globe check refresh-cw cloud-off circle-alert = 22개 ≈ 7.5 KB 비압축 / ≈ 1.2 KB gzip [추정 — 비율 적용]. 나머지는 각 화면 청크의 `icons.<screen>.ts` 로.
