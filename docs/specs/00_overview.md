@@ -1,6 +1,6 @@
 # 00. 재설계 종합 — 흑백+초록/빨강, 계정·공유·관리자
 
-작성: 2026-11-08, 오케스트레이터. plan `../plans/orchestration_redesign.md`. 상태: **설계 문서 단계 완료(DS·SH 3차 수정 반영분은 §9 참고)**, 구현은 다음 오케스트레이션.
+작성: 2026-11-08, 오케스트레이터. plan `../plans/orchestration_redesign.md`. 상태: **설계 문서 단계 완료(3차 수정까지 머지)**, 구현은 다음 오케스트레이션.
 
 이 문서는 다섯 문서(`01`~`05`)의 결정을 한 장으로 모은 것이다. 근거·대안·측정은 각 문서에 있다. 등급: **[결정]** 확정 / **[제안]** 오케스트레이터 추천, 사용자 확인 필요 / **[가정]** / **[사용자]** 사용자 결정 대기(§6).
 
@@ -105,14 +105,14 @@
 | 검증 | 결과 | 어디 |
 |---|---|---|
 | 대비 계산(라이트·다크, 84쌍) | 위반 0건, RV가 스크립트 재실행해 일치 | 01 §5, evidence/ds/contrast.md, 05 §5.1 |
-| 폰트 바이트 실측(6 후보) | 최소 183KB(Noto 가변 11청크)~538KB | evidence/ds/fonts.md |
+| 폰트 실측 | 6 후보 바이트(최소 183KB~538KB) + fontTools 메트릭: Pretendard x-height 0.530·한글 자폭 0.864·tnum / SUIT 0.461 / Malgun 0.513·자폭 1.000 / Noto 0.543. 추천 = Pretendard 정적 서브셋 2개 535,848B | evidence/ds/fonts.md |
 | 번들 기준선 | precache 36개 489.88KiB, RV 재현 | evidence/ds/bundle.md |
 | 목업(라이트·다크) | 정적 HTML 31.5KB, 스크린샷 각 91KB, 오케스트레이터 육안 확인 | evidence/ds/mock.html |
 | 현재 앱 스크린샷 6화면×3폭 + 키보드 시뮬레이션 | 390×844+336px 키보드에서 에디터 제목·내용·개요 입력 가려짐, 배율 도구 항상 가려짐 | evidence/lm, 02 §5 |
 | 서버 메모리 | Node+SQLite 1만 사용자 RSS 63MB(x64 Windows 측정, ARM은 [가정]) | evidence/aa/memory_measure.md |
-| 용량 | 300노드 76KB(gzip 10.5KB), 사용자당 0.7MB, 1천 명 1GB·0.14req/s | evidence/sh/capacity.md |
+| 용량 | 300노드 JSON 76KB(gzip 10.5KB). SQLite 실측 노드 361B·srs 458B → 사용자당 0.9MB, 1천 명 약 1GB·0.14req/s | evidence/sh/capacity.md, measure_sqlite.mjs |
 | 충돌 시나리오 20종 | 기대 결과 표 | evidence/sh/conflicts.md |
-| 교차 검증 | 높음 2·중간 15·낮음 20 → 3차에서 반영(LM 8/8, AA 15/15, DS·SH §9) | 05 |
+| 교차 검증 | 높음 2·중간 15·낮음 20 → 3차에서 전부 반영(§9) | 05 |
 | 출처 표본 18개 | 17개 뒷받침, 1개 불일치(L10 → [가정]으로 낮춤) | 05 §5.3 |
 
 검증하지 못한 것: 실기기(iOS Safari·Chrome Android·PWA standalone), ARM 메모리, 카카오톡 인앱 브라우저의 OAuth 거부 여부, 메신저 URL 길이 상한, 사용성(아이콘만으로 "직관적 이해"가 되는지 — 1회성 힌트 대상 3개는 [가정]), 가정 회선 약관.
@@ -124,5 +124,7 @@
 
 ## 9. 3차 수정 반영 상태
 
-- LM(5f775ac)·AA(953c9e3): 담당 RV 항목 전부 반영, 각 문서 §8에 기록.
-- DS·SH: 워커가 사용량 한도로 중단됐다가 재개 중. 워크트리에 미커밋 수정(폰트 실측 스크립트, SQLite 용량 재계산 등)이 있다. 머지되면 이 절을 갱신한다. 이 문서의 §1·§4·§6은 plan §3.5 판정 기준으로 썼으므로 DS·SH 3차 반영 뒤에도 바뀌지 않는다.
+- LM(5f775ac) 8/8, AA(953c9e3) 15/15, SH(2d63e53) 14/14 + AA 요청 3건(`since` 인자·7일·events 제외), DS(61d74cc) 11/11. 각 문서 §8에 기록.
+- DS·SH 워커는 사용량 한도로 중단됐다가 재개됐다. DS는 스스로 커밋(1c848b0)했고, SH는 워크트리의 미커밋 수정을 오케스트레이터가 검토해 커밋(78f7bf3, `since` 인자 한 줄 추가)했다.
+- 3차 뒤 남은 교차 요청: SH `sync.ts`를 동적 import로(첫 화면 gzip 120KB 예산 조건, DS §3.9) → 구현 P3 완료 기준에 포함. Apple SD Gothic Neo 메트릭은 macOS가 없어 미측정.
+- 최종 검증: typecheck 0 오류, lint 0 경고(evidence 스크립트의 미사용 import 1건 정리), build 통과, evidence 링크 누락 0건, `docs/specs` 합계 약 1.6MB(스크린샷 포함).

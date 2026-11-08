@@ -1,6 +1,6 @@
 // SQLite(node:sqlite) 실측: 300노드 트리 + srs 300행의 DB 파일 크기. 실행: node docs/specs/evidence/sh/measure_sqlite.mjs
 import { DatabaseSync } from 'node:sqlite'
-import { statSync, rmSync, existsSync } from 'node:fs'
+import { statSync, rmSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
