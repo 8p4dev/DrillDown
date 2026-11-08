@@ -378,7 +378,7 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
     const id = changedNode(prev, step.ns)
     if (id) jump(id)
     else if (!step.ns.some((n) => n.id === selId)) setSelId(topNode().id)
-    toast(`${step.label} ${redo ? '다시 실행' : '되돌림'}`)
+    toast(`${step.label} ${redo ? '다시 실행' : '되돌림'}`, undefined, 4000, true) // 떠 있는 [되돌리기] 토스트는 이제 무의미 → 대체
   }
   /** 토스트 [되돌리기]: 그 사이 다른 변경이 있으면 엉뚱한 단계를 되돌리지 않는다 */
   function undoIf(ns: TreeNode[]) {

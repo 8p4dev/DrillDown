@@ -26,8 +26,12 @@ function dismiss(t: Item) {
   if (head) arm()
   emit()
 }
-function push(t: Item) {
+const UNDO = /되돌리기|실행 취소/
+
+function push(t: Item, now = false) {
   const head = queue[0]
+  // now: 지금 떠 있는 것을 대체(힌트·되돌리기 외 액션 토스트는 대체하지 않음 — 그 액션은 아직 유효하다)
+  if (now && head && !head.hint && (!head.action || UNDO.test(head.action.label))) queue = queue.slice(1)
   // 일반 토스트는 언제나 힌트보다 앞(힌트가 [확인] 전까지 되돌리기·복사됨을 막지 않게). 힌트는 맨 뒤
   const i = t.hint ? -1 : queue.findIndex((x) => x.hint)
   const next = i < 0 ? [...queue, t] : [...queue.slice(0, i), t, ...queue.slice(i)]
@@ -38,10 +42,10 @@ function push(t: Item) {
   emit()
 }
 
-/** 화면 하단(키보드 위)에 ms 동안 표시. 동시 1개, 나머지는 큐 */
-
-export function toast(text: string, action?: Action, ms = 4000) {
-  push({ id: ++seq, text, action, ms })
+/** 화면 하단(키보드 위)에 ms 동안 표시. 동시 1개, 나머지는 큐.
+ *  now = 방금 그 동작을 되돌린 결과처럼 떠 있는 [되돌리기] 토스트를 무의미하게 만드는 알림: 기다리지 않고 대체한다 */
+export function toast(text: string, action?: Action, ms = 4000, now = false) {
+  push({ id: ++seq, text, action, ms }, now)
 }
 
 /** 1회성 힌트(02 §3.5): 화면당 1개, 첫 진입 때만. localStorage `hint:<id>` 가 있으면 무시. [확인] 으로 닫는다 */
@@ -53,8 +57,6 @@ export function hint(id: string, text: string, icon: string = I.circleAlert) {
   } catch { /* 저장 불가면 그냥 한 번 보여준다 */ }
   push({ id: ++seq, text, ms: 0, hint: true, icon })
 }
-
-const UNDO = /되돌리기|실행 취소/
 
 export function Toaster() {
   const list = useSyncExternalStore((f) => (subs.add(f), () => void subs.delete(f)), () => queue)
