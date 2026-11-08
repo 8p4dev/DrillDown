@@ -19,7 +19,10 @@
 | 아바타 32px 정사각(모바일) / 28px(PC) 자리 | 아바타 형태(필렛 ≤2px), 생성 아바타 → DS R2·AA R8 |
 | 빈 상태 = "큰 + 하나 + 한 줄" 배치(§3.5) | 문구·아이콘 → DS R3 언어 |
 | 툴팁은 길게 누르기 500ms, 컨트롤 위에 뜸(§3.5) | 툴팁 모양·지속 시간·모션 → DS |
-| 트리 삭제 확인창을 토스트 되돌리기로 바꿈(§3.5) | 소프트 삭제(`trees.deleted_at`)·되돌리기 창 5초 동안의 서버 반영 → SH |
+| 트리 삭제 확인창을 토스트 되돌리기 10초로 바꿈(§3.5, D9) | 로컬 `Tree.deletedAt` 소프트 삭제·하드 삭제 시점·서버 소프트 삭제(7일) → SH `04` §3.1·§3.6 |
+| 동기화 상태의 자리 = 목록 헤더(글자·탭 동작), 다른 화면은 아바타 점(§3.1 목록) | 상태 집합·조건·문구 → SH §3.10, 아이콘 5종 → DS |
+| 공유 보기 신고 = 헤더 `⋯` → 하단 시트(§3.1 공유 보기, I12) | 신고 API·사유 목록·메모 300자 → AA §3.6; **요청(SH)**: §3.10 "하단 고정 `신고`(보조)" 문장을 "`⋯` 메뉴 → 시트"로 바꿈(RV M10·L20) |
+| 2단계 버튼 자리(계정 탈퇴 맨 아래, 관리자 행 오른쪽 끝) | 버튼 상태·모션 → DS 카탈로그 #22; **요청(AA)**: 계정 삭제 모달·2초 홀드를 2단계 버튼으로 교체(RV M11), 정지·숨김 `reason` 입력은 I14 규칙 |
 | 공유 보기 하단 고정 바 `[내 트리로 복제]`(§4) | 복제 시 SRS 처리·권한 → SH R10 |
 | 관리자 화면은 PC 우선, 모바일은 읽기 전용 카드 배치(§4) | 화면 목록·데이터 출처 → AA R9 |
 | 로그인 화면에 입력칸 없음(OAuth 버튼만) | 제공자·흐름 → AA R8 |
@@ -37,16 +40,16 @@
 | D6 | 하단 고정 UI 규칙 | 입력칸이 없는 화면의 바(`.flash-nav` `.dnd-bar`)는 `bottom: var(--kb)`로 **올라온다**. 입력칸이 있는 화면의 떠 있는 도구(`.zoom-tools`)·토스트는 키보드 열림 동안 **숨기거나 올린다**(§3.2 표) | 전부 숨김 | 입력 중 필요한 것(토스트 되돌리기)은 보여야 하고, 필요 없는 것(배율)은 자리를 비켜야 한다. [결정] |
 | D7 | 태블릿 768 | 별도 브레이크포인트를 만들지 않는다. 에디터 1단(≤860) + 나머지는 PC 규칙(>760) 그대로 | 768 전용 규칙 | 현재 계약(모바일 ≤760, 에디터 1단 ≤860) 유지. 768 스크린샷에서 깨진 곳 없음[측정]. [결정] |
 | D8 | 빈 상태 | 큰 + 타일 하나 + 한 줄. 모바일에서는 입력칸 자동 포커스 금지 | 일러스트+문장 | 자동 포커스는 진입 직후 키보드를 띄워 화면 40%를 가린다(§3.3 키보드 높이). [결정] |
-| D9 | 확인창 | `confirm()` 제거 → 실행 후 토스트 **되돌리기**(5초). 에디터 노드 삭제와 같은 패턴 | 인라인 2단계 확인 | 글자를 줄이고(R3), 네이티브 모달은 테마·폰트를 따르지 않는다. 트리 삭제는 SH 소프트 삭제 필요. [결정]/[제안: SH 의존] |
+| D9 | 확인창 | `confirm()`은 앱 전체에서 제거. **트리 삭제 = 확인창 없음 + 토스트 되돌리기 10초**(에디터 노드 삭제와 같은 패턴). 로컬은 `Tree.deletedAt` 소프트 삭제 → 목록에서 숨김 → 토스트 종료·앱 재시작 시 하드 삭제, 로그인 사용자는 SH 서버 소프트 삭제(복구 7일)로 이어진다(데이터 규칙은 SH `04` §3.1·§3.6). **계정 탈퇴·관리자 정지/삭제 = 2단계 버튼**(`[탈퇴]` → `[정말 탈퇴]` 3초, DS 카탈로그 #22) | 인라인 2단계 확인을 전부에 / confirm 유지 | 글자를 줄이고(R3), 네이티브 모달은 테마·폰트를 따르지 않는다. 되돌릴 수 있는 것은 되돌리기, 되돌릴 수 없는 것은 2단계. 오케스트레이터 3차 판정 H2·M11. [결정] |
 | D10 | 관리자 화면 | PC(≥861) 우선 설계, ≤760은 표를 카드로 바꾼 읽기 중심 | 모바일 동등 | 운영자 1~2인(plan A5). [제안] |
 | D11 | 가로 모드(폰) | `(max-height: 500px) and (pointer: coarse)`에서 하단 고정 바를 흐름으로 돌리고 캔버스는 `100dvh - 헤더` | 가로 모드 미지원 안내 | 세로 390px만 측정했다. 가로는 규칙만 둔다. [제안] |
-| D12 | 안전 영역 | 상단 바에 `env(safe-area-inset-top)` 추가(PWA standalone·노치) | 현행(하단만) | 현재 코드는 하단·좌우만 반영[코드 index.css:16,49]. standalone에서 상태 바 아래 겹침 위험. [제안] |
+| D12 | 안전 영역 | 상단 바에 `env(safe-area-inset-top)` 추가(PWA standalone·노치) | 현행(하단만) | 현재 코드는 하단·좌우만 반영[코드 index.css:14,54]. standalone에서 상태 바 아래 겹침 위험. [제안] |
 
 ## 3. 상세 설계
 
 ### 3.1 화면 × 폭 레이아웃 [R6]
 
-공통 상수 [코드]: 상단 바 `--nav-h` 52px(≤760: 48px) `index.css:16,36`. `main` 최대 폭 960px(에디터는 제한 없음 `editor.css:2`, 퀴즈 1400px `dnd.css:3`). 모바일 패딩 `1rem .85rem` `index.css:81`. 브레이크포인트 모바일 ≤760, 에디터 1단 ≤860.
+공통 상수 [코드]: 상단 바 `--nav-h` 52px(≤760: 48px) `index.css:14,29`. `main` 최대 폭 960px(에디터는 제한 없음 `editor.css:2`, 퀴즈 1400px `dnd.css:3`). 모바일 패딩 `1rem .85rem` `index.css:78`. 브레이크포인트 모바일 ≤760, 에디터 1단 ≤860.
 
 **측정된 현재 상태(390×844, 라이트)** [측정 measure.json `screens`]:
 
@@ -70,8 +73,8 @@
 ```
 - `•3` = 오늘 복습 due 수 배지(숫자 0이면 숨김). 배지는 텍스트 대신 상태를 알리는 마이크로 인터랙션(R3). 데이터는 `dueByTree()`[코드 src/core/srs/index.ts:138] 합계. [결정]
 - 비로그인 모바일은 사람 아이콘만(aria-label 로그인) + 첫 방문 1회 힌트(§3.5). ≥761은 `로그인` 텍스트 버튼. [결정]
-- 상단 바 링크 표적 높이: 현재 약 35px(패딩 .4rem + 글자 22px)[코드 계산 index.css:55] → coarse 포인터에서 `min-height: var(--tap)` 44px. [결정]
-- 상단 바는 모든 화면에서 sticky 유지[코드 index.css:48]. 공유 보기(anon)에서도 같은 바, 단 `내 트리`는 비로그인·로컬 트리 0개면 숨김. [결정]
+- 상단 바 링크 표적 높이: 현재 약 35px(패딩 .4rem + 글자 22px)[코드 계산 index.css:58] → coarse 포인터에서 `min-height: var(--tap)` 44px. [결정]
+- 상단 바는 모든 화면에서 sticky 유지[코드 index.css:51]. 공유 보기(anon)에서도 같은 바, 단 `내 트리`는 비로그인·로컬 트리 0개면 숨김. [결정]
 
 **화면 × 폭 와이어.** 범례: `═` 고정(sticky/fixed), `─` 흐름, `[ ]` 버튼, `( )` 입력칸, `▤` 표/목록, `≋` 스크롤 영역. 768은 표로 요약(와이어는 390·1440).
 
@@ -90,7 +93,16 @@
 ║ (빈 상태: 큰 + 타일)   ║            ║                                                  ║
 ╚════════════════════════╝            ╚══════════════════════════════════════════════════╝
 ```
-[코드] 카드 격자 `repeat(auto-fill, minmax(260px,1fr))` `treelist.css:13`, ≤760 1열 `:90`. 768: 2열(768−27.2 패딩 = 740 → 260×2+14 가능). 변경: 빈 상태(§3.5), 로그인 시 카드에 공개 범위 아이콘 1개(자물쇠/링크/지구 — DS)가 제목 오른쪽 `⋯` 앞에 놓인다[결정]. 동기화 상태는 카드가 아니라 상단 바 아바타의 작은 점으로(SH 의존)[제안].
+[코드] 카드 격자 `repeat(auto-fill, minmax(260px,1fr))` `treelist.css:13`, ≤760 1열 `:90`. 768: 2열(768−27.2 패딩 = 740 → 260×2+14 가능). 변경: 빈 상태(§3.5), 로그인 시 카드에 공개 범위 아이콘 1개(자물쇠/링크/지구 — DS)가 제목 오른쪽 `⋯` 앞에 놓인다[결정].
+
+**동기화 상태 자리**(상태 집합은 SH `04` §3.10: `저장됨 / 동기화 중 / 오프라인(n건 대기) / 오류`, 비로그인은 표시 없음) [결정]:
+```
+390:  ║ 내 트리        [⟳ 3건 대기] [⤓] ║   ← 목록 헤더 h1 오른쪽, 내보내기 버튼 왼쪽. 44px 표적, 아이콘 + 짧은 글자
+1440: ║ 내 트리   …   [⟳ 3건 대기] [⤓] ║
+```
+- 전역 1곳은 **목록 헤더**(`.trees-head`)다. 저장됨은 아이콘만, 동기화 중은 아이콘 애니메이션(reduced-motion 정적), 오프라인은 아이콘 + `n건 대기`, 오류는 danger 아이콘. 글자는 상태 두 개(오프라인·오류)에서만 보인다. 탭 동작: 오프라인 = 재시도, 오류 = 사유 1줄을 토스트 자리에(§3.5). 모양·아이콘 5종은 DS.
+- 다른 화면(에디터 등)에서는 상단 바 아바타에 **점만**(오류·오프라인일 때만 표시, 탭하면 목록으로). 점은 보조이고 글자·동작은 목록 헤더에 있다. 상단 바 폭 예산은 바뀌지 않는다(점은 아바타 안).
+- 충돌 반영 토스트(SH §3.10)는 일반 토스트 자리.
 
 #### 에디터 (EditorPage)
 ```
@@ -132,7 +144,7 @@
 ║ [  다음 개념 →  ][요약] ║ fixed 60   ╚════════════════════════════════════╩═════════════╝
 ╚════════════════════════╝
 ```
-[코드] 2단 `flash.css:8`(>760), 모바일 미니맵 띠 64px `:155`, 하단 바 fixed `:176-186` + `--flash-bar-h: 60px`, 토스트는 상단 바 아래 `index.css:126`. 입력칸 없음 → 키보드 규칙 해당 없음. 변경: 하단 바 `bottom: var(--kb)`(D6, 공유 보기에서 재사용), 가로 모드 D11.
+[코드] 2단 `flash.css:8`(>760), 모바일 미니맵 띠 64px `:155`, 하단 바 fixed `:176-186` + `--flash-bar-h: 60px`, 토스트는 상단 바 아래 `index.css:174`. 입력칸 없음 → 키보드 규칙 해당 없음. 변경: 하단 바 `bottom: var(--kb)`(D6, 공유 보기에서 재사용), 가로 모드 D11.
 
 #### 복습 목록 (ReviewPage 목록)
 ```
@@ -190,9 +202,9 @@
 ║ ▤ 트리 n개 · 동기화 시각  ║            ║ │ ───────────────────────────────────── │         ║
 ║ [데이터 내보내기]        ║ 44         ║ │ 탈퇴 ›  (danger, 분리)                 │         ║
 ║ [로그아웃]              ║            ║ └──────────────────────────────────────┘         ║
-║ ───── 탈퇴 › ─────      ║ 맨 아래     ║
+║ ───── [탈퇴] ─────      ║ 맨 아래, 2단계 ║
 ```
-닉네임 입력칸은 화면 상단 1/3 안(y < 300px) → 키보드가 가리지 않는다(§3.2 표). 탈퇴는 하단 고정이 아니라 흐름 맨 아래에 두어 키보드·실수 탭과 떨어뜨린다[결정]. 아바타 변경은 네이티브 파일 선택(`<input type=file>`)[결정].
+닉네임 입력칸은 화면 상단 1/3 안(y < 300px) → 키보드가 가리지 않는다(§3.2 표). 탈퇴는 하단 고정이 아니라 흐름 맨 아래에 두어 키보드·실수 탭과 떨어뜨린다[결정]. 탈퇴 확인은 모달·홀드가 아니라 **2단계 버튼**: `[탈퇴]`(보조) 탭 → 같은 자리가 `[정말 탈퇴]`(danger)로 바뀌고 3초 안에 다시 탭해야 실행, 지나면 원복(D9·M11, 관리자 정지·삭제와 같은 컴포넌트)[결정]. 입력칸은 없다(I15). 아바타 변경은 네이티브 파일 선택(`<input type=file>`)[결정].
 
 #### 관리자 (신규, 블록은 plan R9)
 ```
@@ -205,7 +217,7 @@
 ║ ▤ … (헤더 sticky, 행 높이 36px)                     ║     ║ └───────────────────────────┘                ║
 ║ 공지 (한 줄                        ) [게시]          ║     ║ 공지 (한 줄          ) [게시]                 ║
 ```
-PC: 표(`<table>`) + sticky 헤더. 모바일(≤760): 표 행을 카드로(`display:grid`), 숫자 카드는 2열. 검색·공지 입력칸은 모두 화면 상단 → 키보드 안전. 파괴 버튼(정지·삭제)은 행 오른쪽 끝, 모바일 카드에서는 마지막 줄 오른쪽 정렬, 확인은 토스트 되돌리기가 아니라 **2단계 버튼**(관리 행위는 되돌리기 불가 → `[삭제]` 탭 → 같은 자리가 `[정말 삭제]`(danger) 3초)[결정]. 관리자 전용 모바일 최적화 공수는 S로 제한[제안].
+PC: 표(`<table>`) + sticky 헤더. 모바일(≤760): 표 행을 카드로(`display:grid`), 숫자 카드는 2열. 검색·공지 입력칸은 모두 화면 상단 → 키보드 안전. 파괴 버튼(정지·삭제·숨김)은 행 오른쪽 끝, 모바일 카드에서는 마지막 줄 오른쪽 정렬, 확인은 토스트 되돌리기가 아니라 **2단계 버튼**(관리 행위는 되돌리기 불가 → `[삭제]` 탭 → 같은 자리가 `[정말 삭제]`(danger) 3초; 계정 탈퇴와 같은 컴포넌트, M11)[결정]. 정지·숨김의 선택 사유 `reason` 입력칸(I14)은 2단계 버튼 **왼쪽 같은 줄**(PC) / 카드 마지막 줄 위(모바일)에 놓이고, 1단계 탭 때 나타난다 — 사유를 쓰려면 키보드가 열리므로 3초 타이머는 입력칸에 포커스가 있는 동안 멈춘다[결정]. 관리자 전용 모바일 최적화 공수는 S로 제한[제안].
 
 #### 공유 보기 `/t/<slug>` (신규, 블록은 plan R10)
 ```
@@ -213,17 +225,20 @@ PC: 표(`<table>`) + sticky 헤더. 모바일(≤760): 표 행을 카드로(`dis
 ╔════════════════════════╗            ╔══════════════════════════════════════════════════╗
 ║ 상단 바(anon: 사람아이콘)║            ║ 상단 바                                          ║
 ╠════════════════════════╣            ╠══════════════════════════════════════════════════╣
-║ 노동법   ▣ 닉네임        ║ 제목+소유자 ║ 노동법  ▣ 닉네임   [보기|플래시|빈칸|백지]  [내 트리로 복제]║
+║ 노동법 ▣ 닉네임  [⧉][⋯] ║ 제목+소유자 ║ 노동법  ▣ 닉네임   [보기|플래시|빈칸|백지]  [⧉ 내 트리로 복제] [⋯]║
 ║ [보기|플래시|빈칸|백지]   ║ 탭(편집 없음)║ ┌──────────────────────────────────────────────┐ ║
 ║ ┌──────────────────┐  ║            ║ │≋ 읽기 전용 캔버스(패널·도구 없음, 배율만)        │ ║
 ║ │≋ 읽기 전용 캔버스   │  ║ 100dvh−헤더║ │                                   [− 50% + ⤢]│ ║
 ║ │        [− 50% + ⤢] │  ║ −바         ║ └──────────────────────────────────────────────┘ ║
 ║ └──────────────────┘  ║            ╚══════════════════════════════════════════════════╝
 ╠════════════════════════╣
-║ [    내 트리로 복제    ] ║ fixed 60 (flash-nav 재사용)
+║ [    내 트리로 복제    ] ║ fixed 60 (flash-nav 재사용) — 보기 탭에서만
 ╚════════════════════════╝
 ```
-입력칸 없음 → 키보드 규칙 해당 없음. 플래시·빈칸·백지 탭은 기존 화면을 **읽기 전용 트리 id**로 그대로 쓴다(라우트 `shared` → 모드 재사용, SH 의존)[결정]. 모바일 복제 버튼은 `.flash-nav`와 같은 고정 바(60px)이며 플래시 탭에서는 `[다음 개념 →][요약]` 바가 이를 대체하고 복제는 헤더 오른쪽 아이콘으로 내려간다[결정].
+- 하단 고정 UI는 **탭당 하나**다[결정]: 보기 탭 = 복제 바(60px), 플래시 탭 = `[다음 개념 →][요약]`, 빈칸·백지 탭 = `.dnd-dock` 시트(채점 후 `.dnd-bar`). 플래시·빈칸·백지 탭에서 복제는 헤더 오른쪽 아이콘 `⧉`(`.tree-header-tools`, 44px)으로 내려간다. 모바일 보기 탭에서는 헤더 아이콘 없이 바만(중복 금지).
+- **신고**는 모든 탭에서 헤더 `⋯` 메뉴 안(AA `03` §4와 통일, SH §3.10의 "하단 고정 `신고`" 문장은 SH에 수정 요청). `⋯` 메뉴 항목: 신고, 링크 복사. 신고를 고르면 **하단 시트**가 열리고 그 안에 선택 사유 + 메모 textarea(≤300자, I12)가 있다. 시트는 키보드 규칙 4(a)를 따른다(`bottom: var(--kb)`, `max-height: calc(100dvh − var(--kb) − var(--nav-h))`). 시트가 열린 동안 탭의 하단 바는 시트 뒤에 있다(시트 z-index > 바).
+- 플래시·빈칸·백지 탭은 기존 화면을 **읽기 전용 트리 id**로 그대로 쓴다(라우트 `shared` → 모드 재사용, SH 의존)[결정]. 비로그인 체험 중 기록 미저장 토스트(SH §3.10)는 일반 토스트 자리.
+- 입력칸은 신고 메모(I12)뿐이며 시트 안에 있다.
 
 ### 3.2 입력칸 인벤토리와 키보드 열림 규칙 [R6]
 
@@ -242,15 +257,18 @@ PC: 표(`<table>`) + sticky 헤더. 모바일(≤760): 표 행을 카드로(`dis
 | I9 | 계정 닉네임 `input` (신규) | 상단 1/3 | — | — | ① 위치로 해결(y<300) ② 하단 고정 UI 없음 ③ — |
 | I10 | 관리자 검색·공지 `input` (신규) | 상단 | — | — | 같음. 표 sticky 헤더는 `top`, 키보드와 무관 |
 | I11 | 관리자 2단계 확인 (입력 아님) | — | — | — | — |
-| I12 | 공유 slug 편집 `input` (신규, 목록 카드 메뉴 → 공개 범위 시트 안) [SH 의존] | 하단 시트 | — | — | ① 시트는 `bottom: var(--kb)`로 올라오고 `max-height: calc(100dvh − var(--kb) − var(--nav-h))` ② 시트 자체가 하단 UI ③ — |
+| I12 | 공유 보기 **신고 메모** `textarea`(≤300자, 선택; AA `03` §3.6 `POST /api/t/:slug/report { note? }`) (신규) | 헤더 `⋯` → 신고 **하단 시트** 안 | — | — | ① 시트는 `bottom: var(--kb)`로 올라오고 `max-height: calc(100dvh − var(--kb) − var(--nav-h))`, textarea rows 3, `scroll-margin-bottom` ② 시트 자체가 하단 UI(규칙 4(a)); 탭의 하단 바(복제·플래시·시트)는 시트 뒤 ③ — |
 | I13 | 아바타 파일 `input[type=file]` | 계정 | — | — | 키보드 없음 |
+| I14 | 관리자 정지·숨김 **사유** `input`(선택; AA §3.6 `suspend { reason? }`) (신규) | 사용자·공개 트리 표의 행 안(2단계 버튼 옆 인라인) 또는 PC 표 위 | — | — | I10과 같음(상단 영역, 하단 고정 UI 없음). 모바일 카드에서는 행이 길어져 y>508 가능 → `scroll-margin-bottom: calc(var(--kb) + 1rem)` + 포커스 시 `scrollIntoView` |
+| I15 | 계정 탈퇴 | 계정 맨 아래 | — | — | **입력 없음**(2단계 버튼, D9·M11). 공유 slug 편집 입력칸은 **없다**(slug는 서버 발급·재발급만, SH `04` §3.3) |
+| I16 | 공개 범위 시트(목록 카드 ⋯ → 공유…, SH §3.10) | 하단 시트 | — | — | 입력칸 없음(세그먼트·버튼만). 시트 규칙은 I12와 같음 |
 
 **공통 규칙** [결정]
-1. 모든 입력칸은 coarse 포인터에서 `font-size ≥ 16px`[코드 index.css:97 이미 적용]. 예외 확인 필요: I3은 카드가 `scale(.5)`로 그려져 **렌더 크기 8px**이다(측정 rect h18). iOS 확대 판정이 계산값인지 렌더값인지 미확인 → 수동 체크 M3 [가정].
+1. 모든 입력칸은 coarse 포인터에서 `font-size ≥ 16px`[코드 index.css:111 이미 적용]. 예외 확인 필요: I3은 카드가 `scale(.5)`로 그려져 **렌더 크기 8px**이다(측정 rect h18). iOS 확대 판정이 계산값인지 렌더값인지 미확인 → 수동 체크 M3 [가정].
 2. 입력칸이 있는 요소는 `scroll-margin-bottom: calc(var(--kb) + 1rem)`과 `scroll-margin-top: calc(var(--nav-h) + .5rem)`을 가진다(상단은 이미 `.outline`에 있음[코드 editor.css:16]).
 3. `focusin` 이벤트와 `--kb` 변경 두 시점에 `ensureVisible(activeElement)`를 호출한다(§3.3 훅). 두 번 호출되는 이유: iOS는 포커스 → 키보드 애니메이션(≈250ms) 뒤에야 `visualViewport.resize`가 온다[출처 3].
 4. 하단 고정 UI 분류: (a) **올라옴** — `.flash-nav` `.dnd-bar`(채점 후) `.toasts` 공유 보기 복제 바, 공개 범위 시트: `bottom: calc(기존 + var(--kb))`. (b) **숨김** — `.zoom-tools` `.keys`(열려 있으면 닫음) `.dnd-dock`(키보드가 열릴 일이 없으므로 규칙만): `:root[data-kb] .zoom-tools { visibility: hidden }`. (c) **무관** — `.topnav`(상단), `.minimap`.
-5. 토스트는 입력 중에도 보인다(되돌리기가 토스트에 있으므로). 모바일 에디터 토스트 위치: 현재 하단(`index.css:126`은 퀴즈·플래시만 상단) → **키보드 열림 동안은 상단 바 아래**로 옮긴다(`:root[data-kb] .toasts { top: calc(var(--nav-h) + .6rem); bottom: auto }`). 이유: 캔버스 하단 카드 편집 중 키보드 바로 위 토스트가 카드를 가린다. [결정]
+5. 토스트는 입력 중에도 보인다(되돌리기가 토스트에 있으므로). 모바일 에디터 토스트 위치: 현재 하단(`index.css:174`는 퀴즈·플래시만 상단) → **키보드 열림 동안은 상단 바 아래**로 옮긴다(`:root[data-kb] .toasts { top: calc(var(--nav-h) + .6rem); bottom: auto }`). 이유: 캔버스 하단 카드 편집 중 키보드 바로 위 토스트가 카드를 가린다. [결정]
 6. `--kb` 가 0이 아닐 때 `body`에 `data-kb` 대신 `:root[data-kb]`(문서 루트 속성)를 쓴다. 선택자 비용이 같고 CSS 변수와 같은 곳에 있다.
 
 ### 3.3 브라우저별 전략표 [R6]
@@ -277,13 +295,13 @@ export function ensureVisible(el: Element, margin?: number): void
 - 계산: `kb = max(0, round(innerHeight − vv.height − vv.offsetTop))`; `kb < 100`이면 0(URL 바 접힘·iOS 26 24px 잔차 무시). `open = kb > 0`. [결정]
 - 구독: `visualViewport` `resize`·`scroll`(passive) + `focusin`/`focusout`. 콜백은 `requestAnimationFrame`으로 합치고 정수값이 바뀔 때만 `documentElement.style.setProperty('--kb', kb+'px')`·`--vv-h`를 쓴다(§3.7). [결정]
 - 2차(선택): `'virtualKeyboard' in navigator`면 `overlaysContent = true` 뒤 `geometrychange`의 `boundingRect.height`를 같은 `--kb`에 쓴다. 두 공급자가 동시에 쓰지 않도록 API가 있으면 `visualViewport` 계산은 끈다. 이득: Chrome에서 키보드 애니메이션 중간값 없이 최종 높이를 바로 받는다. 비용: 코드 경로 2개 → **1차만으로 시작**하고 실기기 측정(M5) 뒤 결정. [제안]
-- CSS 토큰: `:root { --kb: 0px; --vv-h: 100dvh; --safe-t: env(safe-area-inset-top, 0px); }` (`--safe-b`는 기존[코드 index.css:16]). [결정]
+- CSS 토큰: `:root { --kb: 0px; --vv-h: 100dvh; --safe-t: env(safe-area-inset-top, 0px); }` (`--safe-b`는 기존[코드 index.css:14]). [결정]
 - `index.html` viewport 메타는 **현행 유지**(`interactive-widget` 미지정, D3). [결정]
 - 자동화 가능한 검사(E2E, 다음 오케스트레이션): Playwright `page.setViewportSize`로는 시각 뷰포트를 줄일 수 없다 → 테스트는 `--kb`를 **직접 주입**(`documentElement.style.setProperty('--kb','336px')` + `data-kb`)해 (1) `.flash-nav` rect.bottom ≤ 844−336 (2) `.zoom-tools` visibility hidden (3) `.toasts` top 위치 (4) `ensureVisible` 후 활성 입력칸 rect.bottom ≤ 508 을 검사한다. 훅 자체는 실기기(M 체크리스트). [제안]
 
 ### 3.4 키보드 높이 수치의 근거
 
-- 이 문서의 시뮬레이션 값 **336px**(844 → 508) [결정]. 근거: iOS 27 시뮬레이터 측정 — 6.1~6.3인치급(iPhone 17e·18 Pro) **301pt**, Pro Max **320pt**, 예측 바 없음; 예측 바는 +44pt → 345/364pt[출처 11]. iPhone 11 실측 346pt(예측 바 45pt 포함)[출처 8]. 390×844는 iPhone 12~14 계열의 CSS px 크기이므로 "예측 바 포함 ≈ 345pt"에서 3% 안쪽인 336px을 썼다.
+- 이 문서의 시뮬레이션 값 **336px**(844 → 508) [결정]. 근거: iOS 27 시뮬레이터 측정 — 6.1~6.3인치급(iPhone 17e·18 Pro) **301pt**, Pro Max **320pt**, 예측 바 없음; 예측 바는 +44pt → 345/364pt[출처 11: 취미 저장소 PR의 시뮬레이터 측정이라 1차 근거로는 약함]. "iPhone 11 실측 346pt(예측 바 45pt)"는 출처를 확인하지 못했다 → **[가정]**(RV L10). 390×844는 iPhone 12~14 계열의 CSS px 크기이므로 "예측 바 포함 ≈ 345pt"에서 3% 안쪽인 336px을 썼다. 설계는 `--kb` 실측에 의존하므로 이 수치의 오차는 규칙을 바꾸지 않는다.
 - Android: AOSP LatinIME은 폰의 바람직한 키보드 높이를 **절대 길이 1.285인치**(≈ 206dp)로 두고 기기별 dp 표(200~227dp)를 둔다[출처 12]. 여기에 제안 줄(≈40dp)을 더하면 약 **245dp ≈ 844px 화면의 29%** [가정: 제안 줄 높이·Gboard 기본값은 미확인, Gboard는 사용자가 7단계/드래그로 바꿀 수 있음[출처 13]]. 따라서 336px(40%)는 Android에선 보수적(큰 쪽) 값이다. 규칙은 수치가 아니라 `--kb` 실측에 의존하므로 수치 오차가 설계를 바꾸지 않는다.
 
 ### 3.5 최소 텍스트의 배치 [R3 배치]
@@ -298,17 +316,17 @@ export function ensureVisible(el: Element, margin?: number): void
 | 플래시 빈 트리 | "트리가 비어 있습니다." `FlashPage.tsx:62` | 한 줄 + `[편집 ›]` |
 | 안내문(툴팁) | `title` 속성(터치에서 안 뜸) `EditorPage.tsx:529-540` 등 | 모든 아이콘 버튼: `aria-label` 필수 + **길게 누르기 500ms**에 툴팁 버블(컨트롤 **위** 8px, 상단 60px 안이면 아래로 뒤집음, 화면 좌우 8px 안에 클램프, 손가락 떼면 사라짐). 호버 기기는 기존 `title` 대신 같은 버블을 400ms 지연으로. 툴팁은 키보드 위 영역(`vv.height`) 안에만 그린다 |
 | 1회성 힌트 | 없음 | 화면당 **최대 1개**, 첫 진입 때만, 저장 키 `hint:<screen>`(localStorage). 자리: 그 화면의 하단 바 위치(없으면 토스트 자리)에 토스트 변형으로 `[아이콘] 7자 이내 동작 설명 [확인]`. 대상: 에디터 "카드 두 번 탭 = 제목", 플래시 "카드 탭 = 펼치기", 빈칸 "카드 탭 → 빈칸 탭", 상단 바 비로그인 아이콘 "로그인하면 저장돼요". 힌트가 떠 있는 동안 일반 토스트는 큐에 대기 |
-| 확인창 | `confirm()` 네이티브 `TreeListPage.tsx:55` | 제거. 삭제 즉시 실행 + 토스트 `[되돌리기]` 5초(에디터 노드 삭제 `EditorPage.tsx:364`와 동일 패턴). 관리자 파괴 행위만 2단계 버튼(§3.1 관리자) |
-| 토스트 | 하단 중앙 `min(92vw, 28rem)`, 퀴즈·플래시는 상단 바 아래 `index.css:117-127` | 유지. 추가: 키보드 열림 동안 상단(§3.2 규칙 5). 한 줄 권장, 모바일 최대 2줄(글자 수는 DS). 동시 1개(현재 3개 `Toast.tsx:19`) — 겹침이 하단 바를 밀어 올리지 않게 |
+| 확인창 | `confirm()` 네이티브 `TreeListPage.tsx:55` | 제거(앱 전체). 트리 삭제 = 즉시 소프트 삭제(`Tree.deletedAt`, SH 규칙) + 토스트 `[되돌리기]` **10초**(에디터 노드 삭제 `EditorPage.tsx:364`와 동일 패턴, 노드 삭제도 10초로 맞춘다). 되돌릴 수 없는 행위(계정 탈퇴, 관리자 정지·삭제·숨김)는 **2단계 버튼** `[탈퇴]` → `[정말 탈퇴]`(danger) 3초 뒤 원복(§3.1 관리자·계정, DS #22) |
+| 토스트 | 하단 중앙 `min(92vw, 28rem)`, 퀴즈·플래시는 상단 바 아래 `index.css:157-174` | 유지. 추가: 키보드 열림 동안 상단(§3.2 규칙 5). 한 줄 권장, 모바일 최대 2줄(글자 수는 DS). 동시 1개(현재 3개 `Toast.tsx:19`) — 겹침이 하단 바를 밀어 올리지 않게 |
 | 아이콘만 있는 컨트롤의 자리 | — | 상단 바 오른쪽(테마·계정) / 트리 헤더 오른쪽(`.tree-header-tools`: 범위·공유·복제) / 캔버스 오른쪽 아래(`.zoom-tools`) / 패널 도구 모음(서식·너비) / 카드 오른쪽 위(`⋯`) / 미니맵 띠 오른쪽(펼침). 새 컨트롤은 이 6자리 중 하나에만 둔다 |
 
 ### 3.6 터치 표적과 제스처 [R6]
 
-- **44px**: WCAG 2.5.8(AA)은 최소 24×24 CSS px, 2.5.5(AAA)는 44×44[출처 14]. 이 앱은 `--tap: 44px`(coarse)[코드 index.css:37]을 전역 기본으로 유지한다[결정]. 44 미만인 곳 [코드]: 모드 탭 `min-height: 36px` `tree-header.css:23`, 상단 바 링크 ≈35px(계산), 패널 서식 버튼 36px `editor.css:228`, 접기 배지 1.25rem `editor.css:128`, 미니맵 접힘 띠 64px(전체가 버튼, OK), `+ 내용` 1.3rem `editor.css:145`. 변경: 탭·상단 바 링크·서식 버튼은 44로 키운다(헤더 85→93px). 배지·`+ 내용`은 보이는 크기를 유지하고 표적만 넓히되 **아래 규칙**을 따른다.
+- **44px**: WCAG 2.5.8(AA)은 최소 24×24 CSS px, 2.5.5(AAA)는 44×44[출처 14]. 이 앱은 `--tap: 44px`(coarse)[코드 index.css:30]을 전역 기본으로 유지한다[결정]. 44 미만인 곳 [코드]: 모드 탭 `min-height: 36px` `tree-header.css:23`, 상단 바 링크 ≈35px(계산), 패널 서식 버튼 36px `editor.css:228`, 접기 배지 1.25rem `editor.css:128`, 미니맵 접힘 띠 64px(전체가 버튼, OK), `+ 내용` 1.3rem `editor.css:145`. 변경: 탭·상단 바 링크·서식 버튼은 44로 키운다(헤더 85→93px). 배지·`+ 내용`은 보이는 크기를 유지하고 표적만 넓히되 **아래 규칙**을 따른다.
 - **표적 확장 규칙**(배지 탭 문제의 재발 방지, 버그 자체는 범위 밖 A11): `::after`로 넓힌 표적(`editor.css:155` `inset: -12px -8px`)은 카드 **바깥쪽으로만** 확장한다(`inset: auto -8px -12px -8px` 식으로 위쪽 0). 확장 영역끼리 또는 부모 카드의 탭 영역과 겹치면 안 된다. 검사: Playwright로 `elementFromPoint(카드 중심 하단 10px)`가 카드 자신인지 확인하는 E2E 1개. [결정]
 - **에디터 카드 제스처(터치)** [제안]: 탭 = 선택, 두 번 탭 = 제목 편집(현행 `onDoubleClick` `NodeRow.tsx:115`), **250ms 길게 누른 뒤 이동 = 카드 끌기**(현재는 6px 이동 즉시 끌기 시작 → 스크롤 의도와 충돌), 한 손가락 이동(길게 누르기 전) = 캔버스 패닝, 두 손가락 = 핀치·패닝(현행 `GraphView.tsx:94-127`), 길게 누른 채 이동 없음 500ms = 툴팁(배지·버튼만). `touch-action: none`인 캔버스에서 스크롤은 GraphView가 직접 처리하므로 길게 누르기 판정은 같은 포인터 핸들러에 타이머 하나로 들어간다. 너비 핸들(`.w-handle` 18px)은 선택된 카드에서만 활성(현행 표시 규칙과 일치).
 - **퀴즈 카드**: 탭 놓기(현행) 유지, 끌기 시작은 즉시(트레이는 세로 스크롤이 없어 충돌 없음; 모바일 트레이는 카드 위에서 스크롤되지 않는 알려진 한계[코드 dnd.css:147]). 트레이 스크롤은 **좌우 여백 12px**을 넓혀 손가락 자리를 준다[결정].
-- **안전 영역**: 하단 `--safe-b`는 main·토스트·바·시트에 적용됨[코드 index.css:16,80,117; flash.css:178; dnd.css:143,154]. **상단**은 없음 → `.topnav { padding-top: var(--safe-t); height: calc(var(--nav-h) + var(--safe-t)) }`와 `.toasts`·`.keys`·`body:has(...) .toasts` top 계산에 `--safe-t` 추가(D12). 좌우는 상단 바·플래시 바에 있음[코드]. 가로 모드에서 좌우 inset이 커지므로 `main` 패딩도 `max(.85rem, env(safe-area-inset-left/right))`로[결정].
+- **안전 영역**: 하단 `--safe-b`는 main·토스트·바·시트에 적용됨[코드 index.css:14,77,158; flash.css:178; dnd.css:143,154]. **상단**은 없음 → `.topnav { padding-top: var(--safe-t); height: calc(var(--nav-h) + var(--safe-t)) }`와 `.toasts`·`.keys`·`body:has(...) .toasts` top 계산에 `--safe-t` 추가(D12). 좌우는 상단 바·플래시 바에 있음[코드]. 가로 모드에서 좌우 inset이 커지므로 `main` 패딩도 `max(.85rem, env(safe-area-inset-left/right))`로[결정].
 - **가로 모드(폰, 844×390)**: 미측정. 규칙(D11) `@media (max-height: 500px) and (pointer: coarse)`: `.flash-nav`·`.dnd-bar` `position: static`(흐름), `.dnd-dock max-height: 50dvh`, 에디터 `.canvas { height: calc(100dvh − var(--nav-h) − var(--tree-head-h)) }` + 패널은 캔버스 아래 흐름, 키보드 열림 시 캔버스는 D5대로 불변(키보드가 화면의 60% 이상을 덮으므로 사실상 입력칸만 보이면 된다). [제안]
 
 ### 3.7 성능 — 레이아웃이 유발하는 비용 [R5]
@@ -321,7 +339,7 @@ export function ensureVisible(el: Element, margin?: number): void
 | `visualViewport` 리스너 | 없음 | iOS는 스크롤 중 `visualViewport.scroll`이 연속 발생 → passive + rAF 합치기 + 정수 변경 시에만 CSS 변수 쓰기. `--kb`를 읽는 선택자는 ≤6개(바·토스트·도구·시트)로 제한, **노드 카드 스타일에서는 절대 읽지 않는다**(변수 변경 = 읽는 요소 전부 스타일 재계산) |
 | 전역 `matchMedia` 구독 | `NodeRow.tsx:12-16` 노드마다 구독 1개(MediaQueryList 1개에 301 리스너) | 유지(폭 전환 때만 발화) |
 | 퀴즈 캔버스 폭 관찰 | `ResizeObserver` → 폭 바뀌면 트리 재배치 `kit.tsx:49` | 키보드(`resizes-visual`)는 폭을 안 바꿈 → 무영향. 회전만 1회 |
-| 고정 바 `backdrop-filter: blur` | `.topnav` `.flash-nav` `.zoom-tools` `index.css:50` `flash.css:179` `editor.css:36` | [제안 → DS] 스크롤마다 블러 재합성. 저사양 Android에서 비용. 불투명 면으로 바꾸면 사라진다(형태 결정은 DS R2·R5) |
+| 고정 바 `backdrop-filter: blur` | `.topnav` `.flash-nav` `.zoom-tools` `index.css:55` `flash.css:179` `editor.css:36` | [제안 → DS] 스크롤마다 블러 재합성. 저사양 Android에서 비용. 불투명 면으로 바꾸면 사라진다(형태 결정은 DS R2·R5) |
 | 리사이즈 핸들러 | `window.resize` 리스너 없음[코드 grep] | 추가하지 않는다. 폭 의존 로직은 모두 `ResizeObserver`·`matchMedia` |
 | 하단 시트 `max-height: 38dvh` | `dnd.css:126,142` | 유지. `dvh`는 URL 바 접힘에 반응하므로 Chrome에서 스크롤 중 시트 높이가 변할 수 있다 → standalone(PWA)에서는 안정. 브라우저 탭에서의 흔들림은 `svh`로 바꿔 없앤다(`38svh`) [제안 S] |
 
@@ -337,7 +355,7 @@ export function ensureVisible(el: Element, margin?: number): void
 | 로그인 | 상단 1/3 블록, 버튼 100% | 360px 카드 중앙 | 360px 카드 중앙 | 없음 | S(AA가 내용) |
 | 계정 | 1열, 탈퇴 맨 아래 | 560px | 560px | I9 위치로 해결 | S |
 | 관리자 | 카드형 읽기 중심 | 표 | 표 + sticky 헤더 | I10 상단 | M(AA가 내용) |
-| 공유 보기 | 읽기 전용 캔버스 + 복제 바 60px | 헤더 버튼 | 헤더 버튼 | 없음 | M(SH 의존) |
+| 공유 보기 | 읽기 전용 캔버스 + 보기 탭만 복제 바 60px, 다른 탭은 헤더 `⧉`, 신고는 `⋯` | 헤더 버튼 | 헤더 버튼 | I12 신고 메모(시트, 규칙 4(a)) | M(SH·AA 의존) |
 
 ## 5. 검증
 
@@ -362,10 +380,11 @@ export function ensureVisible(el: Element, margin?: number): void
 | 파일:줄 | 현재 | 변경 | 공수 |
 |---|---|---|---|
 | `index.html:6` | `viewport-fit=cover`, `interactive-widget` 없음 | **유지**(D3). 주석으로 이유 남김 | — |
-| `src/index.css:16` | `--nav-h --tap --safe-b` | `--kb: 0px; --vv-h: 100dvh; --safe-t; --tree-head-h` 추가 | S |
-| `src/index.css:48-53` `.topnav` | `top:0; height: var(--nav-h)`, 좌우 safe만 | `padding-top: var(--safe-t); height: calc(var(--nav-h) + var(--safe-t))`, 오른쪽에 테마·계정 슬롯 | S |
-| `src/index.css:55` `.topnav a` | 패딩 .4rem(≈35px) | coarse에서 `min-height: var(--tap)`; 복습 링크에 배지 자리 | S |
-| `src/index.css:117-127` `.toasts` | `bottom: calc(1.25rem + var(--safe-b))`, 퀴즈·플래시만 top | `bottom: calc(1.25rem + var(--safe-b) + var(--kb))`; `:root[data-kb] .toasts { top: …; bottom:auto }`; 동시 1개 | S |
+| `src/index.css:14` | `--nav-h --tap --safe-b` | `--kb: 0px; --vv-h: 100dvh; --safe-t; --tree-head-h` 추가 | S |
+| `src/index.css:51-56` `.topnav` | `top:0; height: var(--nav-h)`, 좌우 safe만(`:54`) | `padding-top: var(--safe-t); height: calc(var(--nav-h) + var(--safe-t))`, 오른쪽에 테마·계정 슬롯 | S |
+| `src/index.css:58` `.topnav a` | 패딩 .4rem(≈35px) | coarse에서 `min-height: var(--tap)`; 복습 링크에 배지 자리 | S |
+| `src/index.css:157-174` `.toasts` | `bottom: calc(1.25rem + var(--safe-b))`(`:158`), 퀴즈·플래시만 top(`:174`) | `bottom: calc(1.25rem + var(--safe-b) + var(--kb))`; `:root[data-kb] .toasts { top: …; bottom:auto }`; 동시 1개 | S |
+| `src/features/editor/treelist.css:1-3` `.trees-head` | h1 + 내보내기 버튼 | 동기화 상태 슬롯(아이콘 + `n건 대기`, 44px, 탭 = 재시도/사유) 추가, 비로그인은 렌더 안 함 | S |
 | `src/App.tsx:28-32` | 링크 3개 | 테마 토글(DS 컴포넌트)·아바타/로그인(AA) 슬롯 추가, `내 트리` 조건 표시 | S |
 | `src/features/editor/editor.css:14,213,226` | 캔버스 `dvh` 식, 상수 7rem | `7rem` → `var(--tree-head-h)`; 높이는 키보드에 불변(변경 없음, D5) | S |
 | `editor.css:33-38` `.zoom-tools` | 항상 표시 | `:root[data-kb] .zoom-tools { visibility: hidden }` | S |
@@ -377,7 +396,7 @@ export function ensureVisible(el: Element, margin?: number): void
 | `EditorPage.tsx:558` 개요 textarea | rows 5 | 모바일 rows 3 + `scroll-margin-bottom` | S |
 | `EditorPage.tsx:570` 내보낸 textarea | readonly textarea | `[복사]` 버튼 + 접힘 [제안] | S |
 | `src/features/editor/NodeRow.tsx:76-98,114-115` | 즉시 끌기, dblclick 편집 | 터치 길게 누르기 250ms 후 끌기 [제안] | M |
-| `src/features/editor/TreeListPage.tsx:55,78-85` | `confirm()`, 일러스트 빈 상태 | 토스트 되돌리기(SH 소프트 삭제 의존), 큰 + 타일 | S |
+| `src/features/editor/TreeListPage.tsx:55,78-85` | `confirm()`, 일러스트 빈 상태 | 토스트 되돌리기 10초(`Tree.deletedAt` 소프트 삭제 → 목록 숨김 → 토스트 종료·재시작 시 `deleteTree` 하드 삭제; `repo.ts:26-33`은 SH 소유), 큰 + 타일 | S |
 | `src/features/editor/treelist.css:8-11` | 점선 상자 + SVG | 타일(44px+ 표적) | S |
 | `src/features/tree-header.css:23` | 탭 `min-height: 36px` | 44px; 헤더 높이를 `--tree-head-h`로 노출 | S |
 | `src/features/flash/flash.css:176-186` `.flash-nav` | `bottom: 0` | `bottom: var(--kb)`; 가로 모드 static; 공유 보기 복제 바로 재사용 | S |
@@ -445,7 +464,8 @@ export function ensureVisible(el: Element, margin?: number): void
 | M3 | iOS Safari | 카드 제목 편집(배율 50%) | 페이지 확대 없음. 확대되면 편집 중 배율 1 대안 적용 |
 | M4 | iOS Safari | 플래시 하단 바·토스트 위치 | 키보드 없는 화면에서 바 하단 고정, 안전 영역 패딩 |
 | M5 | Chrome Android(Pixel급) | 같은 시나리오 + `interactive-widget` 미지정 확인 | 시각 뷰포트만 줄고 `--kb` ≈ 키보드 높이; VirtualKeyboard API 2차 도입 여부 판단 자료 |
-| M6 | PWA standalone(iOS 홈 화면 추가, Android 설치) | 상단 바가 상태 바 아래 겹치지 않음, URL 바 없음 → `dvh` 안정, 키보드 모델 동일 | `--safe-t` 적용 확인 |
+| M6 | PWA standalone(iOS 홈 화면 추가, Android 설치) | 상단 바가 상태 바 아래 겹치지 않음, URL 바 없음 → `dvh` 안정, 키보드 모델 동일. **iOS 홈 화면 standalone에서 Google·Kakao OAuth 시작 → 302 왕복 → 돌아온 뒤 세션 쿠키가 standalone 저장소에 있고 로그인 상태가 유지되는가**(쿠키 저장소가 Safari와 분리됨 [가정], AA `03` §3.2 콜백 흐름) | `--safe-t` 적용 확인; 로그인 후 같은 창으로 돌아와 아바타가 보임. 실패하면 AA에 "standalone에서는 로그인 버튼이 Safari로 열기 안내" 요청 |
+| M6b | 카카오톡 인앱 브라우저(Android·iOS)에서 공유 링크 열기 | `/t/<slug>` 열람·플래시·퀴즈 동작, 상단 바 로그인 아이콘 → OAuth 시작 시 **인앱 브라우저 감지 → "외부 브라우저로 열기" 안내**(Google은 임베디드 UA를 거부, AA M8) | 안내 토스트/시트가 하단 바와 겹치지 않음(토스트 자리 규칙), 복제는 로그인 뒤 외부 브라우저에서 이어짐 |
 | M7 | Samsung Internet | M5와 동일 | 동일 |
 | M8 | 가로 모드(iOS·Android) | 플래시·빈칸·에디터 | 하단 바 흐름 배치, 캔버스 전체 높이, 키보드 열림 때 입력칸만 보임 |
 | M9 | 터치 표적 | 모드 탭·상단 바·서식 버튼·배지 | 44px, 배지 탭이 카드 선택을 가로채지 않음 |
@@ -469,7 +489,7 @@ export function ensureVisible(el: Element, margin?: number): void
 5. MDN — VirtualKeyboard API(`overlaysContent`, `env(keyboard-inset-*)`, `geometrychange`, Limited availability) https://developer.mozilla.org/en-US/docs/Web/API/VirtualKeyboard_API
 6. caniuse — `interactive-widget` 지원표(Chrome Android 지원, Samsung Internet 21+, Firefox Android 159, Safari iOS 미지원 ~27.2, Opera Mobile 80) https://caniuse.com/mdn-html_elements_meta_name_viewport_interactive-widget
 7. WebKit Bugzilla 259770 — "Implement the interactive-widget property in the viewport meta tag", RESOLVED FIXED 2026-11, iOS 27.3 베타부터, `resizes-content` 동작 이상 보고 https://bugs.webkit.org/show_bug.cgi?id=259770
-8. Apple Developer Forums 800125 — iOS 26 Safari/WebView `visualViewport` 키보드 닫힘 후 높이 24px 잔차·fixed 어긋남(iPhone 12, 26.0); 같은 스레드에 iPhone 11 키보드 346pt(제안 바 45pt 포함) https://developer.apple.com/forums/thread/800125
+8. Apple Developer Forums 800125 — iOS 26 Safari/WebView `visualViewport` 키보드 닫힘 후 높이 24px 잔차·fixed 어긋남(iPhone 12, 26.0) https://developer.apple.com/forums/thread/800125 (이 스레드에서 키보드 높이 pt 값은 확인되지 않음 — §3.4의 346pt는 [가정])
 9. caniuse — VirtualKeyboard API(Chrome 94+, Edge 94+, Samsung Internet 17+, Safari·Firefox 미지원) https://caniuse.com/mdn-api_virtualkeyboard
 10. MDN — `@media (display-mode)`: `standalone`은 내비게이션 UI 제외 https://developer.mozilla.org/en-US/docs/Web/CSS/@media/display-mode
 11. GitHub Saffsanity/sill PR #30 — iOS 27 시뮬레이터 키보드 높이 301pt(Pro·17e)/320pt(Pro Max), 제안 바 +44pt https://github.com/Saffsanity/sill/pull/30
@@ -478,4 +498,19 @@ export function ensureVisible(el: Element, margin?: number): void
 14. W3C WCAG 2.2 Understanding SC 2.5.8 Target Size (Minimum) 24×24 CSS px(AA), 2.5.5 Enhanced 44×44 https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html
 15. dev.to — "Why CSS dvh ignores the mobile keyboard": iOS는 `visualViewport` resize만 발생, `window.resize` 없음 https://dev.to/rl0425/why-css-dvh-ignores-the-mobile-keyboard-and-how-to-fix-it-31ao
 
-내부 근거: `docs/plans/orchestration_visual_polish.md` §6(이전 모바일 결정·측정), `docs/research/R3_editor_ux.md` #4·#5, `docs/research/R4_platform.md` #3, `../drilldown-biz/reports/04_tech.md` §3("편집은 PC, 학습은 모바일", 세로 드릴다운 권고).
+내부 근거: `docs/plans/orchestration_visual_polish.md` §6(이전 모바일 결정·측정), `docs/research/R3_editor_ux.md` #4·#5, `docs/research/R4_platform.md` #3, `../drilldown-biz/reports/04_tech.md` §3("편집은 PC, 학습은 모바일", 세로 드릴다운 권고). 3차: `docs/specs/05_review.md` §2(RV 발견), `docs/plans/orchestration_redesign.md` §3.5(3차 판정), `docs/specs/04_tree_sharing_sync.md` §3.10(동기화 상태·공유 보기 요소), `docs/specs/03_account_admin.md` §3.6(신고·정지 API).
+
+## 8. 3차 변경 기록 (2026-11-08, RV `05_review.md` §2 · 오케스트레이터 §3.5 판정)
+
+| RV # | 변경 위치 | 내용 |
+|---|---|---|
+| H2 | §2 D9, §3.5 확인창 행, §5(b) TreeListPage 행, §1 타 문서 의존 | D9 유지. 트리 삭제 = 확인창 없음 + 되돌리기 토스트 **10초**(5→10). 로컬 `Tree.deletedAt` 소프트 삭제 → 목록 숨김 → 토스트 종료·재시작 시 하드 삭제, 로그인 시 SH 서버 소프트 삭제(7일) — 데이터 규칙은 SH `04` §3.1·§3.6 참조. 에디터 노드 삭제 토스트도 10초로 맞춤 |
+| M4 | §3.1 목록(새 "동기화 상태 자리" 블록), §5(b) treelist.css 행, §1 타 문서 의존 | 상태 집합을 SH §3.10(`저장됨/동기화 중/오프라인 n건 대기/오류`)으로. 글자·탭 동작(재시도·사유)의 자리 = **목록 헤더**(`.trees-head`, h1 오른쪽, 44px). 다른 화면은 아바타 점만(오프라인·오류 때, 탭 → 목록). "아바타 점만" 제안 삭제 |
+| M8 | §5(e) M6, 새 M6b | M6에 iOS standalone OAuth 302 왕복·쿠키 저장소 항목, M6b 카카오톡 인앱 브라우저 → 외부 브라우저 안내 항목 추가 |
+| M9 | §3.2 I12·I14·I15·I16, §3.1 공유 보기, §4 공유 보기 행 | I12 slug 편집 input **삭제**(slug는 서버 발급·재발급만). I12 = 공유 보기 신고 메모 textarea(시트, 규칙 4(a)), I14 = 관리자 정지·숨김 `reason`(I10과 같은 상단 규칙 + 모바일 카드 scroll-margin), I15 = 계정 탈퇴 입력 없음, I16 = 공개 범위 시트 입력 없음. 공유 보기 "입력칸 없음" → "신고 메모(I12)" |
+| M10 | §3.1 공유 보기 와이어·규칙, §4 공유 보기 행, §1 타 문서 의존(SH 요청) | 하단 고정 UI는 탭당 하나. 보기 탭만 복제 바, 플래시·빈칸·백지 탭은 복제를 헤더 `⧉` 아이콘으로, 신고는 모든 탭에서 헤더 `⋯` 메뉴 → 시트. SH §3.10 "하단 고정 신고" 문장 수정 요청 |
+| M11 | §2 D9, §3.1 계정·관리자, §3.5 확인창 행, §1 타 문서 의존(AA 요청) | 2단계 버튼(`[탈퇴]` → `[정말 탈퇴]` 3초)을 계정 탈퇴에도 명시. 관리자 정지·삭제·숨김과 같은 컴포넌트(DS #22). 사유 입력 포커스 중 타이머 정지 |
+| L1 | §2 D12, §3.1 공통 상수·상단 바·플래시, §3.2 규칙 1·5, §3.3 토큰, §3.5 토스트, §3.6 44px·안전 영역, §3.7 blur, §5(b) 4행 | `index.css` 줄 번호 전부 갱신: `--nav-h` :14, 모바일 48px :29, `--tap` :30, `.topnav` :51-56(좌우 safe :54, blur :55), `.topnav a` :58, `main` :77-78, 16px 규칙 :111, `.toasts` :157-174(bottom :158, 퀴즈·플래시 top :174) |
+| L10 | §3.4, §7 출처 8 | "iPhone 11 346pt·제안 바 45pt"를 **[가정]**으로 낮춤(출처 8 스레드에서 확인 안 됨). 출처 11은 취미 저장소 시뮬레이터 측정임을 명시. 설계는 `--kb` 실측 의존이라 영향 없음 |
+
+반영하지 않은 항목: 없음(담당 8건 모두 반영). 다른 문서 수정은 하지 않았고 SH·AA에 대한 요청은 §1 "타 문서 의존" 표에 적었다.
