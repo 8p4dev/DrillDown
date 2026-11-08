@@ -1,0 +1,34 @@
+
+# 노드 30개
+JSON(전체, id 포함)      : 7,793 B (7.6 KB)  (노드당 260 B)
+gzip -9                  : 1,831 B (1.8 KB)
+brotli                   : 1,545 B (1.5 KB)
+deflate-raw → base64url  : 1813 B → URL 해시 2418 글자
+축약(id 없음) → deflate → base64url: 원문 1138 B → 485 B → URL 해시 647 글자
+
+# 노드 100개
+JSON(전체, id 포함)      : 25,451 B (24.9 KB)  (노드당 255 B)
+gzip -9                  : 4,211 B (4.1 KB)
+brotli                   : 3,487 B (3.4 KB)
+deflate-raw → base64url  : 4193 B → URL 해시 5591 글자
+축약(id 없음) → deflate → base64url: 원문 3851 B → 629 B → URL 해시 839 글자
+
+# 노드 300개
+JSON(전체, id 포함)      : 76,457 B (74.7 KB)  (노드당 255 B)
+gzip -9                  : 10,545 B (10.3 KB)
+brotli                   : 8,418 B (8.2 KB)
+deflate-raw → base64url  : 10527 B → URL 해시 14036 글자
+축약(id 없음) → deflate → base64url: 원문 11626 B → 691 B → URL 해시 922 글자
+
+# 노드 1000개
+JSON(전체, id 포함)      : 254,962 B (249.0 KB)  (노드당 255 B)
+gzip -9                  : 31,819 B (31.1 KB)
+brotli                   : 24,932 B (24.3 KB)
+deflate-raw → base64url  : 31801 B → URL 해시 42402 글자
+축약(id 없음) → deflate → base64url: 원문 38843 B → 866 B → URL 해시 1155 글자
+
+# Postgres 노드 1행 추정: 본문 176 B + 인덱스 64 B ≈ 240 B  (평균 title 24 B, note 12 B, aliases 9 B)
+# 트리 300노드 DB 점유 ≈ 70 KB
+# srs 1행 추정 ≈ 429 B
+# 무작위 음절 100노드 축약: 원문 4038 B → deflate 2307 B → base64url 3076 글자 (상한)
+# 무작위 음절 300노드 축약: 원문 12038 B → deflate 6701 B → base64url 8935 글자 (상한)
