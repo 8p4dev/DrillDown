@@ -1,5 +1,5 @@
 // 실행: npx tsx src/core/outline.check.ts
-import { nodesToOutline, outlineToNodes, parseOutline, serializeOutline, type OutlineItem } from './outline'
+import { nodesToOutline, outlineToNodes, parseOutline, serializeOutline, splitTitle, type OutlineItem } from './outline'
 
 function eq(actual: unknown, expected: unknown, msg: string) {
   const a = JSON.stringify(actual)
@@ -43,3 +43,12 @@ eq(nodesToOutline(all, 'R'), sample[0].children, 'nodesToOutline')
 eq(nodesToOutline(all, 'R', true), [sample[0]], 'nodesToOutline includeRoot')
 
 console.log('outline ok')
+
+// C5: 200자 초과 제목은 200자에서 자르고 나머지는 note
+{
+  const long = '가'.repeat(200) + ' 나머지'
+  const [n] = outlineToNodes(parseOutline(long), 't', null)
+  eq([n.title.length, n.note], [200, '나머지'], 'long title split into note')
+  eq(splitTitle('짧은 제목'), { title: '짧은 제목' }, 'short title untouched')
+  eq(splitTitle('a'.repeat(200)), { title: 'a'.repeat(200) }, 'exactly CAP.title untouched')
+}

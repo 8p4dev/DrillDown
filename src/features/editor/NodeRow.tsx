@@ -1,5 +1,5 @@
 import { memo, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
-import type { TreeNode } from '../../core/types'
+import { CAP, type TreeNode } from '../../core/types'
 import { Icon } from '../../ui/Icon'
 import { I } from '../../ui/icons'
 import { chevronDown, x } from '../../ui/icons.all'
@@ -128,6 +128,7 @@ function NodeRow(p: NodeRowProps) {
           ref={inputRef}
           className="title-input"
           aria-label="노드 제목"
+          maxLength={CAP.title}
           value={p.draft ?? ''}
           onChange={(e) => p.onDraft(e.target.value)}
           onKeyDown={p.onEditKey}

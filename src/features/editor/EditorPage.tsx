@@ -1,10 +1,10 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { logEvent } from '../../core/events'
-import { nodesToOutline, outlineToNodes, parseOutline, serializeOutline } from '../../core/outline'
+import { nodesToOutline, outlineToNodes, parseOutline, serializeOutline, splitTitle } from '../../core/outline'
 import { childrenOf, deleteNodes, descendantsOf, getTreeNodes, putNodes } from '../../core/repo'
 import { getSrsMap, missHeat } from '../../core/srs'
-import type { ID, NodeSrs, TreeNode } from '../../core/types'
+import { CAP, type ID, type NodeSrs, type TreeNode } from '../../core/types'
 import { href } from '../../router'
 import { Icon } from '../../ui/Icon'
 import { clipboardPaste, copy, eraser, highlighter, keyboard, list, maximize, network, zoomIn, zoomOut } from '../../ui/icons.all'
@@ -48,6 +48,7 @@ const visibleRows = (ns: TreeNode[], root: TreeNode) => {
 const newNode = (treeId: ID, parentId: ID, order: number): TreeNode => ({
   id: crypto.randomUUID(), treeId, parentId, order, title: '', aliases: [], updatedAt: Date.now(),
 })
+const FULL_MSG = '트리 하나에 노드는 5,000개까지입니다' // 계약 C5
 const isComposing = (e: React.KeyboardEvent) => e.nativeEvent.isComposing || e.keyCode === 229
 /** 노드별 자식 유무·하위 수를 한 번에 계산 (O(n)). 노드마다 childrenOf/descendantsOf 를 부르면 O(n²) */
 function countTree(ns: TreeNode[]) {
@@ -313,7 +314,7 @@ export default function EditorPage({ treeId }: { treeId: string }) {
     if (e.key === 'Enter') {
       e.preventDefault()
       const id = editRef.current!
-      if (!applyDraft(true)) return stopEdit()
+      if (!applyDraft(true) || isFull()) return stopEdit()
       const newId = insertBelow(id)
       startEdit(newId, '')
     } else if (e.key === 'Tab') {
@@ -335,6 +336,12 @@ export default function EditorPage({ treeId }: { treeId: string }) {
   }
 
   // ---- 구조 편집 ----
+  /** 노드 한도(CAP.nodesPerTree)면 토스트하고 true — 서버가 거부할 노드를 만들지 않는다 */
+  function isFull(adding = 1): boolean {
+    if (nodesRef.current.length + adding <= CAP.nodesPerTree) return false
+    toast(FULL_MSG)
+    return true
+  }
   /** 형제로 아래에 삽입(루트면 첫 자식). 새 id 반환 */
   function insertBelow(id: ID): ID {
     const n = get(id)!
@@ -344,12 +351,6 @@ export default function EditorPage({ treeId }: { treeId: string }) {
         ? newNode(treeId, n.id, (childrenOf(ns, n.id)[0]?.order ?? 1) - 1)
         : newNode(treeId, n.parentId, orderAfter(ns, n))
     commit([...(n.parentId === null ? patch(ns, n.id, { collapsed: false }) : ns), nn])
-    return nn.id
-  }
-  function addChild(id: ID): ID {
-    const ns = nodesRef.current
-    const nn = newNode(treeId, id, nextOrder(ns, id))
-    commit([...patch(ns, id, { collapsed: false }), nn])
     return nn.id
   }
   /** 직전 형제의 마지막 자식으로 */
@@ -450,11 +451,11 @@ export default function EditorPage({ treeId }: { treeId: string }) {
       const to = sib[sib.indexOf(sel) + (e.key === 'ArrowLeft' ? -1 : 1)]
       if (to) setSelId(to.id)
     } else if (e.key === ' ' || e.key === 'F2') startEdit(sel.id)
-    else if (e.key === 'Enter') startEdit(insertBelow(sel.id), '')
-    else if (e.key === 'Tab') {
-      if (e.shiftKey) outdent(sel.id)
-      else startEdit(addChild(sel.id), '')
-    } else if (e.code === 'KeyH' && !e.altKey) {
+    else if (e.key === 'Enter') {
+      if (!isFull()) startEdit(insertBelow(sel.id), '')
+    }
+    // Tab 은 가로채지 않는다(U49: 키보드 트랩 금지). 자식 추가 = Enter 후 Tab(편집 중 들여쓰기)
+    else if (e.code === 'KeyH' && !e.altKey) {
       if (hasKids) commit(patch(nodesRef.current, sel.id, { collapsed: !sel.collapsed }), false)
     }
     else if (e.key === 'Delete') removeSubtree(sel.id)
@@ -475,12 +476,17 @@ export default function EditorPage({ treeId }: { treeId: string }) {
     const target = asRoot ? root! : (get(selId) ?? root!)
     const list = asRoot ? [...items[0].children, ...items.slice(1)] : items
     const added = outlineToNodes(list, treeId, target.id, nextOrder(ns, target.id))
-    const base = patch(ns, target.id, asRoot ? { title: items[0].text, collapsed: false } : { collapsed: false })
+    if (isFull(added.length)) return
+    const rootTitle = asRoot ? splitTitle(items[0].text) : null
+    // 긴 루트 제목의 나머지는 기존 메모 앞에 붙인다(C5)
+    const rootNote = rootTitle?.note !== undefined ? { note: [rootTitle.note, target.note].filter(Boolean).join('\n') } : {}
+    const base = patch(ns, target.id, rootTitle ? { title: rootTitle.title, collapsed: false, ...rootNote } : { collapsed: false })
+    const cut = added.filter((n) => n.note !== undefined).length + (rootTitle?.note !== undefined ? 1 : 0)
     if (added.length) fitPending.current = true // 통째로 들어온 트리는 진입과 같게 맞춘다
     commit([...base, ...added])
     void logEvent('outline_imported', { nodeCount: added.length + (asRoot ? 1 : 0) }, treeId)
     setImportText('')
-    toast(`${added.length + (asRoot ? 1 : 0)}개 가져옴`)
+    toast(`${added.length + (asRoot ? 1 : 0)}개 가져옴${cut ? ` · 긴 제목 ${cut}개를 잘라 메모로 옮겼습니다` : ''}`)
   }
   function copyText(text: string) {
     navigator.clipboard?.writeText(text).then(
@@ -636,8 +642,8 @@ const KEYS: [string, string][] = [
   ['Alt+← Alt+→', '순서 바꾸기'],
   ['Space F2', '제목 편집'],
   ['Enter', '형제 추가'],
-  ['Tab', '자식 추가'],
-  ['Shift+Tab', '내어쓰기'],
+  ['Enter Tab', '자식 추가 (차례로)'],
+  ['Tab Shift+Tab', '편집 중 들여·내어쓰기'],
   ['H', '접기 · 펼치기'],
   ['Delete', '삭제'],
   ['Ctrl+X Ctrl+V', '잘라내기 · 붙여넣기'],
@@ -676,6 +682,7 @@ function DetailPanel({ api, ...p }: {
         className="detail-title"
         aria-label="패널 제목"
         placeholder="제목"
+        maxLength={CAP.title}
         value={title ?? p.titleDraft ?? p.node.title}
         onFocus={(e) => (setTitle(p.node.title), p.onBegin(), ensureVisible(e.currentTarget))}
         onChange={(e) => {
