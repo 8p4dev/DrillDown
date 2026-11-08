@@ -1,14 +1,18 @@
 // 플래시카드 모드 (plan §1 F1)
 import { useEffect, useMemo, useState } from 'react'
 import type { StudySource } from '../../core/source'
-import { getRoot, getTreeNodes } from '../../core/repo'
-import { colorMap, getSrsMap } from '../../core/srs'
+import { getRoot } from '../../core/repo'
+import { colorMap } from '../../core/srs'
 import type { ID, NodeSrs, TreeNode } from '../../core/types'
 import { href } from '../../router'
+import { Icon } from '../../ui/Icon'
+import { I } from '../../ui/icons'
+import { arrowRight, listChecks, rotateCcw, x } from '../../ui/icons.all'
 import TreeHeader from '../TreeHeader'
 import FlashCard from './FlashCard'
 import Minimap from './Minimap'
 import { nextConcept } from './flash'
+import { coarseHint, useStudySource } from './study'
 import './flash.css'
 
 // 세션 진행(현재 개념·노드별 마지막 평가)은 탭 세션 동안 유지 — 새로고침해도 집계가 남는다
@@ -22,7 +26,8 @@ function load(treeId: string): Saved {
   }
 }
 
-export default function FlashPage({ treeId, rootId }: { treeId: string; rootId?: string; source?: StudySource }) {
+export default function FlashPage({ treeId, rootId, source }: { treeId: string; rootId?: string; source?: StudySource }) {
+  const src = useStudySource(source, treeId)
   const [nodes, setNodes] = useState<TreeNode[] | null>(null)
   const [srs, setSrs] = useState({ map: new Map<ID, NodeSrs>(), at: new Date(0) }) // at = 색 계산 기준 시각
   const [saved] = useState(() => load(treeId))
@@ -36,11 +41,12 @@ export default function FlashPage({ treeId, rootId }: { treeId: string; rootId?:
   }, [treeId, current, tally])
 
   useEffect(() => {
-    Promise.all([getTreeNodes(treeId), getSrsMap(treeId)]).then(([ns, s]) => {
+    Promise.all([src.nodes(), src.srs()]).then(([ns, s]) => {
       setNodes(ns)
       setSrs({ map: s, at: new Date() })
+      if (ns.length) coarseHint('flash', '카드 탭 = 펼치기', I.layers)
     })
-  }, [treeId])
+  }, [src])
 
   const tree = useMemo(() => {
     if (!nodes?.length) return null
@@ -60,7 +66,12 @@ export default function FlashPage({ treeId, rootId }: { treeId: string; rootId?:
   const next = useMemo(() => (nodes && tree ? nextConcept(nodes, tree.scope, at) : null), [nodes, tree, at])
 
   if (!nodes) return <section className="flash"><TreeHeader treeId={treeId} active="flash" /><p>불러오는 중…</p></section>
-  if (!tree) return <section className="flash"><TreeHeader treeId={treeId} active="flash" /><p className="muted">트리가 비어 있습니다.</p></section>
+  if (!tree) return (
+    <section className="flash">
+      <TreeHeader treeId={treeId} active="flash" />
+      <p className="empty muted">트리가 비어 있습니다 <a href={href.edit(treeId)}>편집 ›</a></p>
+    </section>
+  )
 
   const go = (id: ID) => { setDone(false); setCurrent(id) }
   const onRated = (s: NodeSrs, known: boolean) => {
@@ -75,7 +86,11 @@ export default function FlashPage({ treeId, rootId }: { treeId: string; rootId?:
   return (
     <section className="flash">
       <TreeHeader treeId={treeId} active="flash">
-        <span className="flash-tally muted" aria-label="평가 집계">알음 <b key={`k${known}`} className="pop-num">{known}</b> · 모름 <b key={`u${unknown.length}`} className="pop-num">{unknown.length}</b></span>
+        {/* 보이는 건 ✓N ✕M, 읽히는 텍스트는 "알음 N · 모름 M"(DS .sr-only) */}
+        <span className="flash-tally muted" aria-label="평가 집계">
+          <Icon d={I.check} className="ok" /><span className="sr-only">알음 </span><b key={`k${known}`} className="pop-num">{known}</b><span className="sr-only"> · </span>
+          <Icon d={x} className="no" /><span className="sr-only">모름 </span><b key={`u${unknown.length}`} className="pop-num">{unknown.length}</b>
+        </span>
       </TreeHeader>
       <div className="flash-layout">
         <div className="flash-stage">
@@ -93,8 +108,8 @@ export default function FlashPage({ treeId, rootId }: { treeId: string; rootId?:
                 </>
               )}
               <div className="actions">
-                <button type="button" className="primary" onClick={() => { setTally(new Map()); go(tree.scope) }}>처음부터 다시</button>
-                <a className="flash-edit-link" href={href.edit(treeId)}>편집으로</a>
+                <button type="button" className="primary" onClick={() => { setTally(new Map()); go(tree.scope) }}><Icon d={rotateCcw} /> 처음부터 다시</button>
+                <a className="flash-edit-link" href={href.edit(treeId)}><Icon d={I.pencil} /> 편집으로</a>
               </div>
             </div>
           ) : (
@@ -107,12 +122,18 @@ export default function FlashPage({ treeId, rootId }: { treeId: string; rootId?:
                   </span>
                 ))}
               </nav>}
-              <FlashCard key={at} treeId={treeId} nodes={nodes} conceptId={at} colors={colors} onRated={onRated} onDive={go} initialRated={tally} onNext={advance} />
+              <FlashCard key={at} treeId={treeId} nodes={nodes} conceptId={at} colors={colors} record={src.record} onRated={onRated} onDive={go} initialRated={tally} onNext={advance} />
               <div className="actions flash-nav">
-                <button type="button" className={`primary${allRated ? ' pulse' : ''}`} title={`${next ? '다음 개념' : '요약 보기'} (→ / Enter)`} onClick={advance}>
-                  {next ? '다음 개념 →' : '요약 보기'}
+                <button
+                  type="button"
+                  className={`primary${allRated ? ' ready' : ''}`}
+                  aria-label={next ? '다음 개념 →' : '요약 보기'}
+                  data-tip={`${next ? '다음 개념' : '요약 보기'} (→ / Enter)`}
+                  onClick={advance}
+                >
+                  <Icon d={next ? arrowRight : listChecks} /> {next ? '다음' : '요약'}
                 </button>
-                {next && <button type="button" onClick={() => setDone(true)}>요약</button>}
+                {next && <button type="button" onClick={() => setDone(true)}><Icon d={listChecks} /> 요약</button>}
               </div>
             </>
           )}

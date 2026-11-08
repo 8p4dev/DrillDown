@@ -2,8 +2,10 @@
 import { lazy, Suspense, useEffect } from 'react'
 import { href, useRoute } from './router'
 import { Toaster } from './features/Toast'
+import { TooltipLayer } from './ui/Tooltip'
 import ThemeToggle from './ui/ThemeToggle'
 import NavUser from './features/account/NavUser'
+import Banners from './features/account/Banners'
 import { useMe } from './core/mock/me'
 
 // 화면별 코드 분할: 첫 화면만 받고, 나머지는 유휴 시간에 미리 받는다. 관리자 청크는 admin 일 때만 (01 §3.8)
@@ -56,6 +58,7 @@ export default function App() {
         <ThemeToggle />
         {r.name !== 'login' && <NavUser />}
       </nav>
+      <Banners />
       <main className={inShared ? 'main-shared' : undefined}>
         <Suspense fallback={<div className="route-loading" aria-busy="true" />}>
           {r.name === 'trees' && <TreeListPage />}
@@ -72,6 +75,7 @@ export default function App() {
         </Suspense>
       </main>
       <Toaster />
+      <TooltipLayer />
     </>
   )
 }

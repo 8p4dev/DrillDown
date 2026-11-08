@@ -5,10 +5,9 @@ import { haptic } from '../feel'
 import { CARD } from './dnd'
 
 const DRAG_MIN = 4 // 이보다 적게 움직이면 탭
-const TILT_MAX = 4 // 고스트 기울기 한계(도)
 const GHOST_NARROW = 112
 
-export interface DragState { id: string; x: number; y: number; ox: number; oy: number; w: number; h: number; over: string | null; tilt: number }
+export interface DragState { id: string; x: number; y: number; ox: number; oy: number; w: number; h: number; over: string | null }
 
 /** el 자신과 그 안을 제외하고 (x,y) 아래 가장 가까운 [data-drop] */
 function dropAt(x: number, y: number, el: HTMLElement): string | null {
@@ -29,17 +28,13 @@ export function useDragDrop(onDrop: (card: string, target: string) => void, enab
   const skipClick = useRef(false)
   useEffect(() => () => cancelAnimationFrame(raf.current), [])
 
-  // 드래그 동안만 도는 루프: 포인터 이동을 프레임당 한 번으로 묶고, 멈추면 기울기를 0으로 되돌린다
+  // 드래그 동안만 도는 루프: 포인터 이동을 프레임당 한 번으로 묶는다
   const frame = () => {
     const s = st.current
     if (!s) return
     const { d } = s
-    const dx = s.x - d.x
-    const goal = Math.max(-TILT_MAX, Math.min(TILT_MAX, dx * 0.5))
-    const tilt = Math.abs(goal - d.tilt) < 0.1 ? goal : d.tilt + (goal - d.tilt) * 0.3
-    const moved = dx !== 0 || s.y !== d.y
-    if (moved || tilt !== d.tilt) {
-      s.d = { ...d, x: s.x, y: s.y, tilt, over: moved ? dropAt(s.x, s.y, s.el) : d.over }
+    if (s.x !== d.x || s.y !== d.y) {
+      s.d = { ...d, x: s.x, y: s.y, over: dropAt(s.x, s.y, s.el) }
       setDrag(s.d)
     }
     raf.current = requestAnimationFrame(frame)
@@ -52,7 +47,7 @@ export function useDragDrop(onDrop: (card: string, target: string) => void, enab
       const r = el.getBoundingClientRect()
       // 모바일 트레이 카드(2열 유동)는 빈칸보다 넓다 → 고스트는 빈칸에 맞는 크기로, 잡은 지점 비율은 유지
       const w = r.width > CARD.w ? GHOST_NARROW : r.width
-      const d = { id: el.dataset.card!, x: e.clientX, y: e.clientY, ox: ((e.clientX - r.left) * w) / r.width, oy: e.clientY - r.top, w, h: r.height, over: null, tilt: 0 }
+      const d = { id: el.dataset.card!, x: e.clientX, y: e.clientY, ox: ((e.clientX - r.left) * w) / r.width, oy: e.clientY - r.top, w, h: r.height, over: null }
       st.current = { el, d, moved: false, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY }
       skipClick.current = false
       el.setPointerCapture(e.pointerId)

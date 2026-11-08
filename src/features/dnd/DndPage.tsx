@@ -2,31 +2,35 @@
 import { Fragment, useEffect, useMemo, useState, type CSSProperties } from 'react'
 import type { StudySource } from '../../core/source'
 import { logEvent } from '../../core/events'
-import { getRoot, getTreeNodes } from '../../core/repo'
-import { recordResult } from '../../core/srs'
+import { getRoot } from '../../core/repo'
 import type { ID, TreeNode } from '../../core/types'
 import { href } from '../../router'
+import { Icon } from '../../ui/Icon'
+import { I } from '../../ui/icons'
+import { checkCheck, eye, eyeOff, rotateCcw } from '../../ui/icons.all'
 import { haptic } from '../feel'
+import { coarseHint, useStudySource } from '../flash/study'
 import TreeHeader from '../TreeHeader'
 import { gradeDnd, leavesOf, moveCard, scopeOf, shuffle, type Place, type Score } from './dnd'
-import { Ghost, Progress, ScopeSelect, ScoreLine, TreeCanvas } from './kit'
+import { Ghost, Progress, ResultMark, ScopeSelect, ScoreLine, TreeCanvas } from './kit'
 import { useDragDrop } from './useDragDrop'
 
-export default function DndPage({ treeId, rootId }: { treeId: string; rootId?: string; source?: StudySource }) {
+export default function DndPage({ treeId, rootId, source }: { treeId: string; rootId?: string; source?: StudySource }) {
+  const src = useStudySource(source, treeId)
   const [all, setAll] = useState<TreeNode[] | null>(null)
-  useEffect(() => void getTreeNodes(treeId).then(setAll), [treeId])
+  useEffect(() => void src.nodes().then((ns) => { setAll(ns); coarseHint('dnd', '카드 탭 → 빈칸 탭', I.squareDashed) }), [src])
   const rid = all && (all.some((n) => n.id === rootId) ? rootId! : getRoot(all).id)
   return (
     <section>
       <TreeHeader treeId={treeId} active="dnd">
         {all && rid && <ScopeSelect nodes={all} value={rid} to={(id) => href.dnd(treeId, id)} />}
       </TreeHeader>
-      {all && rid && <Quiz treeId={treeId} scope={scopeOf(all, rid)} />}
+      {all && rid && <Quiz treeId={treeId} scope={scopeOf(all, rid)} record={src.record} />}
     </section>
   )
 }
 
-function Quiz({ treeId, scope }: { treeId: ID; scope: TreeNode[] }) {
+function Quiz({ treeId, scope, record }: { treeId: ID; scope: TreeNode[]; record: StudySource['record'] }) {
   const rootId = scope[0].id
   const leaves = useMemo(() => leavesOf(scope), [scope])
   const byId = new Map(scope.map((n) => [n.id, n]))
@@ -36,7 +40,7 @@ function Quiz({ treeId, scope }: { treeId: ID; scope: TreeNode[] }) {
   const [answer, setAnswer] = useState(false)
   const { drag, sel, handlers } = useDragDrop((card, to) => setPlace((p) => moveCard(p, card, to)), !score)
 
-  if (!leaves.length) return <p className="muted">이 범위에는 빈칸으로 낼 하위 개념이 없어요. 범위를 바꿔 보세요.</p>
+  if (!leaves.length) return <p className="dnd-empty muted">빈칸으로 낼 하위 개념이 없어요</p>
 
   const placed = new Set(Object.values(place))
   const tray = order.filter((id) => !placed.has(id))
@@ -49,7 +53,7 @@ function Quiz({ treeId, scope }: { treeId: ID; scope: TreeNode[] }) {
     const s = gradeDnd(scope, place)
     setScore(s)
     haptic(s.correct === s.total ? 'success' : 'warn')
-    await Promise.all(leaves.map((l) => recordResult(l.id, treeId, s.ok[l.id])))
+    await Promise.all(leaves.map((l) => record(l.id, s.ok[l.id])))
     await logEvent('dnd_attempt_completed', { mode: 'dnd', rootId, total: s.total, correct: s.correct }, treeId)
   }
   function retry() {
@@ -70,6 +74,7 @@ function Quiz({ treeId, scope }: { treeId: ID; scope: TreeNode[] }) {
       style={i === undefined ? undefined : ({ '--i': i } as CSSProperties)}
     >
       <span>{title(id)}</span>
+      <ResultMark ok={result} />
     </button>
   )
 
@@ -82,7 +87,9 @@ function Quiz({ treeId, scope }: { treeId: ID; scope: TreeNode[] }) {
     if (!c)
       return (
         <button type="button" className={`dnd-slot${over(n.id)}${target(true)}`} data-drop={n.id} data-slot={n.id} aria-label={label}
-          data-result={score ? 'wrong' : undefined} disabled={!!score} />
+          data-result={score ? 'wrong' : undefined} disabled={!!score}>
+          <ResultMark ok={score ? false : undefined} />
+        </button>
       )
     return (
       <div className={`dnd-slot filled${over(n.id)}${target(c !== holding)}`} data-drop={n.id} data-slot={n.id} aria-label={label}>
@@ -101,9 +108,9 @@ function Quiz({ treeId, scope }: { treeId: ID; scope: TreeNode[] }) {
         <div className="dnd-bar">
           {score && <ScoreLine {...score} />}
           {!score && <Progress n={placed.size} total={leaves.length} />}
-          {!score && <button type="button" className={`primary${tray.length ? '' : ' ready'}`} onClick={grade}>채점</button>}
-          {score && <button type="button" onClick={() => setAnswer((a) => !a)}>{answer ? '내 답 보기' : '정답 보기'}</button>}
-          {score && <button type="button" className="primary" onClick={retry}>다시 하기</button>}
+          {!score && <button type="button" className={`primary${tray.length ? '' : ' ready'}`} onClick={grade}><Icon d={checkCheck} /> 채점</button>}
+          {score && <button type="button" onClick={() => setAnswer((a) => !a)}><Icon d={answer ? eyeOff : eye} /> {answer ? '내 답 보기' : '정답 보기'}</button>}
+          {score && <button type="button" className="primary" onClick={retry}><Icon d={rotateCcw} /> 다시 하기</button>}
         </div>
       </div>
       <Ghost drag={drag} title={title} />

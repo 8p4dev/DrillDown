@@ -1,90 +1,90 @@
-.trees-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
-.trees-head h1 { margin: 0; }
-.trees-head button { width: 2.1rem; height: 2.1rem; padding: 0; font-size: 1.05rem; color: var(--muted); }
+/* 목록 화면 — 01 §4 목록 행, 02 §3.1 목록 와이어. 색은 토큰만, 그림자 없음, 반경 2px/0 */
+.trees-head { display: flex; align-items: center; gap: .5rem; margin-bottom: 1rem; }
+.trees-head h1 { margin: 0; flex: 1; min-width: 0; }
+.trees-head > button { flex: none; width: 2.4rem; height: 2.4rem; padding: 0; display: inline-grid; place-items: center; color: var(--muted); }
 .trees-form { display: flex; gap: .5rem; padding: .6rem; margin-bottom: 1.25rem; }
 .trees .trees-form input { flex: 1; min-width: 0; border-color: transparent; background: transparent; }
 .trees .trees-form input:focus { box-shadow: none; border-color: transparent; }
-.trees-form:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-.trees-empty { display: flex; flex-direction: column; align-items: center; gap: .75rem; margin: 0; padding: 2.5rem 1rem; text-align: center; border: 1.5px dashed var(--border-strong); border-radius: var(--radius-lg); }
-.trees-empty svg { width: 64px; height: 48px; fill: var(--surface); stroke: var(--border-strong); stroke-width: 1.5; }
-.trees-empty .branch { fill: none; stroke-linecap: round; }
-.trees-empty .root { fill: var(--accent-soft); stroke: var(--accent); }
+.trees-form:focus-within { border-color: var(--text); box-shadow: inset 0 0 0 1px var(--text); }
+.trees-form .primary { display: inline-flex; align-items: center; gap: .35rem; white-space: nowrap; }
+
+/* 빈 상태(02 D8): 큰 + 타일 하나 + 한 줄. 전체가 버튼(탭 → 입력칸 포커스) */
+.trees .trees-empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .6rem; width: 100%; min-height: 11rem;
+  padding: 2.5rem 1rem; color: var(--muted); font-size: var(--fs-md); font-weight: 550;
+  background: transparent; border: 1px dashed var(--border-strong); border-radius: var(--radius-lg);
+}
+.trees .trees-empty svg { color: var(--text); }
+@media (hover: hover) { .trees .trees-empty:hover:not(:disabled) { background: var(--surface); border-color: var(--text); border-style: solid; } }
 
 .tree-cards { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: .9rem; }
 .tree-cards li {
   position: relative; display: flex; flex-direction: column; cursor: pointer;
-  transition: border-color var(--t-fast), box-shadow var(--t-med) var(--ease-out), transform var(--t-med) var(--ease-out);
+  transition: border-color var(--t-fast), opacity var(--t-med) var(--ease-out), transform var(--t-med) var(--ease-out);
 }
-@media (hover: hover) {
-  .tree-cards li:hover { border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); box-shadow: var(--shadow-lift); transform: translateY(-2px); }
-}
+@media (hover: hover) { .tree-cards li:hover { border-color: var(--text); } }
 .tree-cards li:has(.tree-open:active, .tree-title:active) { transform: scale(.985); transition: transform 60ms var(--ease-press); }
-.tree-cards li.is-new { animation: spring-in var(--t-slow) var(--ease-spring), pulse-ring 900ms var(--ease-out) var(--t-slow); }
+/* 새 카드(01 §3.6 #14): rise + 2px outline 이 페이드. 삭제(#13): opacity 0 + scale(.98) 뒤 목록에서 빠진다 */
+.tree-cards li.is-new { animation: rise var(--t-med) var(--ease-out); }
+.tree-cards li.is-new::before { content: ''; position: absolute; inset: -2px; pointer-events: none; outline: 2px solid var(--text); animation: fade-out var(--t-slow) var(--ease-out) var(--t-med) both; }
+.tree-cards li.is-gone { opacity: 0; transform: scale(.98); pointer-events: none; }
+@keyframes fade-out { from { opacity: 1; } to { opacity: 0; } }
 
 /* stretched link: 카드 전체를 덮는 편집 링크. 다른 상호작용 요소는 그 위(z-index 1) */
 .tree-open { flex: 1; min-height: 1.1rem; }
 .tree-open::after { content: ''; position: absolute; inset: 0; border-radius: inherit; }
 .tree-open:focus-visible { outline: none; }
-.tree-open:focus-visible::after { outline: 2px solid var(--accent); outline-offset: -2px; }
+.tree-open:focus-visible::after { outline: 2px solid var(--text); outline-offset: -2px; }
 .tree-top, .tree-modes { position: relative; z-index: 1; pointer-events: none; }
 .tree-top > *, .tree-modes > * { pointer-events: auto; }
 
 .tree-top { z-index: 2; display: flex; align-items: flex-start; gap: .65rem; }
+.tree-top .avatar { flex: none; pointer-events: none; display: grid; place-items: center; width: 2.25rem; height: 2.25rem; font-weight: 700; user-select: none; } /* 색·톤은 DS .avatar[data-tone]. 눌림은 뒤의 편집 링크로 통과 */
 .tree-title { flex: 1; min-width: 0; padding: .3rem 0; font-size: var(--fs-lg); line-height: 1.35; font-weight: 650; letter-spacing: -.015em; overflow-wrap: anywhere; cursor: pointer; }
 .tree-cards .tree-rename { flex: 1; min-width: 0; padding: .2rem .4rem; font-size: var(--fs-lg); font-weight: 650; }
-
-/* 이니셜 아바타: 색조는 토큰끼리 섞어 만들어 다크 모드를 저절로 따른다. 눌림은 뒤의 편집 링크로 통과 */
-.tree-avatar {
-  --tone: var(--accent);
-  flex: none; display: grid; place-items: center; width: 2.25rem; height: 2.25rem; border-radius: var(--radius); pointer-events: none;
-  font-size: var(--fs-md); font-weight: 700; text-transform: uppercase; user-select: none;
-  color: color-mix(in srgb, var(--tone) 65%, var(--text)); background: color-mix(in srgb, var(--tone) 15%, var(--surface));
-}
-.tree-avatar[data-tone='1'] { --tone: color-mix(in oklch, var(--accent) 72%, var(--danger)); }
-.tree-avatar[data-tone='2'] { --tone: color-mix(in oklch, var(--accent) 40%, var(--danger)); }
-.tree-avatar[data-tone='3'] { --tone: color-mix(in oklch, var(--accent) 72%, var(--ok)); }
-.tree-avatar[data-tone='4'] { --tone: color-mix(in oklch, var(--accent) 35%, var(--ok)); }
-.tree-avatar[data-tone='5'] { --tone: color-mix(in oklch, var(--accent) 30%, var(--muted)); }
+.tree-top .vis-badge { flex: none; align-self: center; }
 
 .tree-cards li:has(.tree-menu[open]) { z-index: 3; }
 .tree-menu { position: relative; margin: 0 -.45rem 0 auto; }
 .tree-menu summary {
-  list-style: none; display: grid; place-items: center; width: 1.9rem; height: 1.9rem; border-radius: 8px;
-  color: var(--muted); font-size: 1.1rem; cursor: pointer; transition: background var(--t-fast), color var(--t-fast);
+  list-style: none; display: grid; place-items: center; width: 2rem; height: 2rem; border-radius: var(--radius);
+  color: var(--muted); cursor: pointer; transition: background var(--t-fast), color var(--t-fast);
 }
 .tree-menu summary::-webkit-details-marker { display: none; }
-@media (hover: hover) { .tree-menu summary:hover { color: var(--text); background: var(--accent-soft); } }
-.tree-menu summary:active, .tree-menu[open] summary { color: var(--text); background: var(--accent-soft); }
+@media (hover: hover) { .tree-menu summary:hover { color: var(--text); background: var(--surface-2); } }
+.tree-menu summary:active, .tree-menu[open] summary { color: var(--text); background: var(--surface-2); }
+/* 메뉴(01 §3.3): 떠 있는 요소 = 1px border-strong + 다른 면. 항목은 아이콘 + 글자 */
 .tree-menu-list {
-  position: absolute; right: 0; top: calc(100% + .25rem); z-index: 2; min-width: 7.5rem; padding: .3rem;
-  display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius); box-shadow: var(--shadow-lift); transform-origin: top right;
-  animation: pop var(--t-med) var(--ease-out);
+  position: absolute; right: 0; top: calc(100% + .25rem); z-index: 2; min-width: 8.5rem; padding: .3rem;
+  display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--border-strong);
+  border-radius: var(--radius); transform-origin: top right;
+  animation: menu-in var(--t-fast) var(--ease-out);
 }
-.tree-menu-list button { text-align: left; border-color: transparent; background: none; box-shadow: none; font-size: .85rem; padding: .4rem .6rem; }
-.tree-menu-list button.danger { border-color: transparent; }
+@keyframes menu-in { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: none; } }
+.tree-menu-list button { display: flex; align-items: center; gap: .5rem; text-align: left; border-color: transparent; background: none; box-shadow: none; font-size: var(--fs-sm); padding: .4rem .6rem; }
+.tree-menu-list button svg { color: var(--muted); }
+.tree-menu-list button.danger, .tree-menu-list button.danger svg { color: var(--danger); }
 
-/* 학습 모드 세그먼트: 한 줄, 칸 3개 */
+/* 학습 모드 세그먼트: 한 줄, 칸 3개 (아이콘 + 짧은 글자) */
 .tree-modes { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
 .tree-modes a {
   display: flex; align-items: center; justify-content: center; gap: .3rem; min-width: 0; padding: .4rem .3rem;
-  font-size: .8rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-size: .8rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-decoration: none;
   color: var(--muted); background: var(--surface); transition: background var(--t-fast), color var(--t-fast);
 }
 .tree-modes a + a { border-left: 1px solid var(--border); }
-.tree-modes svg { flex: none; width: 14px; height: 14px; fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
-@media (hover: hover) { .tree-modes a:hover { text-decoration: none; color: var(--accent); background: var(--accent-soft); } }
-.tree-modes a:active { color: var(--accent); background: var(--accent-soft); }
+.tree-modes svg { flex: none; }
+@media (hover: hover) { .tree-modes a:hover { text-decoration: none; color: var(--text); background: var(--surface-2); } }
+.tree-modes a:active { color: var(--text); background: var(--surface-2); }
 
 /* 터치 목표 44px: 좁은 화면이거나 터치 기기면 */
 @media (max-width: 760px), (pointer: coarse) {
-  .trees-head button { width: 44px; height: 44px; }
+  .trees-head > button { width: 44px; height: 44px; }
   .trees-form button, .trees .trees-form input { min-height: 44px; }
   .tree-menu { margin: -.25rem -.7rem -.25rem auto; }
   .tree-menu summary { width: 44px; height: 44px; }
   .tree-menu-list button { min-height: 44px; }
   .tree-modes a { min-height: 44px; box-sizing: border-box; font-size: var(--fs-sm); }
-  .tree-modes svg { width: 16px; height: 16px; }
 }
 @media (max-width: 760px) {
   .tree-cards { grid-template-columns: 1fr; }

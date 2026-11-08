@@ -65,6 +65,8 @@ export interface AdminTree {
   updated_at: number
   hidden_by_admin_at: number | null
   open_reports: number
+  /** 관리자 "삭제 트리 복구" 목록용(7일 유예 중). 없음/null = 삭제 안 됨 */
+  deleted_at?: number | null
 }
 
 export type ReportReason = 'copyright' | 'spam' | 'abuse' | 'other'

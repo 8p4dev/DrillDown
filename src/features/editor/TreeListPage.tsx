@@ -1,31 +1,45 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { initialOf, toneOf } from '../../core/avatar'
 import { exportEvents, logEvent } from '../../core/events'
-import { createTree, deleteTree, listTrees, renameTree } from '../../core/repo'
+import { createTree, listTrees, markTreeDeleted, purgeDeletedTrees, renameTree, restoreTree } from '../../core/repo'
 import type { Tree } from '../../core/types'
 import { href } from '../../router'
+import { Icon } from '../../ui/Icon'
+import { I } from '../../ui/icons'
+import ShareSheet from '../share/ShareSheet'
+import SyncStatus from '../share/SyncStatus'
+import VisibilityBadge from '../share/VisibilityBadge'
 import { haptic } from '../feel'
+import { toast } from '../Toast'
+import { startViewport } from '../viewport'
 import './treelist.css'
 
-// 선 굵기는 CSS(.tree-modes svg)에서 한 번에 준다
+const UNDO_MS = 10_000
+/** 모드 3칸: 아이콘 + 짧은 글자. aria-label 은 E2E 계약(plan §3.7) */
 const MODES = [
-  { icon: <><rect x="2" y="5" width="9.5" height="8.5" rx="1.5" /><path d="M5 2.5h7.5A1.5 1.5 0 0 1 14 4v7" /></>, label: '플래시카드', to: href.flash },
-  { icon: <rect x="2" y="3.5" width="12" height="9" rx="1.5" strokeDasharray="2.4 2" />, label: '빈칸 퀴즈', to: href.dnd },
-  { icon: <><path d="M9.5 2H4.5A1.5 1.5 0 0 0 3 3.5v9A1.5 1.5 0 0 0 4.5 14h7a1.5 1.5 0 0 0 1.5-1.5V5.5z" /><path d="M9.5 2v3.5H13" /></>, label: '백지 퀴즈', to: href.blank },
+  { icon: I.layers, short: '플래시', label: '플래시카드', to: href.flash },
+  { icon: I.squareDashed, short: '빈칸', label: '빈칸 퀴즈', to: href.dnd },
+  { icon: I.file, short: '백지', label: '백지 퀴즈', to: href.blank },
 ]
-
-/** 제목 → 아바타 색조 0..5 (같은 제목은 언제나 같은 색) */
-const toneOf = (title: string) => [...title].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 0) % 6
+const coarse = () => matchMedia('(pointer: coarse)').matches
 
 export default function TreeListPage() {
   const [trees, setTrees] = useState<Tree[] | null>(null)
   const [title, setTitle] = useState('')
   const [newId, setNewId] = useState<string>()
   const [editing, setEditing] = useState<string>()
+  const [sharing, setSharing] = useState<Tree>()
+  const [goneId, setGoneId] = useState<string>()
   const input = useRef<HTMLInputElement>(null)
+  const purgeTimers = useRef(new Map<string, number>())
   const reload = useCallback(() => listTrees().then(setTrees), [])
-  useEffect(() => void reload(), [reload])
   useEffect(() => {
-    if (trees?.length === 0) input.current?.focus()
+    startViewport()
+    purgeDeletedTrees().then(reload) // 지난 세션에서 되돌리지 않은 삭제를 마무리
+  }, [reload])
+  // D8: PC 는 빈 상태에서 자동 포커스, 터치 기기는 키보드가 화면을 가리므로 탭해야 포커스
+  useEffect(() => {
+    if (trees?.length === 0 && !coarse()) input.current?.focus()
   }, [trees])
   // 열린 ⋯ 메뉴는 바깥을 누르면 닫는다 (네이티브 <details> 는 스스로 닫히지 않음)
   useEffect(() => {
@@ -51,8 +65,29 @@ export default function TreeListPage() {
     next = next.trim()
     if (next && next !== t.title) await renameTree(t.id, next).then(reload)
   }
-  const remove = async (t: Tree) => {
-    if (confirm(`"${t.title}" 트리를 삭제할까요? 학습 기록도 함께 지워집니다.`)) await deleteTree(t.id).then(reload)
+  /** 확인창 없음(02 D9): 소프트 삭제 → 되돌리기 토스트 10초 → 지나면 하드 삭제 */
+  const remove = (t: Tree) => {
+    setGoneId(t.id)
+    haptic('warn')
+    setTimeout(async () => {
+      await markTreeDeleted(t.id)
+      setGoneId(undefined)
+      await reload()
+      const purge = window.setTimeout(() => {
+        purgeTimers.current.delete(t.id)
+        void purgeDeletedTrees(t.id)
+      }, UNDO_MS)
+      purgeTimers.current.set(t.id, purge)
+      toast(`"${t.title}" 삭제`, {
+        label: '되돌리기',
+        run: () => {
+          clearTimeout(purge)
+          purgeTimers.current.delete(t.id)
+          setNewId(t.id)
+          restoreTree(t.id).then(reload)
+        },
+      }, UNDO_MS)
+    }, 200) // 카드 사라짐(opacity·scale) 뒤에 목록에서 뺀다
   }
 
   const exportLog = async () => {
@@ -66,41 +101,40 @@ export default function TreeListPage() {
     <section className="trees">
       <header className="trees-head">
         <h1>내 트리</h1>
-        <button type="button" className="icon" aria-label="학습 기록 내보내기" title="학습 기록 내보내기" onClick={exportLog}>⤓</button>
+        <SyncStatus />
+        <button type="button" className="ghost" aria-label="학습 기록 내보내기" data-tip="학습 기록 내보내기" onClick={exportLog}>
+          <Icon d={I.download} size={20} />
+        </button>
       </header>
       <form onSubmit={create} className="trees-form card">
         <input ref={input} aria-label="새 트리 제목" placeholder="새 트리 제목 (예: 노동법)" value={title} onChange={(e) => setTitle(e.target.value)} />
-        <button type="submit" className="primary">만들기</button>
+        <button type="submit" className="primary"><Icon d={I.plus} />만들기</button>
       </form>
-      {trees === null ? (
-        <p className="muted">불러오는 중…</p>
-      ) : trees.length === 0 ? (
-        <p className="trees-empty muted">
-          <svg viewBox="0 0 64 48" aria-hidden>
-            <path className="branch" d="M32 14v6M12 30v-6a4 4 0 0 1 4-4h32a4 4 0 0 1 4 4v6M32 20v10" />
-            <circle className="root" cx="32" cy="8" r="6" />
-            <circle cx="12" cy="38" r="6" /><circle cx="32" cy="38" r="6" /><circle cx="52" cy="38" r="6" />
-          </svg>
-          아직 트리가 없습니다.
-        </p>
+      {trees === null ? null : trees.length === 0 ? (
+        <button type="button" className="empty trees-empty" onClick={() => input.current?.focus()}>
+          <Icon d={I.plus} size={64} />
+          <span>첫 트리 만들기</span>
+        </button>
       ) : (
         <ul className="tree-cards">
           {trees.map((t) => (
-            <TreeCard key={t.id} t={t} isNew={t.id === newId} editing={t.id === editing}
-              onEdit={() => setEditing(t.id)} onRename={(v) => rename(t, v)} onCancel={() => setEditing(undefined)} onRemove={() => remove(t)} />
+            <TreeCard key={t.id} t={t} isNew={t.id === newId} gone={t.id === goneId} editing={t.id === editing}
+              onEdit={() => setEditing(t.id)} onRename={(v) => rename(t, v)} onCancel={() => setEditing(undefined)}
+              onShare={() => setSharing(t)} onRemove={() => remove(t)} />
           ))}
         </ul>
       )}
+      {sharing && <ShareSheet tree={sharing} onClose={() => setSharing(undefined)} onChange={reload} />}
     </section>
   )
 }
 
 type CardProps = {
-  t: Tree; isNew: boolean; editing: boolean
-  onEdit: () => void; onRename: (v: string) => void; onCancel: () => void; onRemove: () => void
+  t: Tree; isNew: boolean; gone: boolean; editing: boolean
+  onEdit: () => void; onRename: (v: string) => void; onCancel: () => void; onShare: () => void; onRemove: () => void
 }
 
-function TreeCard({ t, isNew, editing, onEdit, onRename, onCancel, onRemove }: CardProps) {
+function TreeCard({ t, isNew, gone, editing, onEdit, onRename, onCancel, onShare, onRemove }: CardProps) {
   const timer = useRef(0)
   const menu = useRef<HTMLDetailsElement>(null)
   const done = useRef(false) // Esc/Enter 처리 뒤 blur 로 한 번 더 확정되지 않게
@@ -110,9 +144,9 @@ function TreeCard({ t, isNew, editing, onEdit, onRename, onCancel, onRemove }: C
     f()
   }
   return (
-    <li data-tree-id={t.id} className={`card${isNew ? ' is-new' : ''}`}>
+    <li data-tree-id={t.id} className={`card${isNew ? ' is-new' : ''}${gone ? ' is-gone' : ''}`}>
       <div className="tree-top">
-        <span className="tree-avatar" data-tone={toneOf(t.title)} aria-hidden>{[...t.title][0]}</span>
+        <span className="avatar" data-tone={toneOf(t.title)} aria-hidden>{initialOf(t.title)}</span>
         {editing ? (
           <input className="tree-rename" aria-label="트리 이름" defaultValue={t.title} autoFocus
             onFocus={(e) => { done.current = false; e.target.select() }}
@@ -128,11 +162,13 @@ function TreeCard({ t, isNew, editing, onEdit, onRename, onCancel, onRemove }: C
             onClick={(e) => { if (e.detail === 1) timer.current = window.setTimeout(() => { haptic('tap'); location.hash = href.edit(t.id) }, 250) }}
             onDoubleClick={() => { clearTimeout(timer.current); onEdit() }}>{t.title}</strong>
         )}
+        <VisibilityBadge tree={t} />
         <details className="tree-menu" ref={menu}>
-          <summary aria-label="더 보기" title="더 보기">⋯</summary>
+          <summary aria-label="더 보기" data-tip="더 보기"><Icon d={I.ellipsis} size={20} /></summary>
           <div className="tree-menu-list">
-            <button type="button" onClick={pick(onEdit)}>이름 변경</button>
-            <button type="button" className="danger" onClick={pick(onRemove)}>삭제</button>
+            <button type="button" onClick={pick(onEdit)}><Icon d={I.pencil} />이름 변경</button>
+            <button type="button" onClick={pick(onShare)}><Icon d={I.link} />공유…</button>
+            <button type="button" className="danger" onClick={pick(onRemove)}><Icon d={I.trash2} />삭제</button>
           </div>
         </details>
       </div>
@@ -140,7 +176,7 @@ function TreeCard({ t, isNew, editing, onEdit, onRename, onCancel, onRemove }: C
       <a className="tree-open" href={href.edit(t.id)} aria-label="편집" onClick={() => haptic('tap')} />
       <nav className="tree-modes" aria-label="학습 모드">
         {MODES.map((m) => (
-          <a key={m.label} href={m.to(t.id)} onClick={() => haptic('tap')}><svg viewBox="0 0 16 16" aria-hidden>{m.icon}</svg>{m.label}</a>
+          <a key={m.label} href={m.to(t.id)} aria-label={m.label} onClick={() => haptic('tap')}><Icon d={m.icon} />{m.short}</a>
         ))}
       </nav>
     </li>

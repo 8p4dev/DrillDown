@@ -1,48 +1,52 @@
-/* 플래시카드·미니맵·오늘의 복습 — index.css 토큰 사용 */
-/* --ok·--warn 은 index.css 전역 토큰. 연두·모름 색·채움색만 지역 정의. 채움은 글자(--surface) 대비를 위해 조금 어둡게 */
-.flash {
-  --ok-soft: #8fd66a; --no: var(--danger);
-  --ok-fill: color-mix(in srgb, var(--ok) 85%, #000); --no-fill: color-mix(in srgb, var(--no) 90%, #000);
-}
+/* 플래시카드·미니맵·오늘의 복습 — index.css 토큰만(01 §3.1 4색 규칙). 연두 = ok 45% + 점선, 채움 위 글자 = --on-fill */
 
 .flash-layout { display: grid; grid-template-columns: minmax(0, 1fr) 220px; gap: 1.5rem; align-items: start; }
 .flash-aside { position: sticky; top: calc(var(--nav-h) + 1rem); }
-.flash-tally { font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
-.flash-tally b { font-weight: 650; color: var(--text); }
+.flash-tally { display: inline-flex; align-items: center; gap: .15rem; font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+.flash-tally b { font-weight: 650; color: var(--text); margin-right: .5rem; }
+.flash-tally svg.ok { color: var(--ok); }
+.flash-tally svg.no { color: var(--danger); }
 .pop-num { display: inline-block; animation: pop var(--t-med) var(--ease-out); }
+.flash .flash-edit-link, .review-link { display: inline-flex; align-items: center; justify-content: center; gap: .35rem; } /* 버튼은 index.css 가 inline-flex */
 
 /* 경로 */
 .flash-path { display: flex; flex-wrap: wrap; align-items: center; gap: .15rem; font-size: var(--fs-sm); color: var(--muted); margin-bottom: .75rem; min-height: 1.4em; }
 .flash-path .sep { margin: 0 .35rem; opacity: .6; }
 .flash-path [aria-current] { color: var(--text); font-weight: 600; }
 .flash-path button.link { color: var(--muted); }
-@media (hover: hover) { .flash-path button.link:hover:not(:disabled) { color: var(--accent); } }
+@media (hover: hover) { .flash-path button.link:hover:not(:disabled) { color: var(--text); } }
 
-/* 카드 공통: 상태 색은 .c-* 가 변수로만 정하고 카드가 읽는다 (전역 button:hover 배경에도 상태 색 유지) */
+/* 카드 공통: 상태는 .c-* 가 변수로만 정하고 카드가 읽는다 (01 §3.1.2 띠·틴트·테두리) */
 .flash .flash-concept, .flash .flash-kid { position: relative; background: var(--tone, var(--surface)); border: 1px solid var(--edge, var(--border)); }
-.flash .flash-concept::before, .flash .flash-kid::before { content: ''; position: absolute; inset: 0 0 auto; height: 4px; background: var(--band, transparent); transition: background var(--t-med); }
-.flash .c-green { --tone: color-mix(in srgb, var(--ok) 9%, var(--surface)); --edge: color-mix(in srgb, var(--ok) 55%, var(--border)); --band: var(--ok); }
-.flash .c-lightgreen { --tone: color-mix(in srgb, var(--ok-soft) 9%, var(--surface)); --edge: color-mix(in srgb, var(--ok-soft) 60%, var(--border)); --band: var(--ok-soft); }
-.flash .c-yellow { --tone: color-mix(in srgb, var(--warn) 9%, var(--surface)); --edge: color-mix(in srgb, var(--warn) 55%, var(--border)); --band: var(--warn); }
-.flash .c-red { --tone: color-mix(in srgb, var(--no) 8%, var(--surface)); --edge: color-mix(in srgb, var(--no) 55%, var(--border)); --band: var(--no); }
+.flash .flash-concept::before, .flash .flash-kid::before {
+  content: ''; position: absolute; inset: 0 0 auto; height: 0;
+  border-top: 4px var(--band-style, solid) var(--band, var(--border)); transition: border-color var(--t-med);
+}
+.flash .c-green { --tone: color-mix(in srgb, var(--ok) 8%, var(--surface)); --edge: var(--ok); --band: var(--ok); }
+.flash .c-lightgreen { --tone: color-mix(in srgb, var(--ok) 6%, var(--surface)); --edge: var(--border-strong); --band: color-mix(in srgb, var(--ok) 45%, var(--surface)); --band-style: dashed; }
+.flash .c-red { --tone: color-mix(in srgb, var(--danger) 8%, var(--surface)); --edge: var(--danger); --band: var(--danger); }
+/* 우상단 마크 — 색 아닌 단서(✓✓ / ✓ / ✕). 초록은 체크 2개 겹침 */
+.flash-state { position: absolute; top: 8px; right: 8px; display: inline-flex; line-height: 0; color: var(--ok); }
+.c-red > .flash-state { color: var(--danger); }
+.flash-state.dbl svg + svg { margin-left: -9px; }
 
 /* 개념 카드 */
 .flash .flash-card-wrap { animation: rise var(--t-med) var(--ease-out); }
 .flash-concept {
-  display: flex; flex-direction: column; align-items: center; gap: .6rem; width: 100%; overflow: hidden; /* 띠가 둥근 모서리를 따른다 */
+  display: flex; flex-direction: column; align-items: center; gap: .6rem; width: 100%; overflow: hidden;
   padding: 2.75rem 1.5rem 1.5rem; text-align: center; color: var(--text);
-  border-radius: var(--radius-lg); box-shadow: var(--shadow-lift); font-size: 1rem; font-weight: 400;
-  transition: transform var(--t-fast) var(--ease-press), box-shadow var(--t-fast), border-color var(--t-med), background var(--t-med);
+  border-radius: var(--radius-lg); border-color: var(--edge, var(--border-strong)); font-size: 1rem; font-weight: 400;
+  transition: transform var(--t-fast) var(--ease-press), border-color var(--t-med), background var(--t-med);
 }
 @media (hover: hover) {
-  .flash .flash-concept:hover:not(:disabled) { background: var(--tone, var(--surface)); border-color: var(--edge, var(--border)); transform: translateY(-1px); box-shadow: var(--shadow-pop); }
+  .flash .flash-concept:hover:not(:disabled) { background: var(--tone, var(--surface)); border-color: var(--text); }
 }
 .flash .flash-concept:active:not(:disabled) { transform: scale(.985); }
 .flash-concept-title { font-size: clamp(1.5rem, 6vw, 2rem); font-weight: 750; letter-spacing: -.02em; line-height: 1.25; word-break: keep-all; overflow-wrap: anywhere; }
-.flash-count { display: inline-flex; align-items: center; gap: .35rem; margin-top: .5rem; padding: .2rem .7rem; border-radius: 999px; font-size: var(--fs-xs); font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-2); background: color-mix(in srgb, var(--text) 6%, transparent); transition: color var(--t-med), background var(--t-med); }
-.flash-count .chev { display: inline-block; font-size: 1.25em; line-height: 1; transition: transform var(--t-slow) var(--ease-spring); }
+.flash-count { display: inline-flex; align-items: center; gap: .25rem; margin-top: .5rem; padding: .2rem .6rem; border-radius: var(--radius-sm); font-size: var(--fs-xs); font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-2); background: color-mix(in srgb, var(--text) 6%, transparent); transition: color var(--t-med), background var(--t-med); }
+.flash-count .chev { transition: transform var(--t-slow) var(--ease-out); }
 .flash-concept[aria-expanded='true'] .chev { transform: rotate(180deg); }
-.flash-concept[aria-expanded='true'] .flash-count { color: var(--accent); background: var(--accent-soft); }
+.flash-concept[aria-expanded='true'] .flash-count { color: var(--text); background: color-mix(in srgb, var(--text) 8%, transparent); }
 .flash-note { white-space: normal; color: var(--text-2); font-size: var(--fs-md); line-height: 1.6; text-align: left; }
 .flash-concept .flash-note { text-align: left; max-width: 36rem; margin: 0 auto; }
 
@@ -54,49 +58,47 @@
 .flash-kids-wrap.closed { display: none; grid-template-rows: 0fr; opacity: 0; }
 @starting-style { .flash-kids-wrap:not(.closed) { grid-template-rows: 0fr; opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .flash-kids-wrap { transition: none; } }
-/* 높이 0 까지 접히도록 잘라내되, 그림자·shake 가 잘리지 않게 좌우 6px·아래 6px 여유 */
+/* 높이 0 까지 접히도록 잘라내되, outline·shake 가 잘리지 않게 좌우 6px·아래 6px 여유 */
 .flash-kids-clip { min-height: 0; overflow: hidden; margin-inline: -6px; }
 .flash-kids { list-style: none; margin: 0; padding: 1rem 6px 6px; display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: .75rem; }
 .flash-kid {
   display: flex; flex-direction: column; justify-content: space-between; gap: .75rem; overflow: hidden;
-  padding: 1rem 1rem .9rem; border-radius: var(--radius);
-  box-shadow: var(--shadow); animation: flash-in var(--t-slow) var(--ease-out) both; animation-delay: calc(var(--i, 0) * 70ms);
-  transition: background var(--t-med), border-color var(--t-med), box-shadow var(--t-med);
+  padding: 1rem 2rem .9rem 1rem; border-radius: var(--radius);
+  animation: flash-in var(--t-slow) var(--ease-out) both; animation-delay: calc(var(--i, 0) * 70ms);
+  transition: background var(--t-med), border-color var(--t-med);
 }
 /* flash-in 을 목록에 남겨 둬야 shake 가 빠질 때 등장 애니메이션이 재시작하지 않는다 */
 .flash-kid.shake { animation: flash-in var(--t-slow) var(--ease-out) both, shake var(--t-slow) var(--ease-out); animation-delay: calc(var(--i, 0) * 70ms), 0s; }
 .flash-kid-body { display: flex; flex-direction: column; gap: .3rem; }
 .flash-kid strong { font-size: var(--fs-lg); font-weight: 650; letter-spacing: -.01em; }
-.flash-dive { position: relative; align-self: flex-start; min-height: 0; padding: .25rem .6rem; font-size: var(--fs-sm); color: var(--accent); font-variant-numeric: tabular-nums; }
+.flash-dive { position: relative; align-self: flex-start; min-height: 0; padding: .25rem .6rem; font-size: var(--fs-sm); color: var(--text); font-variant-numeric: tabular-nums; }
 .flash-dive::after { content: ''; position: absolute; inset: -8px; } /* 작은 배지의 터치 영역만 넓힌다 */
-@keyframes flash-in { from { opacity: 0; transform: translateY(-10px) scale(.97); } to { opacity: 1; transform: none; } }
+@keyframes flash-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
 
-/* 평가 버튼 */
+/* 평가 버튼(01 §3.3 버튼 ok/danger 행): surface 면 + 색 글자·테두리, 호버·눌림은 채움 + --on-fill */
 .flash-rate { display: flex; gap: .4rem; }
 .flash-rate button { flex: 1; }
-.flash-rate button.known:active:not(:disabled), .flash-rate button.unknown:active:not(:disabled) { color: var(--surface); }
-.flash-rate button.known:active:not(:disabled) { background: var(--ok-fill); border-color: transparent; }
-.flash-rate button.unknown:active:not(:disabled) { background: var(--no-fill); border-color: transparent; }
+.flash-rate button.known { color: var(--ok); border-color: var(--ok); }
+.flash-rate button.unknown { color: var(--danger); border-color: var(--danger); }
+.flash-rate button.known:active:not(:disabled) { color: var(--on-fill); background: var(--ok); }
+.flash-rate button.unknown:active:not(:disabled) { color: var(--on-fill); background: var(--danger); }
 @media (hover: hover) {
-  .flash-rate button.known:hover:not(:disabled) { color: var(--surface); background: var(--ok-fill); border-color: transparent; }
-  .flash-rate button.unknown:hover:not(:disabled) { color: var(--surface); background: var(--no-fill); border-color: transparent; }
+  .flash-rate button.known:hover:not(:disabled) { color: var(--on-fill); background: var(--ok); border-color: var(--ok); }
+  .flash-rate button.unknown:hover:not(:disabled) { color: var(--on-fill); background: var(--danger); border-color: var(--danger); }
 }
-.flash-mark { display: inline-block; font-weight: 800; }
-.flash-rate .flash-result { font-weight: 650; }
-/* 알음: 가운데서 초록이 차오르고 체크가 튀어나온다. 끝 상태는 애니메이션 없이도 채움 */
-.flash-rate .flash-result.known, .flash-rate .flash-result.known:hover:not(:disabled) {
-  color: var(--surface); border-color: transparent;
-  background: linear-gradient(var(--ok-fill), var(--ok-fill)) center / 100% 100% no-repeat, color-mix(in srgb, var(--ok) 25%, var(--surface));
-}
-.flash-rate .flash-result.known { animation: flash-fill var(--t-med) var(--ease-out); }
-.flash-result.known .flash-mark { animation: flash-check var(--t-slow) var(--ease-spring) 60ms both; }
-@keyframes flash-fill { from { background-size: 0% 100%, auto; } }
-@keyframes flash-check { from { transform: scale(0) rotate(-25deg); } to { transform: none; } }
-.flash-rate .flash-result.unknown, .flash-rate .flash-result.unknown:hover:not(:disabled) { color: var(--no); background: color-mix(in srgb, var(--no) 10%, var(--surface)); border-color: color-mix(in srgb, var(--no) 40%, var(--border)); }
-.flash-rate .flash-result.unknown { animation: pop var(--t-med) var(--ease-out); }
+.flash-mark { display: inline-flex; line-height: 0; }
+.flash-rate .flash-result { position: relative; isolation: isolate; overflow: hidden; font-weight: 650; }
+.flash-result .flash-mark { animation: flash-check var(--t-med) var(--ease-out) 60ms both; }
+@keyframes flash-check { from { transform: scale(0); } to { transform: none; } }
+/* 알음: ok 채움이 가운데서 가로로 차오른다(가상요소 scaleX, #4). 끝 상태는 애니메이션 없이도 채움 */
+.flash-rate .flash-result.known, .flash-rate .flash-result.known:hover:not(:disabled) { color: var(--on-fill); background: none; border-color: var(--ok); }
+.flash-rate .flash-result.known::before { content: ''; position: absolute; inset: 0; z-index: -1; background: var(--ok); animation: flash-fill var(--t-med) var(--ease-out); }
+@keyframes flash-fill { from { transform: scaleX(0); } }
+/* 모름: danger 테두리 + 8% 틴트(#5) */
+.flash-rate .flash-result.unknown, .flash-rate .flash-result.unknown:hover:not(:disabled) { color: var(--danger); background: color-mix(in srgb, var(--danger) 8%, var(--surface)); border-color: var(--danger); }
 
 .flash-nav { justify-content: center; margin-top: 1.5rem; }
-.flash-nav .pulse { animation: pulse-ring calc(var(--t-slow) * 2) var(--ease-out); }
+.flash-nav .ready { outline: 2px solid var(--text); outline-offset: 2px; } /* 하위를 다 평가하면 [다음] 강조 */
 
 /* 요약: 숫자가 주인공, 라벨은 아래 작게 */
 .flash-summary { text-align: center; padding: 2rem 1.5rem; }
@@ -107,28 +109,30 @@
 .flash-summary-nums strong { font-size: 2.6rem; font-weight: 750; line-height: 1.1; letter-spacing: -.03em; font-variant-numeric: tabular-nums; animation: pop var(--t-slow) var(--ease-out) both; }
 .flash-summary-nums .unknown strong { animation-delay: 60ms; }
 .flash-summary-nums .known strong { color: var(--ok); }
-.flash-summary-nums .unknown strong { color: var(--no); }
+.flash-summary-nums .unknown strong { color: var(--danger); }
 .flash-missed { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: .4rem; justify-content: center; }
-.flash-missed li { padding: .2rem .65rem; border-radius: 999px; font-size: var(--fs-sm); font-weight: 550; background: color-mix(in srgb, var(--no) 10%, var(--surface)); color: var(--no); }
+.flash-missed li { padding: .2rem .65rem; border-radius: var(--radius-sm); font-size: var(--fs-sm); font-weight: 550; background: color-mix(in srgb, var(--danger) 8%, var(--surface)); color: var(--danger); }
 .flash-summary .actions { justify-content: center; align-items: center; gap: 1rem; margin-top: 1.5rem; }
 
-/* 미니맵 */
-.minimap { margin: 0; padding: .6rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow); }
+/* 빈 트리: 한 줄 + [편집 ›] */
+.flash > .empty { display: flex; align-items: center; gap: .75rem; }
+
+/* 미니맵(01 §3.1.2 미니맵 열): 사각 노드, 4단계 채움, 현재 위치 --text 3px 외곽 */
+.minimap { margin: 0; padding: .6rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); }
 .minimap svg { display: block; width: 100%; height: auto; max-height: 260px; }
 .minimap path { fill: none; stroke: var(--border); stroke-width: 2; }
-.minimap path.lit { stroke: var(--accent); stroke-width: 3; }
+.minimap path.lit { stroke: var(--text); stroke-width: 3; }
 .minimap-toggle { display: none; } /* 접기는 모바일 전용 */
-.mm-node rect { fill: color-mix(in srgb, var(--muted) 22%, var(--surface)); stroke: none; transition: fill var(--t-med), stroke-width var(--t-fast); }
-.mm-node[data-color='green'] rect { fill: var(--ok); }
-.mm-node[data-color='lightgreen'] rect { fill: var(--ok-soft); }
-.mm-node[data-color='yellow'] rect { fill: var(--warn); }
-.mm-node[data-color='red'] rect { fill: var(--no); }
+.mm-node rect { fill: var(--surface-2); stroke: var(--border-strong); stroke-width: 1; transition: fill var(--t-med), stroke-width var(--t-fast); }
+.mm-node[data-color='green'] rect { fill: var(--ok); stroke: var(--ok); }
+.mm-node[data-color='lightgreen'] rect { fill: color-mix(in srgb, var(--ok) 45%, var(--surface)); stroke: var(--ok); stroke-dasharray: 3 2; }
+.mm-node[data-color='red'] rect { fill: var(--danger); stroke: var(--danger); }
 .mm-node:not(.lit) { opacity: .55; }
-.mm-node.lit rect { stroke: var(--accent); stroke-width: 3; }
-.mm-node.current rect { stroke-width: 5; }
+.mm-node.lit rect { stroke: var(--text); stroke-width: 2; stroke-dasharray: none; }
+.mm-node.current rect { stroke-width: 3; }
 .mm-node.go { cursor: pointer; }
-.mm-node.go:focus-visible rect { stroke: var(--accent); stroke-width: 4; }
-@media (hover: hover) { .mm-node.go:hover rect { stroke: var(--accent); stroke-width: 4; } }
+.mm-node.go:focus-visible rect { stroke: var(--text); stroke-width: 2; }
+@media (hover: hover) { .mm-node.go:hover rect { stroke: var(--text); stroke-width: 2; } }
 .mm-node:focus { outline: none; }
 
 /* 오늘의 복습 */
@@ -136,11 +140,16 @@
 .review-list li { display: flex; align-items: center; gap: .9rem; }
 .review-list li strong { flex: 1; min-width: 0; font-weight: 650; }
 .due-count { font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+/* 링크를 버튼 규격으로(01 §3.3 버튼 기본 행) */
+.review-link { min-height: var(--tap); padding: .45rem .85rem; font-size: var(--fs-sm); font-weight: 550; color: var(--text); border: 1px solid var(--border-strong); border-radius: var(--radius); text-decoration: none; }
+@media (hover: hover) { .review-link:hover { background: var(--surface-2); border-color: var(--text); text-decoration: none; } }
 .review-head { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
 .review-head h1 { margin: 0; }
 .review-head > .muted { font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
-.review-bar { flex: 1; min-width: 120px; height: 6px; border-radius: 999px; background: var(--accent-soft); overflow: hidden; }
-.review-bar span { display: block; height: 100%; border-radius: inherit; background: var(--accent); transition: width var(--t-slow) var(--ease-out); }
+.review-bar { flex: 1; min-width: 120px; height: 6px; border-radius: 0; background: color-mix(in srgb, var(--text) 8%, transparent); overflow: hidden; }
+.review-bar span { display: block; height: 100%; background: var(--text); transition: width var(--t-slow) var(--ease-out); }
+.review-empty { display: flex; align-items: center; gap: .75rem; color: var(--muted); }
+.review-empty svg { color: var(--ok); }
 
 /* ---- 모바일 (§3.1 브레이크포인트) ---- */
 @media (max-width: 760px) {
@@ -151,7 +160,7 @@
   .flash-rate button { min-height: 44px; }
 
   /* 접힌 미니맵: 실제 크기의 .6 배로 그린 트리를 현재 위치가 띠 가운데 오도록 옮긴다 (높이 ≤ 72px) */
-  .minimap { position: relative; overflow: hidden; padding: 0; interpolate-size: allow-keywords; transition: height var(--t-slow) var(--ease-out); }
+  .minimap { position: relative; overflow: hidden; padding: 0; }
   .minimap:not(.open) { height: 64px; }
   .minimap:not(.open) svg {
     position: absolute; left: 50%; top: 50%; max-height: none;
@@ -164,20 +173,19 @@
   /* 띠 전체가 펼침 버튼. 양끝은 면 색으로 흐려 잘림을 부드럽게 */
   .minimap-toggle, .minimap-toggle:hover:not(:disabled) {
     display: flex; align-items: center; justify-content: flex-end;
-    position: absolute; inset: 0; width: 100%; min-height: 0; padding: 0 .85rem; border: 0; border-radius: 0; box-shadow: none; color: var(--muted);
+    position: absolute; inset: 0; width: 100%; min-height: 0; padding: 0 .85rem; border: 0; border-radius: 0; color: var(--muted);
     background: linear-gradient(90deg, var(--surface), transparent 16%, transparent 70%, var(--surface));
   }
   .minimap.open .minimap-toggle, .minimap.open .minimap-toggle:hover:not(:disabled) { inset: 0 0 auto auto; width: 44px; height: 44px; padding: 0; justify-content: center; background: none; }
   .minimap-toggle:active:not(:disabled) { transform: none; }
-  .minimap-toggle .chev { display: inline-block; font-size: var(--fs-md); transition: transform var(--t-slow) var(--ease-spring); }
+  .minimap-toggle .chev { transition: transform var(--t-slow) var(--ease-out); }
   .minimap.open .chev { transform: rotate(180deg); }
 
-  /* 하단 행동 바: 짧은 화면에서도 바닥에 붙도록 fixed. 내용 가림은 카드 아래 여백으로 막는다 (main 아래 패딩 2rem + 이 여백 ≥ 바 높이) */
+  /* 하단 행동 바: fixed, 키보드가 열리면 그만큼 올라온다(02 §3.2 규칙 4(a)). 내용 가림은 카드 아래 여백으로 막는다 */
   .flash-nav {
-    position: fixed; left: 0; right: 0; bottom: 0; z-index: 9; flex-wrap: nowrap; gap: .5rem; margin: 0;
+    position: fixed; left: 0; right: 0; bottom: var(--kb); z-index: 9; flex-wrap: nowrap; gap: .5rem; margin: 0;
     padding: .5rem max(.85rem, env(safe-area-inset-right)) calc(.5rem + var(--safe-b)) max(.85rem, env(safe-area-inset-left));
-    background: color-mix(in srgb, var(--surface) 88%, transparent); backdrop-filter: saturate(1.6) blur(12px); -webkit-backdrop-filter: saturate(1.6) blur(12px);
-    border-top: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+    background: var(--surface); border-top: 1px solid var(--border);
   }
   .flash-nav button { flex: 1; min-height: 44px; font-size: var(--fs-md); }
   .flash-nav button.primary { flex: 2; }
@@ -189,7 +197,11 @@
   .review-list li { flex-wrap: wrap; gap: .6rem; }
   .review-list li strong { flex-basis: calc(100% - 4rem); }
   .review-list li a, .review-list li button { flex: 1 1 8rem; min-height: 44px; } /* 기준 폭이 첫 줄 남은 칸(4rem)보다 커서 둘째 줄로 내려간다 */
-  .review-list li a { display: inline-flex; align-items: center; justify-content: center; font-size: var(--fs-sm); font-weight: 550; border: 1px solid var(--border); border-radius: 8px; }
   .review-head { gap: .5rem .75rem; }
   .review-head h1 { flex: 1 0 100%; }
+}
+/* 가로 모드 폰(02 D11): 바는 흐름으로 */
+@media (max-height: 500px) and (pointer: coarse) {
+  .flash-nav { position: static; padding: 0; margin-top: 1.5rem; border: 0; background: none; }
+  .flash-card-wrap { margin-bottom: 0; }
 }
