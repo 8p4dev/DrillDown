@@ -92,3 +92,6 @@ export interface BlankAttempt {
   selfGradedCount: number
   overriddenCount: number
 }
+
+/** 서버와 같은 저장 한도 (server/sync/map.ts LIMITS 가 이 값을 쓴다). 클라이언트는 넘기 전에 막는다 */
+export const CAP = { title: 200, note: 5000, nodesPerTree: 5000, treesPerUser: 200 } as const

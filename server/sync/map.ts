@@ -1,8 +1,9 @@
 // 서버 행(snake) ↔ 클라이언트 타입(camel) 변환 + 입력 검증 (04 §3.6 필드 대응표·상한, 03 §3.7 입력 검증)
 import type { BlankAttempt, NodeSrs, Tree, TreeNode } from '../../src/core/types.ts'
 import { fail } from '../http.ts'
+import { CAP } from '../../src/core/types.ts'
 
-export const LIMITS = { title: 200, note: 5000, aliases: 50, alias: 50, nodesPerTree: 5000, treesPerUser: 200, rows: 500, bytes: 2 * 1024 * 1024 }
+export const LIMITS = { title: CAP.title, note: CAP.note, aliases: 50, alias: 50, nodesPerTree: CAP.nodesPerTree, treesPerUser: CAP.treesPerUser, rows: 500, bytes: 2 * 1024 * 1024 }
 
 export interface TreeRow { id: string; owner_id: string; title: string; visibility: 'private' | 'unlisted' | 'public'; slug: string | null; source_tree_id: string | null; node_count: number; copy_count: number; created_at: number; updated_at: number; deleted_at: number | null; hidden_by_admin_at: number | null; seq: number }
 export interface NodeRow { id: string; tree_id: string; owner_id: string; parent_id: string | null; order: number; title: string; note: string | null; aliases: string; collapsed: number | null; offset: string | null; width: number | null; updated_at: number; deleted_at: number | null; seq: number }

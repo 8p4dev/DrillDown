@@ -32,3 +32,4 @@ config/admins.json
 .env
 .preview-data/
 .research-data/
+.p0-data/
