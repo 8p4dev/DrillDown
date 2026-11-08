@@ -144,3 +144,5 @@ A6 보강: 초록·빨강 외 유채색 금지는 UI 색에 한한다. 사용자
 - 2차 머지 16e4218: RV 발견 높음 2·중간 15·낮음 20. 판정 §3.5.
 - 2차 분배: RV `C:/Users/User/orca/workspaces/app/agent-RV-review`, dispatch `ctx_46ebe8961d99` (d4b5361에서 시작).
 - 3차 분배(2026-11-08, `send`로 재개, 같은 워크트리): DS `ctx_8e47f492cc4e`, LM `ctx_4dc3ebbc94bf`, AA `ctx_02ece70e8578`, SH `ctx_37a4733c2978`. 각자 `git merge main`(45645c4) 후 자기 문서만 수정, 끝에 "## 8. 3차 변경 기록" 표.
+- 3차 머지: LM 5f775ac, AA 953c9e3. DS·SH는 사용량 한도로 중단됐다가 재개(`send`): SH `ctx_fcad07dc318d`, DS `ctx_b1c746a18ba1`. 워크트리의 미커밋 수정에서 이어서 진행.
+- 오케스트레이터 승인(AA §6 #8-9): AA 소유 `settings` 테이블과 필드 `users.nickname_edited_at` `users.use_provider_avatar` `sessions.last_seen_at` 추가 승인. 계약 §3.3에 반영된 것으로 본다.
