@@ -184,9 +184,13 @@ export function registerAdmin(app: Hono<AppEnv>) {
   app.get('/api/admin/trees', (c) => {
     const db = c.get('db')
     const cursor = c.req.query('cursor')
-    const r = listTreesForAdmin(db, { cursor: cursor && cursor.length <= 200 ? cursor : undefined, limit: lim(c.req.query('limit')), deleted: c.req.query('deleted') === '1' })
+    const onlyDeleted = c.req.query('deleted') === '1'
+    const r = listTreesForAdmin(db, { cursor: cursor && cursor.length <= 200 ? cursor : undefined, limit: lim(c.req.query('limit')), deleted: onlyDeleted })
+    // 기본 목록 첫 페이지에 삭제 유예 트리(7일, deleted_at 포함)를 덧붙인다 — 클라이언트는 deleted_at 으로 "삭제 트리 복구" 목록을 가른다.
+    // ponytail: 유예 트리는 최대 100개만(커서 없음). 많아지면 ?deleted=1 로 따로 페이지
+    const items = !onlyDeleted && !cursor ? [...r.items, ...listTreesForAdmin(db, { limit: 100, deleted: true }).items] : r.items
     const open = db.prepare('SELECT COUNT(*) n FROM reports WHERE tree_id = ? AND resolved_at IS NULL')
-    return c.json({ items: r.items.map((t) => ({ ...t, open_reports: (open.get(t.id) as { n: number }).n })), next: r.next })
+    return c.json({ items: items.map((t) => ({ ...t, open_reports: (open.get(t.id) as { n: number }).n })), next: r.next })
   })
 
   for (const act of ['hide', 'unhide'] as const)
