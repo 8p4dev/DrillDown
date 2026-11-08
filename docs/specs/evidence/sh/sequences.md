@@ -31,7 +31,7 @@ sync.ts                                   S
   │── GET /api/sync?since=<meta.cursor> ─▶│  WHERE owner_id=me AND seq>since ORDER BY seq LIMIT 500
   │◀─ 200 {trees:[..톰스톤 포함], nodes:[..], srs:[..], seq, more:bool}
   │  Dexie tx(rw 전부, outbox 제외):
-  │   trees: deletedAt → 로컬 트리·노드·srs·attempts 하드 삭제(deleteTree와 동일 경로, outbox 기록 없음)
+  │   trees: deletedAt → 로컬 trees.deletedAt 설정 후 purgeDeletedTrees 경로로 트리·노드·srs·attempts 하드 삭제(outbox 기록 없음)
   │          아니면 put (visibility·slug 포함)
   │   nodes: deletedAt → 로컬 삭제 + srs 삭제 / 아니면 로컬 행과 updatedAt 비교, 서버가 크면 put
   │          (로컬이 크면 outbox에 이미 있으므로 다음 push가 이김)
@@ -59,16 +59,17 @@ AA 로그인 UX           sync.ts                        Dexie                 S
 같은 기기에서 로그아웃 → 재로그인(같은 사용자): `meta.userId == u`면 S2만 수행. 다른 사용자(u2): 04 §3.8 M3.
 
 ## S4. 공유 보기 `/t/<slug>` (비로그인)
+프록시 없음(3차 RV M5): Cloudflare Tunnel → 같은 호스트의 Node 1프로세스(Hono). `GET /t/:slug` 라우트가 정적 서빙 `/*`보다 먼저 매칭된다.
 ```
-Bot/브라우저           CF                 Caddy                  S(API)                 DB
-  │ GET /t/abc…        │                  │                       │                      │
-  │───────────────────▶│ 캐시 miss         │                       │                      │
-  │                    │─────────────────▶│ /t/* → reverse_proxy ─▶│ SELECT title,node_count,visibility,hidden,deleted WHERE slug
-  │                    │                  │                       │◀─────────────────────│
-  │                    │                  │                       │ visibility∈{unlisted,public} ∧ !hidden ∧ !deleted ?
-  │                    │                  │                       │   → index.html 템플릿에 <title> og:title og:description("노드 300개 · Drill Down") og:image(정적 1장) og:url canonical robots(unlisted면 noindex) 치환, Cache-Control: public,max-age=60
-  │                    │                  │                       │   아니면 → 410/404 HTML(동일 셸, "링크가 닫혔습니다"), no-store
-  │◀───────────────────│◀─────────────────│◀──────────────────────│
+Bot/브라우저           CF(Tunnel·캐시)     Node(Hono) /t/:slug 라우트              SQLite
+  │ GET /t/abc…        │                  │                                        │
+  │───────────────────▶│ 캐시 miss         │                                        │
+  │                    │─────────────────▶│ SELECT title,node_count,visibility,hidden,deleted WHERE slug ─▶│
+  │                    │                  │◀───────────────────────────────────────│
+  │                    │                  │ visibility∈{unlisted,public} ∧ !hidden ∧ !deleted ?
+  │                    │                  │   → 기동 시 읽어 둔 dist/index.html에 <title> og:title og:description("노드 300개 · Drill Down") og:image(정적 1장) og:url canonical robots(unlisted면 noindex) 치환, Cache-Control: public,max-age=60
+  │                    │                  │   아니면 → 410/404 HTML(동일 셸, "링크가 닫혔습니다"), no-store
+  │◀───────────────────│◀─────────────────│
   │ (브라우저) SPA 부팅 → router: pathname /t/<slug> → route shared
   │──GET /api/t/abc… ───────────────────────────────────────────▶│ {tree:{id,title,nodeCount,copyCount,owner:{nickname}}, nodes:[...]}  Cache-Control: private,no-store
   │  읽기 전용 소스로 플래시·빈칸·백지 실행(srs는 메모리 Map, 저장 안 함)
