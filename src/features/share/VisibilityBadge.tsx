@@ -3,7 +3,7 @@
 import type { Tree } from '../../core/types'
 import { Icon } from '../../ui/Icon'
 import { I } from '../../ui/icons'
-import './share.css'
+import './share-list.css'
 
 export default function VisibilityBadge({ tree }: { tree: Tree }) {
   const v = tree.visibility

@@ -1,0 +1,30 @@
+/* 목록 화면이 받는 공유 규칙만(동기화 상태·공개 배지·공유 시트) — share.css 전체를 첫 화면에서 빼기 위해 분리 (QA §5). 토큰만 사용 */
+
+/* ── 동기화 상태 (01 §3.6 #17): 44px 표적, 아이콘 교차 페이드, 회전은 동기화 중만 ── */
+.sync-status {
+  display: inline-flex; align-items: center; justify-content: center; gap: .3rem;
+  min-width: 44px; min-height: 44px; padding: 0 .5rem; box-sizing: border-box;
+  color: var(--muted); font-size: var(--fs-sm); background: none; border: 0; box-shadow: none; border-radius: var(--radius);
+}
+.sync-status[data-kind='error'] { color: var(--danger); }
+.sync-status > svg, .xfade { animation: sh-fade var(--t-fast) var(--ease-out); }
+.sync-status .spin { animation: sh-fade var(--t-fast) var(--ease-out), sh-spin 1.2s linear infinite; }
+@keyframes sh-fade { from { opacity: 0; } }
+@keyframes sh-spin { to { transform: rotate(360deg); } }
+
+/* ── 공개 배지: 16px muted ── */
+.vis-badge { display: inline-flex; align-items: center; color: var(--muted); }
+
+.share-sheet { display: grid; gap: .75rem; }
+.share-sheet p { margin: 0; }
+
+/* ── 공유 시트 내용 ── */
+.share-notice { display: grid; gap: .6rem; padding: .75rem .85rem; background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: var(--radius); }
+.share-notice button { justify-self: end; }
+.share-link { display: grid; gap: .5rem; }
+.share-url { display: block; padding: .5rem .65rem; font-size: var(--fs-sm); word-break: break-all; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text-2); }
+.share-link .actions { margin: 0; }
+.share-link .actions button { display: inline-flex; align-items: center; gap: .35rem; min-height: 40px; }
+
+/* 시트 머리 닫기: 아이콘 전용 44px (QA #7) */
+.sheet-head .sheet-x { min-width: var(--tap); min-height: var(--tap); }
