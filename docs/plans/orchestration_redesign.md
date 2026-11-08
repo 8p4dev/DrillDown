@@ -109,3 +109,14 @@
 ## 6. 결과
 
 (통합 후 기록)
+
+### 진행 기록
+- 0차 커밋 e52f5b0 (2026-11-08). typecheck·lint·build 통과. E2E 결과는 §6에 기록.
+- 1차 분배 (Orca run `run_b6832e7652c4`, 워커 포트 8021~8024):
+
+| 에이전트 | 워크트리 | dispatch |
+|---|---|---|
+| DS | `C:/Users/User/orca/workspaces/app/agent-DS-design` | `ctx_e635df9c7786` |
+| LM | `C:/Users/User/orca/workspaces/app/agent-LM-layout` | `ctx_5325d3cc93a6` |
+| AA | `C:/Users/User/orca/workspaces/app/agent-AA-account` | `ctx_671bd72d2d0e` |
+| SH | `C:/Users/User/orca/workspaces/app/agent-SH-sharing` | `ctx_31aedc7369af` |
