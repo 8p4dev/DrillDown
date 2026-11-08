@@ -129,6 +129,9 @@ push(C, { trees: [many[199]] })
 throws(() => push(C, { trees: [tree(id(), 1)] }), 403, 'tree_limit')
 push(C, { trees: [many[0]] }) // 기존 트리 갱신은 상한과 무관
 assert.equal(treeCountOf(db, C), 200)
+// 200개 상태에서 1개 삭제 + 1개 생성을 한 배치로 → 삭제가 먼저 반영돼 성공 (C4)
+push(C, { trees: [tree(id(), 1)], deleted: { trees: [{ id: many[1].id, deletedAt: 2 }] } })
+assert.equal(treeCountOf(db, C), 200)
 
 // ---- pull ----
 let pl = pullSince(db, A, 0)
