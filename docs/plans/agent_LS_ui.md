@@ -33,7 +33,7 @@
 - [x] 9 `DndPage.tsx`·`BlankDndPage.tsx`: 버튼 아이콘(채점·정답/내 답 보기·다시 하기), 결과 마크, 빈 범위 한 줄, 원본 트리 패널 클래스, 힌트
 - [x] 10 `npm run typecheck && npm run lint && npm run check && npm run build` 통과, grep 완료 기준 0건
 - [x] 11 임시 Playwright(8023, msedge): 플래시 평가·빈칸 채점·백지 채점·복습, 메모리 source 로 Dexie `srs` 행 수 변화 0 확인, 스크린샷 → `docs/specs/evidence/ui/ls/`
-- [ ] 12 커밋
+- [x] 12 커밋 (311273c flash · 27921c0 dnd · d13948a docs)
 
 ## 검증 방법
 - 단계 1: typecheck + `grep -rn "getTreeNodes(\|getSrsMap(\|recordResult(" src/features/flash src/features/dnd` → ReviewPage 만.
