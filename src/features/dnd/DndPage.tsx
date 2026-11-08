@@ -23,7 +23,7 @@ export default function DndPage({ treeId, rootId, source }: { treeId: string; ro
   return (
     <section>
       <TreeHeader treeId={treeId} active="dnd">
-        {all && rid && <ScopeSelect nodes={all} value={rid} to={(id) => href.dnd(treeId, id)} />}
+        {all && rid && <ScopeSelect nodes={all} value={rid} to={(id) => (source ? href.shared(treeId, 'dnd', id) : href.dnd(treeId, id))} />}
       </TreeHeader>
       {all && rid && <Quiz treeId={treeId} scope={scopeOf(all, rid)} source={src} />}
     </section>
@@ -53,7 +53,7 @@ function Quiz({ treeId, scope, source }: { treeId: ID; scope: TreeNode[]; source
     const s = gradeDnd(scope, place)
     setScore(s)
     haptic(s.correct === s.total ? 'success' : 'warn')
-    await Promise.all(leaves.map((l) => source.record(l.id, s.ok[l.id])))
+    await Promise.all(s.placed.map((id) => source.record(id, s.ok[id]))) // 안 놓은 카드는 기록하지 않음(U35)
     if (!source.ephemeral) await logEvent('dnd_attempt_completed', { mode: 'dnd', rootId, total: s.total, correct: s.correct }, treeId)
   }
   function retry() {
@@ -107,6 +107,7 @@ function Quiz({ treeId, scope, source }: { treeId: ID; scope: TreeNode[]; source
         </div>
         <div className="dnd-bar">
           {score && <ScoreLine {...score} />}
+          {score && !score.placed.length && <p className="muted">놓은 카드가 없어 학습 기록을 남기지 않았어요</p>}
           {!score && <Progress n={placed.size} total={leaves.length} />}
           {!score && <button type="button" className={`primary${tray.length ? '' : ' ready'}`} onClick={grade}><Icon d={checkCheck} /> 채점</button>}
           {score && <button type="button" onClick={() => setAnswer((a) => !a)}><Icon d={answer ? eyeOff : eye} /> {answer ? '내 답 보기' : '정답 보기'}</button>}

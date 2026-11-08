@@ -1,6 +1,6 @@
 // 개요 텍스트 ↔ 트리 — 공유 계약 §4.2 (에이전트 A 소유). 순수 함수
 import { childrenOf } from './repo'
-import type { ID, TreeNode } from './types'
+import { CAP, type ID, type TreeNode } from './types'
 
 export interface OutlineItem {
   text: string
@@ -41,14 +41,18 @@ export function serializeOutline(items: OutlineItem[]): string {
   return lines.join('\n')
 }
 
-/** 전위 순서로 새 노드 생성. 최상위 항목은 parentId 아래 startOrder, startOrder+1, ... */
+/** CAP.title 초과 제목은 잘라서 나머지를 note 로 (계약 C5). 서버가 긴 제목 행을 거부하지 않게 */
+export const splitTitle = (text: string): { title: string; note?: string } =>
+  text.length > CAP.title ? { title: text.slice(0, CAP.title), note: text.slice(CAP.title).trim() } : { title: text }
+
+/** 전위 순서로 새 노드 생성. 최상위 항목은 parentId 아래 startOrder, startOrder+1, ... 긴 제목은 splitTitle */
 export function outlineToNodes(items: OutlineItem[], treeId: ID, parentId: ID | null, startOrder = 0): TreeNode[] {
   const now = Date.now()
   const out: TreeNode[] = []
   const walk = (xs: OutlineItem[], pid: ID | null, base: number) =>
     xs.forEach((x, i) => {
       const id = crypto.randomUUID()
-      out.push({ id, treeId, parentId: pid, order: base + i, title: x.text, aliases: [], updatedAt: now })
+      out.push({ id, treeId, parentId: pid, order: base + i, ...splitTitle(x.text), aliases: [], updatedAt: now })
       walk(x.children, id, 0)
     })
   walk(items, parentId, startOrder)

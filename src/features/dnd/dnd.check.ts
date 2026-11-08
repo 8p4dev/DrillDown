@@ -44,7 +44,8 @@ assert.deepEqual(moveCard(p, 'c', 'tray'), { a2: 'b2' })
 let g = gradeDnd(scope, { a1: 'a2', a2: 'a1', b1: 'b2', b2: 'b1', c: 'c' })
 assert.equal(g.correct, 5)
 g = gradeDnd(scope, { a1: 'a1', a2: 'b1', b1: 'a2', b2: 'b2' }) // b1·a2 둘 다 제목 X → 교환해도 정답, c 미배치
-assert.deepEqual(g, { ok: { a1: true, b1: true, a2: true, b2: true, c: false }, correct: 4, total: 5 })
+assert.deepEqual(g, { ok: { a1: true, b1: true, a2: true, b2: true, c: false }, correct: 4, total: 5, placed: ['a1', 'b1', 'a2', 'b2'] })
+assert.deepEqual(gradeDnd(scope, {}).placed, []) // U35: 아무것도 안 놓으면 기록 0
 g = gradeDnd(scope, { a1: 'b2', b1: 'a1' })
 assert.equal(g.correct, 0)
 // 같은 제목 둘이 한 부모의 X 자리 하나를 이중으로 맞히지 않음
@@ -74,6 +75,8 @@ g = gradeBlank(scope, L)
 assert.equal(g.total, 7)
 assert.equal(g.correct, 4)
 assert.equal(g.ok.a2, false)
+assert.deepEqual(g.placed.sort(), ['A', 'B', 'a1', 'b1']) // 트레이에 남은 카드는 기록 대상 아님
+assert.deepEqual(gradeBlank(scope, new Map()).placed, [])
 let full: Links = new Map()
 for (const n of scope.slice(1)) full = attach(full, n.id, n.parentId!, 'R')
 assert.equal(gradeBlank(scope, full).correct, 7)

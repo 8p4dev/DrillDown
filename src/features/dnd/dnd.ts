@@ -62,7 +62,8 @@ function matchPairs(expected: string[], actual: [string, ID][]): Record<ID, bool
   return out
 }
 
-export interface Score { ok: Record<ID, boolean>; correct: number; total: number }
+/** placed = 사용자가 놓은 카드 id — SRS 는 이것만 기록한다(U35: 안 놓은 카드는 '모름'이 아니다) */
+export interface Score { ok: Record<ID, boolean>; correct: number; total: number; placed: ID[] }
 
 // ── D1: 뼈대 + 리프 빈칸 ─────────────────────────────────────
 
@@ -95,7 +96,8 @@ export function gradeDnd(scope: TreeNode[], place: Place): Score {
     }),
   )
   for (const l of leaves) ok[l.id] ??= false
-  return { ok, correct: Object.values(ok).filter(Boolean).length, total: leaves.length }
+  const placed = leaves.map((l) => place[l.id]).filter(Boolean)
+  return { ok, correct: Object.values(ok).filter(Boolean).length, total: leaves.length, placed }
 }
 
 // ── D2: 백지 캔버스 ─────────────────────────────────────────
@@ -143,5 +145,6 @@ export function gradeBlank(scope: TreeNode[], links: Links): Score {
     [...links].map(([id, p]) => [key(p, id), id]),
   )
   for (const n of rest) ok[n.id] ??= false
-  return { ok, correct: Object.values(ok).filter(Boolean).length, total: rest.length }
+  const placed = rest.filter((n) => links.has(n.id)).map((n) => n.id)
+  return { ok, correct: Object.values(ok).filter(Boolean).length, total: rest.length, placed }
 }

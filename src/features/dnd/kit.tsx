@@ -14,6 +14,10 @@ const SIDE_MAX = 640 // 캔버스 폭이 이 이하면 좌→우 배치
 const SIDE_BELOW_SCALE = 0.8 // 위→아래 배율이 이보다 작으면 좌→우 배치(글자 약 10.4px 미만)
 const CANVAS_PAD = 4 // dnd.css .dnd-canvas padding 과 같게
 
+/** 해시 라우트는 해시로, 공유 보기(/t/<slug>?m=)는 pushState + popstate(router navigateShared 와 같게) */
+const go = (h: string) =>
+  h.startsWith('#') ? (location.hash = h) : (history.pushState(null, '', h), dispatchEvent(new PopStateEvent('popstate')))
+
 /** 자식 있는 노드만, 전위 순서·깊이 들여쓰기. 바꾸면 to(id) 로 이동. 라벨 글자 대신 crosshair 아이콘(aria 는 "범위") */
 export function ScopeSelect(p: { nodes: TreeNode[]; value: ID; to: (id: ID) => string }) {
   const kids = new Map<ID | null, TreeNode[]>()
@@ -29,7 +33,7 @@ export function ScopeSelect(p: { nodes: TreeNode[]; value: ID; to: (id: ID) => s
   return (
     <label className="dnd-scope" data-tip="범위">
       <Icon d={crosshair} />
-      <select aria-label="범위" value={p.value} onChange={(e) => (location.hash = p.to(e.target.value))}>
+      <select aria-label="범위" value={p.value} onChange={(e) => go(p.to(e.target.value))}>
         {!opts.some(([n]) => n.id === p.value) && <option value={p.value}>—</option>}
         {opts.map(([n, d]) => (
           <option key={n.id} value={n.id}>{'  '.repeat(d) + n.title}</option>
