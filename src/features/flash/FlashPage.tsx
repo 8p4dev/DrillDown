@@ -44,7 +44,7 @@ export default function FlashPage({ treeId, rootId, source }: { treeId: string; 
     Promise.all([src.nodes(), src.srs()]).then(([ns, s]) => {
       setNodes(ns)
       setSrs({ map: s, at: new Date() })
-      if (ns.length) coarseHint('flash', '카드 탭 = 펼치기')
+      if (ns.length) coarseHint('flash', '카드 탭 = 펼치기', I.layers)
     })
   }, [src])
 
@@ -86,10 +86,10 @@ export default function FlashPage({ treeId, rootId, source }: { treeId: string; 
   return (
     <section className="flash">
       <TreeHeader treeId={treeId} active="flash">
-        {/* 보이는 건 ✓N ✕M, 읽히는 텍스트는 "알음 N · 모름 M"(숨긴 .sr) */}
+        {/* 보이는 건 ✓N ✕M, 읽히는 텍스트는 "알음 N · 모름 M"(DS .sr-only) */}
         <span className="flash-tally muted" aria-label="평가 집계">
-          <Icon d={I.check} className="ok" /><span className="sr">알음 </span><b key={`k${known}`} className="pop-num">{known}</b><span className="sr"> · </span>
-          <Icon d={x} className="no" /><span className="sr">모름 </span><b key={`u${unknown.length}`} className="pop-num">{unknown.length}</b>
+          <Icon d={I.check} className="ok" /><span className="sr-only">알음 </span><b key={`k${known}`} className="pop-num">{known}</b><span className="sr-only"> · </span>
+          <Icon d={x} className="no" /><span className="sr-only">모름 </span><b key={`u${unknown.length}`} className="pop-num">{unknown.length}</b>
         </span>
       </TreeHeader>
       <div className="flash-layout">

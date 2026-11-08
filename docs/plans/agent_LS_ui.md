@@ -43,7 +43,7 @@
 
 ## 변경 사항 (plan 과 다르게 한 것)
 - 집계 "알음 N 모름 M" 은 `aria-label` 이 아니라 시각적으로 숨긴 텍스트(`.sr`)로 유지했다. 이유: E2E 가 `toHaveText('알음 1 · 모름 1')` 로 **텍스트**를 검사하므로 aria-label 만으로는 깨진다. 접근 이름(`평가 집계`)·읽기 텍스트 모두 보존.
-- `hint()` 는 직접 import 대신 선택적 호출(위). DS 가 `hint` 를 내보내는 즉시 동작.
+- ~~`hint()` 는 직접 import 대신 선택적 호출~~ → DS 머지(main 09b4cbc) 뒤 `import { hint } from '../Toast'` 직접 호출로 교체, 화면 아이콘(`layers`/`squareDashed`) 전달. 숨긴 글자는 DS `.sr-only` 로 교체(지역 `.sr` 삭제).
 - `ScoreLine` 글자 "정답" 도 함께 지우고 `aria-label="정답 n / m"` 로 옮겼다(01 §3.5 인벤토리 "숫자 + ✓ 마크, 글자 삭제").
 - 미니맵 접기/펼치기의 `transition: height` 는 뺐다(transform·opacity 규칙). `interpolate-size` 도 함께 제거.
 - `source` 를 메모리 구현으로 넘긴 렌더의 IndexedDB 검사: 앱 라우트로는 메모리 소스를 넘길 입구가 없어(SH 의 SharedPage 가 아직 스텁) Playwright 로 직접 재현하지 못했다. 대신 `useStudySource` 가 `source` 가 있으면 Dexie 를 전혀 import 경로에 두지 않음을 코드로 보장하고, Dexie 경로(소스 없음)에서 평가 → `srs` 행 수 증가를 스크립트로 확인했다(아래 결과).
@@ -56,8 +56,12 @@
 - 스크린샷 8장(`docs/specs/evidence/ui/ls/`, 각 ≤63KB): `flash-390-light` `flash-1440-dark` `dnd-390-dark` `dnd-1440-light` `blank-1440-light` `blank-390-dark` `review-390-light` `review-1440-dark`. 나머지 조합(라이트/다크 × 390/1440, 요약·복습 세션·빈 범위)은 scratch 에서 눈으로 확인.
 - 관찰: 채점 뒤 테마를 바꾸면 `.dnd.locked [data-result]` 의 색 전환(기존 stagger `--d` 지연)이 카드마다 순차로 걸려 ≤600ms 동안 새 테마 글자 + 옛 테마 배경이 보인다(DS #2 "테마 전환 때 색 전환 없음"). 기존 동작이며 테마 토글은 DS 소유라 그대로 둠 — QA 가 문제 삼으면 `:root[data-theme] .dnd.locked [data-result] { transition: none }` 류로 처리 가능.
 
+## DS·LM 머지 후속 (2026-11-08, main 09b4cbc 머지)
+- `git merge main` 충돌 없음. `study.ts` 가 `hint(id, text, icon)` 을 직접 import, `.sr` → DS `.sr-only`, DS 버튼이 `inline-flex` 라 지역 버튼 flex 규칙 삭제. typecheck·lint·check·build 통과(precache 45개 519.97 KiB).
+- 임시 Playwright 재실행: 기존 검사 전부 통과 + 터치 컨텍스트(`isMobile`·`hasTouch`)에서 플래시 "카드 탭 = 펼치기"·빈칸 "카드 탭 → 빈칸 탭" 힌트가 첫 진입 때 1회, 새로고침 뒤 없음 확인. 스크린샷 8장을 DS 머지 뒤 모양으로 갱신.
+- 주의(스크립트에서 본 것): 힌트는 동시 1개 큐라 에디터 힌트(LM)를 [확인] 하지 않고 플래시로 오면 플래시 힌트가 그 뒤에 대기한다 — 02 §3.5 규칙대로의 동작.
+
 ## 다른 워커에게 / 미해결
-- DS: `Toast.tsx` 에 `hint(id, text)` 가 생기면 `study.ts` 의 선택적 호출이 그대로 동작한다. 아이콘 문자열의 자식 사이 공백(위) 제거를 권함.
-- DS: `button.primary` 가 아직 `#fff` 글자 + accent(=text) 채움(index.css) — 플래시 `[다음]`·채점 `[채점]` 은 DS 머지 뒤 `--bg` 글자로 바뀐다. `.ghost`·`.empty` 클래스는 내 CSS 가 자체 규칙을 가져 DS 전/후 모두 그려진다.
+- DS: 아이콘 문자열의 자식 사이 공백(위) 제거를 권함(집계 textContent 공백 2개).
 - SH: `SharedPage` 가 `source={ nodes, srs, record, ephemeral: true }` 를 넘기면 첫 `record` 때 토스트 1회가 나간다(페이지 마운트당 1회). `logEvent` 는 공유 보기에서도 로컬 Dexie `events` 에 기록된다(계약은 `srs` 만 금지) — 원치 않으면 `treeId` 대신 slug 를 넘기지 말고 알려 달라.
 - 메모리 소스 렌더의 IndexedDB 무변경 검사는 앱에 진입점이 없어 직접 재현 못 함(위 "변경 사항"). SH 머지 뒤 `/t/<slug>` 에서 QA 가 `srs` 행 수를 세면 된다.

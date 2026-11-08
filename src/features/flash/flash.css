@@ -7,10 +7,7 @@
 .flash-tally svg.ok { color: var(--ok); }
 .flash-tally svg.no { color: var(--danger); }
 .pop-num { display: inline-block; animation: pop var(--t-med) var(--ease-out); }
-/* 읽히지만 보이지 않는 글자(집계·하위 개수) */
-.flash .sr, .flash-tally .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-.flash button, .flash .flash-edit-link, .review-link { display: inline-flex; align-items: center; justify-content: center; gap: .35rem; }
-.flash button.link { display: inline; }
+.flash .flash-edit-link, .review-link { display: inline-flex; align-items: center; justify-content: center; gap: .35rem; } /* 버튼은 index.css 가 inline-flex */
 
 /* 경로 */
 .flash-path { display: flex; flex-wrap: wrap; align-items: center; gap: .15rem; font-size: var(--fs-sm); color: var(--muted); margin-bottom: .75rem; min-height: 1.4em; }
