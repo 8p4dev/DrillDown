@@ -21,8 +21,8 @@ main:has(> .editor) { max-width: none; }
 @media (pointer: coarse) { .outline:focus-visible { border-color: var(--border); } } /* 진입 시 자동 포커스: 터치에선 키보드 표시가 필요 없다 */
 
 /* ---- 그래프 캔버스 ---- */
-/* 아래 여백: 맨 아래 카드도 떠 있는 도구에 가리지 않게 스크롤된다. touch-action: 핀치·패닝은 GraphView 가 처리 */
-.graph-pan { display: flex; justify-content: center; align-items: flex-start; box-sizing: border-box; min-width: 100%; min-height: 100%; width: max-content; padding-bottom: 3.25rem; cursor: default; touch-action: none; }
+/* 위 여백: 루트 카드가 떠 있는 도구(오른쪽 위)에 가리지 않는다. touch-action: 핀치·패닝은 GraphView 가 처리 */
+.graph-pan { display: flex; justify-content: center; align-items: flex-start; box-sizing: border-box; min-width: 100%; min-height: 100%; width: max-content; padding-top: 3.25rem; cursor: default; touch-action: none; }
 .graph-pan.panning { cursor: grabbing; }
 .graph-zoom { flex: none; }
 /* 배율 적용 직후 rect 로 스크롤을 계산한다. reduced-motion 전역 규칙(* transition-duration: 1ms, 속성 기본값 all)이 폭·scale 을 트랜지션시키면 옛 값을 읽는다 */
@@ -31,7 +31,7 @@ main:has(> .editor) { max-width: none; }
 
 /* 떠 있는 확대 도구: 직사각 1px 테두리 그룹 [− 배율 + ⤢ (⊞) ?]. 키보드가 열리면 숨김(02 D6·규칙 4(b)) */
 .zoom-tools {
-  position: absolute; right: .75rem; bottom: .75rem; z-index: 3;
+  position: absolute; right: .75rem; top: .75rem; z-index: 3; /* 위쪽: 하단 가운데 토스트와 겹치지 않게 */
   display: flex; align-items: center; gap: 1px; padding: 2px; border-radius: var(--radius);
   background: var(--surface); border: 1px solid var(--border-strong);
 }
@@ -168,10 +168,7 @@ mark.hl-b { background: #6cc8ff66; }
 
 /* 터치: 작은 표적은 보이는 크기를 유지하고 누르는 영역만 넓힌다 — 카드 **바깥쪽으로만**(02 §3.6: 카드 중앙 탭이 접기로 가지 않게) */
 @media (pointer: coarse) {
-  .w-handle { width: 18px; }
-  .w-handle.l { left: -9px; }
-  .w-handle.r { right: -9px; }
-  .w-handle::after { left: 8px; }
+  .w-handle { display: none; } /* 너비는 패널 1·2·3 (R6-M7) */
   .badge::after, .editor .node-row .add-note::after { content: ''; position: absolute; inset: 50% -8px -12px; }
 }
 
@@ -282,7 +279,10 @@ mark.hl-b { background: #6cc8ff66; }
 /* 경로(U14 헤더·U15 패널) */
 .focus-all, .focus-here { font-size: var(--fs-sm); white-space: nowrap; }
 .detail-path { display: flex; align-items: center; gap: .25rem .75rem; flex-wrap: wrap; padding: .55rem .85rem 0; }
-.detail-path .focus-here { margin-left: auto; }
+.detail-path .focus-here, .editor .to-import { margin-left: auto; }
+.editor .focus-here + .to-import { margin-left: 0; }
+.editor .to-import { flex: none; display: inline-grid; place-items: center; min-width: 2rem; min-height: 2rem; padding: 0; border: none; background: transparent; box-shadow: none; color: var(--muted); }
+@media (pointer: coarse) { .editor .to-import { min-width: var(--tap); min-height: var(--tap); } }
 /* U51: 폰은 패널 위 경로를 한 줄로 — 조상 칸이 줄며 말줄임, 지금 노드는 끝까지 보인다 */
 @media (max-width: 760px) {
   .detail-path { flex-wrap: nowrap; }
@@ -290,3 +290,25 @@ mark.hl-b { background: #6cc8ff66; }
   .detail-path .node-path > span { flex: 0 1 auto; min-width: 1.5em; overflow: hidden; text-overflow: ellipsis; }
   .detail-path .node-path > span:last-child { flex-shrink: 0; min-width: 0; }
 }
+
+/* U23 구조 바(coarse 전용): 캔버스 위 고정 한 줄 — 하단 토스트·가상 키보드와 겹치지 않는다. 넘치면 가로 스크롤 */
+.struct { display: none; }
+@media (pointer: coarse) {
+  .canvas { display: flex; flex-direction: column; gap: .5rem; }
+  .canvas > .outline { flex: 1; min-height: 0; height: auto; }
+  .struct {
+    display: flex; flex: none; gap: 1px; padding: 2px; overflow-x: auto; scrollbar-width: none;
+    background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius);
+  }
+  .editor .struct button {
+    flex: none; width: var(--tap); height: var(--tap); padding: 0; border: none; border-radius: var(--radius-sm);
+    background: transparent; box-shadow: none; display: inline-grid; place-items: center; color: var(--text-2);
+  }
+  .editor .struct button:active:not(:disabled) { background: var(--surface-2); }
+  .editor .struct button:disabled { opacity: .35; }
+  .editor .struct button[aria-pressed='true'] { color: var(--bg); background: var(--text); }
+  /* 바(44px + 테두리 6px) + 간격 아래로 */
+  .zoom-tools, .search { top: calc(var(--tap) + 6px + 1.25rem); }
+}
+/* coarse: 단축키 버튼은 숨긴다(구조 바가 대신, R6-M2) — 폰 폭에서 확대 도구가 캔버스를 넘지 않게 */
+@media (pointer: coarse) { .editor .zoom-tools button[popovertarget] { display: none; } }
