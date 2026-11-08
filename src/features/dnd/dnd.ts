@@ -62,7 +62,7 @@ function matchPairs(expected: string[], actual: [string, ID][]): Record<ID, bool
   return out
 }
 
-/** placed = 사용자가 놓은 카드 id — SRS 는 이것만 기록한다(U35: 안 놓은 카드는 '모름'이 아니다) */
+/** placed = 사용자가 놓은 카드 id — 비어 있으면 채점 결과를 SRS 에 기록하지 않는다(U35) */
 export interface Score { ok: Record<ID, boolean>; correct: number; total: number; placed: ID[] }
 
 // ── D1: 뼈대 + 리프 빈칸 ─────────────────────────────────────

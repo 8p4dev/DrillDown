@@ -3,7 +3,7 @@ import type { AppEvent, BlankAttempt, ID, NodeSrs, Tree, TreeNode } from './type
 
 /** 동기화 큐 1행 = 엔티티 1개(04 §3.1). 페이로드는 없다 — 보낼 때 현재 행을 읽는다 */
 export interface OutboxRow { seq?: number; kind: 'tree' | 'node' | 'srs' | 'attempt'; id: ID; treeId: ID; op: 'put' | 'del'; at: number }
-export interface MetaRow { key: 'userId' | 'cursor' | 'lastSyncAt' | 'lastSyncError'; value: string | number | null }
+export interface MetaRow { key: 'userId' | 'cursor' | 'lastSyncAt' | 'lastSyncError' | 'rejected'; value: string | number | null }
 
 export const db = new Dexie('drilldown') as Dexie & {
   trees: EntityTable<Tree, 'id'>

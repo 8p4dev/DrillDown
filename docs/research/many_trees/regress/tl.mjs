@@ -21,10 +21,9 @@ await p.waitForTimeout(4000)
 // 기존 트리 t0 에 자식 추가
 await p.goto(`${B}/#/tree/${ids.first}`); await p.waitForTimeout(1500)
 const url = p.url(); await p.waitForTimeout(500)
-await p.keyboard.press('Tab'); await p.keyboard.type('child'); await p.keyboard.press('Escape')
+await p.getByLabel('개요 텍스트').fill('child'); await p.getByRole('button', { name: '선택 노드의 자식으로 추가' }).click()
 await p.waitForTimeout(5000)
 const srv = await p.evaluate(async (id) => (await (await fetch('/api/trees/' + id)).json()).nodes.length, ids.first)
-const st = await p.evaluate(async () => { const r = indexedDB.open('drilldown'); return 'n/a' })
 console.log({ localTreeItems: await p.locator('[role=treeitem]').count(), url, serverNodesOfT0: srv, status: await p.locator('[class*=sync]').first().getAttribute('aria-label').catch(() => null) })
 // M1: Tab 10번 후 포커스 위치
 for (let i = 0; i < 10; i++) await p.keyboard.press('Tab')

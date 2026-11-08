@@ -75,7 +75,7 @@ g = gradeBlank(scope, L)
 assert.equal(g.total, 7)
 assert.equal(g.correct, 4)
 assert.equal(g.ok.a2, false)
-assert.deepEqual(g.placed.sort(), ['A', 'B', 'a1', 'b1']) // 트레이에 남은 카드는 기록 대상 아님
+assert.deepEqual(g.placed.sort(), ['A', 'B', 'a1', 'b1']) // 놓은 카드
 assert.deepEqual(gradeBlank(scope, new Map()).placed, [])
 let full: Links = new Map()
 for (const n of scope.slice(1)) full = attach(full, n.id, n.parentId!, 'R')

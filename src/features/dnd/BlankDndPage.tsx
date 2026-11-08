@@ -56,7 +56,7 @@ function Quiz({ treeId, scope, source }: { treeId: ID; scope: TreeNode[]; source
     const s = gradeBlank(scope, links)
     setScore(s)
     haptic(s.correct === s.total ? 'success' : 'warn')
-    await Promise.all(s.placed.map((id) => source.record(id, s.ok[id]))) // 안 놓은 카드는 기록하지 않음(U35)
+    if (s.placed.length) await Promise.all(rest.map((n) => source.record(n.id, s.ok[n.id]))) // 하나도 안 놓은 채점은 기록하지 않음(U35), 일부만 놓았으면 남은 카드 = 오답(설계 그대로)
     if (!source.ephemeral) await logEvent('dnd_attempt_completed', { mode: 'blank_dnd', rootId, total: s.total, correct: s.correct }, treeId)
   }
   function retry() {

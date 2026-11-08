@@ -43,20 +43,29 @@ test('D1: 새 기기 첫 pull 이 여러 페이지여도 고아 복구로 구조
   await b.close()
 })
 
-test('D2: 201번째 트리는 보류되고 나머지는 올라가며, 트리를 지우면 보류가 풀린다', async ({ browser }) => {
+test('D2: 두 기기가 199개에서 각각 만들면 늦은 쪽 트리는 보류되고, 트리를 지우면 보류가 풀린다', async ({ browser }) => {
   const a = await browser.newContext()
   const pa = await a.newPage()
   await login(pa, 'robust-d2')
   const t0 = Date.now() - 60_000
-  const trees = Array.from({ length: 200 }, (_, i) => ({ id: crypto.randomUUID(), title: 'seed' + i, createdAt: t0, updatedAt: t0 }))
+  const trees = Array.from({ length: 199 }, (_, i) => ({ id: crypto.randomUUID(), title: 'seed' + i, createdAt: t0, updatedAt: t0 }))
   const nodes = trees.map((t) => ({ id: crypto.randomUUID(), treeId: t.id, parentId: null, order: 0, title: t.title, aliases: [], updatedAt: t0 }))
   expect(await push(pa, { trees, nodes })).toBe(200)
   await a.close()
 
+  // 로그인 상태에선 200개에서 만들기가 막힌다(P0 #2 UI) — 그래도 두 기기가 동시에 199→200 을 만들면 서버에서 201이 된다
+  const c = await browser.newContext()
+  const pc = await c.newPage()
+  await login(pc, 'robust-d2')
   const b = await browser.newContext()
   const p = await b.newPage()
   await login(p, 'robust-d2')
-  await expect(p.locator('li[data-tree-id]')).toHaveCount(200, { timeout: 15_000 })
+  await expect(p.locator('li[data-tree-id]')).toHaveCount(199, { timeout: 15_000 })
+  await expect(pc.locator('li[data-tree-id]')).toHaveCount(199, { timeout: 15_000 })
+  await pc.getByLabel('새 트리 제목').fill('200번째')
+  await pc.getByLabel('새 트리 제목').press('Enter')
+  await expect.poll(async () => (await (await c.request.get('/api/trees')).json()).trees.length, { timeout: 15_000 }).toBe(200)
+  await c.close()
   await p.getByLabel('새 트리 제목').fill('201번째')
   await p.getByLabel('새 트리 제목').press('Enter')
   await expect(p.locator('.sync-status[data-kind="error"]')).toBeVisible({ timeout: 15_000 })

@@ -24,7 +24,7 @@ decisions 4는 "오프라인 편집 동기화"도 MVP 제외로 적었다. plan 
 | 복제 | copy-on-import: 클라이언트가 새 id 발급, `sourceTreeId` 계보, SRS 비움. 서버는 복제 수만 센다 | 서버 측 복제(로그인 필수, 비로그인 체험 불가) | [출처 9] 04_tech §4 |
 | 비로그인 학습 기록 | 저장 안 함(세션 메모리만). 복제하면 그때부터 기록 | 로컬 임시 저장(복제 전 기록 승계 로직 추가, 범위 대비 이득 작음) | §3.4.2 |
 | 갤러리 | 최소형(최근·복제 수 정렬, 검색 없음) + 신고(⋯ 메뉴, 테이블·API는 AA 소유). **운영 여부는 사용자 결정** | 전체 검색·태그(운영 부담, 콘텐츠 없음) | §3.5, plan 미결 |
-| 삭제 | 확인창 없음 + 되돌리기 토스트 10초. **로컬도 소프트 삭제**(`Tree.deletedAt`, 목록에서 숨김, 토스트 종료·다음 앱 시작 시 하드 삭제). 로그인 사용자는 서버 소프트 삭제 **7일 유예** → 복구 API | `confirm()` 유지(LM D9와 충돌) / 즉시 영구 삭제(C11 유실 복구 불가) | §3.1·§3.3·§3.10, RV H2·M1 |
+| 삭제 | 확인창 없음 + 되돌리기 토스트 10초. **로컬도 소프트 삭제**(`Tree.deletedAt`, 목록에서 숨김, 7일 보존 뒤 앱 시작 시 하드 삭제 — 2026-11-09 Q6 개정). 로그인 사용자는 서버 소프트 삭제 **7일 유예** → 복구 API | `confirm()` 유지(LM D9와 충돌) / 즉시 영구 삭제(C11 유실 복구 불가) | §3.1·§3.3·§3.10, RV H2·M1 |
 | 첫 로그인 병합 | 로컬 트리 **모두 올리기**(확인 1회), id 충돌 시 재발급 | 트리 선택 UI(공수 M 추가, 사용자가 나중에 지우면 됨) | §3.8 |
 | 구현 순서 | ① 서버 저장+첫 로그인 병합 M → ② 공유 링크 M → ③ 두 기기 동기화·srs·충돌 UI L → ④ 갤러리 S | — | §3.11 |
 
@@ -62,7 +62,7 @@ outbox에는 페이로드를 넣지 않는다. 비울 때 현재 행을 읽어 �
 |---|---|---|
 | `createTree` | trees.add + 루트 nodes.add | tree put, node put |
 | `renameTree` | trees.update + 루트 nodes.update | tree put, node put |
-| `deleteTree` → **3개로 분리**(RV H2): `markTreeDeleted(id)` = `trees.update({deletedAt: now})`(목록에서 숨김) / `restoreTree(id)` = `deletedAt` 제거 / `purgeDeletedTrees()` = `deletedAt` 있는 트리의 trees·nodes·srs·attempts 하드 삭제(되돌리기 토스트 10초 종료 시·앱 시작 시 호출) | 현재는 즉시 하드 삭제 | `markTreeDeleted`: tree del **1행만**(서버가 트리 톰스톤으로 하위를 가린다. 노드 300개 톰스톤을 만들지 않음). `restoreTree`: tree put(서버는 7일 이내 `deleted_at=NULL`). `purge`: outbox 없음 |
+| `deleteTree` → **3개로 분리**(RV H2): `markTreeDeleted(id)` = `trees.update({deletedAt: now})`(목록에서 숨김) / `restoreTree(id)` = `deletedAt` 제거 / `purgeDeletedTrees()` = `deletedAt < now−7일` 인 트리의 trees·nodes·srs·attempts 하드 삭제(목록 진입 시 호출, Q6 개정) | 현재는 즉시 하드 삭제 | `markTreeDeleted`: tree del **1행만**(서버가 트리 톰스톤으로 하위를 가린다. 노드 300개 톰스톤을 만들지 않음). `restoreTree`: tree put(서버는 7일 이내 `deleted_at=NULL`). `purge`: outbox 없음 |
 | `putNodes` | nodes.bulkPut + trees.updatedAt(루트면 title) | node put × n, tree put |
 | `deleteNodes` | nodes·srs bulkDelete + trees.updatedAt | node del × n(srs는 서버 cascade), tree put |
 | `addAlias` | putNodes 경유 | (putNodes가 처리) |
@@ -382,7 +382,7 @@ CREATE TABLE user_seq (user_id uuid PRIMARY KEY, seq bigint NOT NULL DEFAULT 0);
 모양(색·형태·아이콘)은 DS(01), 위치는 LM(02). 여기서는 상태·요소·문구 뼈대만 정한다 [결정].
 **공개 범위 컨트롤(3상태)** — 목록 카드 ⋯ 메뉴 "공유…" → 시트. 요소: ① 세그먼트 3개 `비공개 / 링크 / 공개`(현재 값 표시, 오프라인이면 비활성 + "오프라인"), ② 링크 줄(링크·공개일 때만): URL 텍스트, `복사`, `열기`, `재발급`, ③ 공개일 때 안내 1줄 "갤러리에 표시됩니다 · 노드 N개", ④ hidden이면 배너 "운영 정책으로 숨김 — 링크가 열리지 않습니다", ⑤ 첫 공개 시 고지 1회(§3.3). 비로그인 사용자에게는 시트 대신 "로그인하면 링크로 공유할 수 있습니다" 1줄(AA 로그인 진입점).
 **카드 표식** — 목록 카드에 공개 상태 아이콘 1개(비공개는 표시 없음, 링크·공개는 아이콘) + `aria-label`. 복제본은 "복제됨" 표식 없음(사용자에게 의미 없음, `sourceTreeId`는 데이터로만).
-**트리 삭제(확인창 없음, RV H2)** — ⋯ 메뉴 `삭제` 즉시 실행(`markTreeDeleted`) → 카드 사라짐 → 토스트 "삭제됨 · [되돌리기]" **10초**(노드 삭제와 같은 패턴). 되돌리기 → `restoreTree`, 카드 복귀. 토스트 종료 또는 다음 앱 시작 → `purgeDeletedTrees` 하드 삭제. 로그인 사용자는 서버 7일 유예 동안 계정 화면 휴지통(AA)에서도 복구 가능. 비로그인도 10초 되돌리기는 동일하게 동작한다(로컬 소프트 삭제라 서버 불필요).
+**트리 삭제(확인창 없음, RV H2)** — ⋯ 메뉴 `삭제` 즉시 실행(`markTreeDeleted`) → 카드 사라짐 → 토스트 "삭제됨 · [되돌리기]" **10초**(노드 삭제와 같은 패턴). 되돌리기 → `restoreTree`, 카드 복귀. 7일 동안 계정 화면 휴지통에서 복구 가능(비로그인은 목록의 휴지통 아이콘으로 진입), 7일 뒤 `purgeDeletedTrees` 하드 삭제. 다른 기기에서 지운 트리(pull 톰스톤)도 로컬에 소프트 삭제로 남아 휴지통에 보인다(Q6 개정, 2026-11-09).
 **동기화 상태 표시(4상태 + 1토스트)** — 전역 1곳(위치 LM).
 | 상태 | 조건 | 표시 | 동작 |
 |---|---|---|---|

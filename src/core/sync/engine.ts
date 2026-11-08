@@ -235,7 +235,7 @@ const held = new Set<ID>()
  *  목록은 db.meta 'rejected' 에 영속 (C3) — 새로고침 뒤에도 오류 표시가 남는다 */
 type Rejected = { kind: OutboxRow['kind']; id: ID; treeId: ID; reason: string }
 const bad = new Map<string, Rejected>()
-const REJ = 'rejected' as MetaRow['key'] // ponytail: db.ts MetaRow key 유니온에 'rejected' 가 들어가면 캐스트 제거
+const REJ = 'rejected'
 const saveBad = () => db.meta.put({ key: REJ, value: JSON.stringify([...bad.values()]) })
 async function loadBad() {
   const v = await getMeta(REJ)
