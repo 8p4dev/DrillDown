@@ -162,9 +162,10 @@ export function dismissMerge() {
 
 // ---- 공통 오류: 503 점검 → 배너, 429 → 토스트 1회 ----
 let limitedAt = 0
-setApiErrorHook((e) => {
+setApiErrorHook((e, path) => {
   if (e.status === 503 && e.code === 'maintenance' && me && !me.maintenance) { me = { ...me, maintenance: true }; emit() }
-  if (e.status === 429 && Date.now() - limitedAt > 10_000) { limitedAt = Date.now(); toast('요청이 많아요 · 잠시 후 다시 시도해 주세요') }
+  // /api/sync 의 429 는 엔진이 Retry-After 로 조용히 재시도한다(P1 U08) — 토스트 제외
+  if (e.status === 429 && !path.startsWith('/api/sync') && Date.now() - limitedAt > 10_000) { limitedAt = Date.now(); toast('요청이 많아요 · 잠시 후 다시 시도해 주세요') }
 })
 
 if (typeof window !== 'undefined') {

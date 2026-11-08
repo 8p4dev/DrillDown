@@ -35,3 +35,10 @@
 6. `worker_done`: 커밋 해시, 항목별 확인 방법·수치, 기존 E2E 영향, 남은 위험. 막히면 `ask` 후 턴 종료.
 
 ## 5. 진행 기록
+- 2026-11-09 기반 c8fe7de → WE1·WL·WY·WS·WG 디스패치(새 워크트리 agent-W*-p1). WE2 는 WE1 머지 후
+- WL 완료 c177653(검색·메타·정렬·n/200·말줄임·갤러리 링크·persist). 후속 요청: listTrees 정렬을 listTreeMeta 로 이동(호출처 비용)
+- WL 후속 d8ba196: listTrees 가볍게 복귀, 정렬은 listTreeMeta
+- WG 질문: /api/gallery 라우트에 q 전달 1줄(server/sync/index.ts, WY 소유) → 통합 때 오케스트레이터가 적용
+- WG 완료 eda9fd9: 공유 보기 details(폰 기본 917px, R7 11,003px), 여기부터 학습, 중복 복제 시트, 갤러리 q 검색·갱신일, 더 보기 중복·연타. 남김: index.ts q 1줄(통합), 실패한 더 보기 페이지 건너뜀(기존 버그)
+- WS 완료 a51e41d: 복습 경로·연체순·fuzz(하루 최대 221→60)·범위 라벨·백지 키 사용자 트리 기준·범위 화면(빈칸 리프>30·백지>40)·플래시 n/m·미니맵 숨김. 남김: 미니맵 숨김 시 aside 빈칸, 공유 토스트 미확인
+- WY 완료 51fee11: 3만 행 첫 업로드 36초·오류 0(R5 245초+·빨간 80초), 끊긴 pull 뒤 '저장됨' 안 뜸, 백업 가져오기(srs 포함·충돌 시 새 id). 남김: backup.check 연결(오케스트레이터), me.ts 429 토스트, applyRemote outbox 페이지별 읽기

@@ -103,7 +103,7 @@ export function registerSync(app: Hono<AppEnv>) {
     const page = c.req.query('page') ?? '1'
     if (sort !== 'recent' && sort !== 'copies') fail(400, 'invalid', '정렬이 올바르지 않습니다', 'sort')
     if (!/^\d{1,4}$/.test(page) || Number(page) < 1) fail(400, 'invalid', '페이지가 올바르지 않습니다', 'page')
-    return c.json(gallery(c.get('db'), sort as 'recent' | 'copies', Number(page), now()))
+    return c.json(gallery(c.get('db'), sort as 'recent' | 'copies', Number(page), now(), c.req.query('q') ?? ''))
   })
 }
 

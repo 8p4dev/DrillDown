@@ -17,8 +17,8 @@ export class ApiError extends Error {
 }
 
 /** 모든 api() 오류를 한 곳에서 본다(me.ts 가 설치: 503 maintenance → 배너, 429 → 토스트 1회) */
-let onError: ((e: ApiError) => void) | undefined
-export const setApiErrorHook = (f: (e: ApiError) => void) => { onError = f }
+let onError: ((e: ApiError, path: string) => void) | undefined
+export const setApiErrorHook = (f: (e: ApiError, path: string) => void) => { onError = f }
 
 /** 네트워크 실패는 ApiError(0, 'offline'). 2xx 가 아니면 봉투를 읽어 ApiError. 204 는 undefined */
 export async function api<T>(path: string, init: { method?: string; body?: unknown; signal?: AbortSignal } = {}): Promise<T> {
@@ -41,7 +41,7 @@ export async function api<T>(path: string, init: { method?: string; body?: unkno
     const err = (data as ApiErrorBody | null)?.error
     const ra = Number(res.headers.get('retry-after')) || undefined
     const e = new ApiError(res.status, err?.code ?? 'internal', err?.message ?? `HTTP ${res.status}`, err?.field, ra)
-    onError?.(e)
+    onError?.(e, path)
     throw e
   }
   return data as T
