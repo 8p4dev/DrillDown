@@ -1,5 +1,9 @@
 import { memo, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import type { TreeNode } from '../../core/types'
+import { Icon } from '../../ui/Icon'
+import { I } from '../../ui/icons'
+import { chevronDown, x } from '../../ui/icons.all'
+import { ensureVisible } from '../viewport'
 import { parse, toHtml } from './content/format'
 
 /** 너비 단계별 카드 폭(px) */
@@ -26,8 +30,10 @@ export interface NodeRowProps {
   hiddenCount: number
   selected: boolean
   cut: boolean
-  /** 오답 농도 0..1 (core/srs missHeat) */
+  /** 오답 농도 0..1 (core/srs missHeat) — data-miss(E2E 계약) */
   heat: number
+  /** 오답 점수(정수). 1 이상이면 우하단 ✕n 배지 (01 §3.1.3) */
+  miss: number
   /** 위치 트랜지션 끔 (측정 전·드래그로 따라오는 중) */
   still: boolean
   /** 끌고 있는 카드: 들어 올린 모양 */
@@ -60,7 +66,10 @@ function NodeRow(p: NodeRowProps) {
   const drag = useRef<{ x: number; side: 1 | -1; z: number } | null>(null) // z = 그래프 확대 배율
   // 편집 중 들여쓰기·내어쓰기로 카드가 DOM 에서 옮겨지면 포커스를 되찾는다
   useLayoutEffect(() => {
-    if (editing && document.activeElement !== inputRef.current) inputRef.current?.focus()
+    if (editing && document.activeElement !== inputRef.current) {
+      inputRef.current?.focus()
+      if (inputRef.current) ensureVisible(inputRef.current)
+    }
   }, [editing, p.depth, p.node.parentId, p.node.order])
   // 선택되거나 편집 중 카드가 늘어나면 보이도록 스크롤
   useEffect(() => {
@@ -72,7 +81,7 @@ function NodeRow(p: NodeRowProps) {
     <span
       className={`w-handle ${side > 0 ? 'r' : 'l'}`}
       aria-label="너비 조절"
-      title="끌어서 너비 조절 (3단계)"
+      data-tip="끌어서 너비 조절"
       onPointerDown={(e) => {
         if (e.button !== 0 || !e.isPrimary) return
         e.stopPropagation()
@@ -137,29 +146,32 @@ function NodeRow(p: NodeRowProps) {
       ) : p.node.note ? (
         <div
           className="node-note"
-          title="더블클릭하여 내용 편집"
+          data-tip="두 번 탭 = 내용 편집"
           onDoubleClick={(e) => (stop(e), p.onStartNoteEdit())}
           // 저장 형식 → HTML (텍스트는 이스케이프됨)
           dangerouslySetInnerHTML={{ __html: toHtml(parse(p.node.note)) }}
         />
       ) : p.selected && !editing ? (
         // 내용이 없는 카드: 선택 시 카드 아래에 겹쳐 뜨는 추가 버튼 (배치 높이에 영향 없음)
-        <button type="button" className="add-note" onClick={(e) => (stop(e), p.onStartNoteEdit())} onDoubleClick={stop}>
-          + 내용
+        <button type="button" className="add-note" aria-label="+ 내용" data-tip="내용 추가" onClick={(e) => (stop(e), p.onStartNoteEdit())} onDoubleClick={stop}>
+          <Icon d={I.plus} />
         </button>
       ) : null}
       {handle(-1)}
       {handle(1)}
+      {p.miss >= 1 && (
+        <span className="miss" aria-label={`오답 ${p.miss}회`}><Icon d={x} />{p.miss}</span>
+      )}
       {p.hasChildren && (
         <span
           className={`badge${p.hiddenCount ? ' folded' : ''}`}
           role="button"
           aria-label={p.hiddenCount ? `펼치기 (하위 ${p.hiddenCount}개)` : '접기'}
-          title={p.hiddenCount ? '펼치기 (H)' : '접기 (H)'}
+          data-tip={p.hiddenCount ? '펼치기 (H)' : '접기 (H)'}
           onClick={(e) => (stop(e), p.onToggle())}
           onDoubleClick={stop}
         >
-          {p.hiddenCount ? `+${p.hiddenCount}` : '−'}
+          <Icon d={chevronDown} />{p.hiddenCount ? p.hiddenCount : null}
         </span>
       )}
     </div>
