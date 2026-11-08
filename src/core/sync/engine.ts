@@ -34,6 +34,8 @@ let debounce: ReturnType<typeof setTimeout> | undefined
 let retry: ReturnType<typeof setTimeout> | undefined
 let poll: ReturnType<typeof setInterval> | undefined
 let chain: Promise<void> = Promise.resolve()
+/** 마지막 pull 이 more=false 로 끝났나 (U08·R5-P3). 시작·새로고침 때 false — start() 가 늘 pull 하므로 영속할 필요 없다 */
+let pullDone = false
 
 const onOnline = () => void sync()
 const onVis = () => document.visibilityState === 'visible' && void sync()
@@ -102,7 +104,7 @@ async function run(pullToo: boolean) {
       const reason = msgs.join(' · ')
       await db.meta.put({ key: 'lastSyncError', value: reason })
       setSyncState({ kind: 'error', reason, pending })
-    } else setSyncState(pending ? { kind: 'syncing' } : { kind: 'saved' })
+    } else setSyncState(pending || !pullDone ? { kind: 'syncing' } : { kind: 'saved' })
   } catch (e) {
     await fail(e)
   }
@@ -110,6 +112,12 @@ async function run(pullToo: boolean) {
 
 async function fail(e: unknown) {
   const pending = await db.outbox.count()
+  if (e instanceof ApiError && e.status === 429) {
+    // U08·R5-P2: 리밋은 오류가 아니라 대기 — Retry-After(없으면 15초) 뒤 이어서
+    setSyncState({ kind: 'syncing' })
+    retry = setTimeout(() => void sync(), (e.retryAfter ?? 15) * 1000)
+    return
+  }
   if (e instanceof ApiError && (e.status === 0 || e.status === 503)) {
     setSyncState({ kind: 'offline', pending })
     if (e.status === 503) retry = setTimeout(() => void sync(), (e.retryAfter ?? 30) * 1000) // 점검 모드 (RV L17)
@@ -129,15 +137,19 @@ async function fail(e: unknown) {
 
 // ── push ────────────────────────────────────────────────────
 
+/** outbox 를 한 번 읽어 배치로 나눠 보낸다(U08·R5-P10). 보내는 동안 바뀌거나 남은 행은 다음 바퀴에서 다시 읽는다 */
 async function pushAll() {
   for (let guard = 0; guard < 100; guard++) {
-    const rows = (await db.outbox.toArray()).filter((r) => !held.has(r.treeId)).sort((a, b) => ORDER[a.kind] - ORDER[b.kind] || a.seq! - b.seq!)
+    let rows = (await db.outbox.toArray()).filter((r) => !held.has(r.treeId)).sort((a, b) => ORDER[a.kind] - ORDER[b.kind] || a.seq! - b.seq!)
     if (!rows.length) return
-    await pushOnce(rows.slice(0, MAX_ROWS))
+    while (rows.length) {
+      rows = rows.slice(await pushOnce(rows.slice(0, MAX_ROWS))).filter((r) => !held.has(r.treeId))
+    }
   }
 }
 
-async function pushOnce(slice: OutboxRow[]) {
+/** 보낸(처리한) 앞쪽 행 수를 돌려준다 — 바이트 상한으로 slice 보다 적을 수 있다 */
+async function pushOnce(slice: OutboxRow[]): Promise<number> {
   const ids = (k: OutboxRow['kind']) => slice.filter((r) => r.kind === k && r.op === 'put').map((r) => r.id)
   const [ts, ns, ss, as] = await Promise.all([db.trees.bulkGet(ids('tree')), db.nodes.bulkGet(ids('node')), db.srs.bulkGet(ids('srs')), db.attempts.bulkGet(ids('attempt'))])
   const cur = new Map<string, RTree | TreeNode | NodeSrs | BlankAttempt>()
@@ -187,22 +199,22 @@ async function pushOnce(slice: OutboxRow[]) {
     if (e instanceof ApiError && e.code === 'tree_limit') {
       const tp = sent.filter((r) => r.kind === 'tree' && r.op === 'put' && cur.has(r.id) && !(cur.get(r.id) as RTree).deletedAt)
       if (!tp.length) throw e
-      if (tp.length === 1) return void held.add(tp[0].treeId)
+      if (tp.length === 1) return held.add(tp[0].treeId), sent.length
       const half = Math.ceil(tp.length / 2)
       await pushOnce(tp.slice(0, half))
       await pushOnce(tp.slice(half))
-      return
+      return sent.length // 트리 아닌 행은 outbox 에 남아 다음 바퀴에 간다
     }
     // 행 하나 때문에 큐 전체가 막히지 않게: 400 invalid 는 field 로 범인 행을, 못 찾거나 payload_too_large·413 이면 반씩 나눠 격리
     if (!(e instanceof ApiError) || !(e.status === 413 || (e.status === 400 && (e.code === 'invalid' || e.code === 'payload_too_large')))) throw e
     const m = /^((?:deleted\.)?\w+)\[(\d+)\](?:\.(\w+))?/.exec(e.field ?? '')
     const hit = m ? pos[m[1]]?.[Number(m[2])] : undefined
-    if (hit) return quarantine(hit, why(e, m?.[3]))
-    if (sent.length === 1) return quarantine(sent[0], why(e))
+    if (hit) return await quarantine(hit, why(e, m?.[3])), sent.length // 나머지는 다음 바퀴에
+    if (sent.length === 1) return await quarantine(sent[0], why(e)), 1
     const half = Math.ceil(sent.length / 2)
     await pushOnce(sent.slice(0, half))
     await pushOnce(sent.slice(half))
-    return
+    return sent.length
   }
   if (sent.filter((r) => bad.delete(r.kind + r.id)).length) await saveBad() // 다시 바뀌어 통과하면 오류 목록에서 뺀다
   if (body.deleted.trees.some((d) => res.applied.includes(d.id))) held.clear() // 자리가 났을 수 있다 → 보류 재시도
@@ -226,6 +238,7 @@ async function pushOnce(slice: OutboxRow[]) {
     toast(`다른 기기 변경 반영됨 ${n}건`, { label: '내 버전 유지', run: () => void keepMine(losers) }, 8000)
   }
   if (taken.size) await reId(taken)
+  return sent.length
 }
 
 /** tree_limit 으로 보류한 트리 id (C4). 그 트리의 outbox 행은 남겨 두고 전송만 건너뛴다. 로그인·트리 삭제 push/pull 때 비운다 */
@@ -335,6 +348,7 @@ async function pull() {
 async function pullFrom(since: number): Promise<Set<ID>> {
   const seen = new Set<ID>()
   const changed = new Set<ID>()
+  pullDone = false
   for (let guard = 0; guard < 1000; guard++) {
     const r = await api<PullRes>(`/api/sync?since=${since}`)
     for (const t of r.trees) seen.add(t.id)
@@ -345,6 +359,7 @@ async function pullFrom(since: number): Promise<Set<ID>> {
     since = r.seq
     // D1: 고아 복구는 마지막 페이지까지 받은 뒤 1회. 중간에 끊기면(throw) 건너뛴다 — 부모가 뒤 페이지에 있을 수 있다
     if (!r.more) {
+      pullDone = true
       emit(await rescueOrphans(changed))
       break
     }

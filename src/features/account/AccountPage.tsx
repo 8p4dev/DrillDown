@@ -4,6 +4,7 @@
 // 아바타 파일 업로드는 없다(서버는 이미지 저장 안 함, 03 §3.3).
 import { useEffect, useRef, useState } from 'react'
 import { api, ApiError } from '../../core/api'
+import { importBackup, parseBackup } from '../../core/backup'
 import { db } from '../../core/db'
 import { exportEvents } from '../../core/events'
 import { deleteAccount, exportServer, loadSessions, login, logout, patchMe, revokeOtherSessions, revokeSession, useMe, useMeReady, useSessions } from '../../core/me'
@@ -25,6 +26,7 @@ const rel = (t: number) => {
   return m < 1 ? '방금' : m < 60 ? `${m}분 전` : m < 1440 ? `${Math.round(m / 60)}시간 전` : `${Math.round(m / 1440)}일 전`
 }
 const daysLeft = (deletedAt: number) => Math.max(1, Math.ceil((deletedAt + TRASH_MS - Date.now()) / 86_400_000))
+const upload = '<path d="M12 3v12" /><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="m17 8-5-5-5 5" />'
 const okNick = (s: string) => s.length >= 1 && s.length <= 20 && !/[\p{Cc}]/u.test(s)
 const fail = (e: unknown) => toast(e instanceof ApiError && e.status === 0 ? '오프라인이에요' : '실패했어요 · 다시 시도해 주세요')
 
@@ -39,6 +41,7 @@ export default function AccountPage() {
   const [treeCount, setTreeCount] = useState(0)
   const [trash, setTrash] = useState<Tree[]>([])
   const done = useRef(false)
+  const file = useRef<HTMLInputElement>(null)
 
   const loggedIn = !!me
   useEffect(() => { if (loggedIn) loadSessions().catch(() => { /* 목록 비움 */ }) }, [loggedIn])
@@ -84,6 +87,23 @@ export default function AccountPage() {
       )}
     </section>
   )
+  const importData = async (f: File | undefined) => {
+    if (!f) return
+    try {
+      const r = await importBackup(parseBackup(await f.text(), (await listTrees()).length))
+      toast(`트리 ${r.trees}개를 가져왔어요${r.copied ? ` · ${r.copied}개는 이미 있어 사본으로` : ''}`)
+    } catch (e) {
+      // parseBackup 문구는 그대로, Dexie 오류(ConstraintError 등)는 일반 문구
+      toast(e instanceof Error && e.name === 'Error' ? e.message : '가져오지 못했어요 · 파일을 확인해 주세요')
+    }
+    reload()
+  }
+  const importBtn = (
+    <>
+      <button type="button" className="icon-btn" onClick={() => file.current?.click()}><Icon d={upload} /> 백업 가져오기</button>
+      <input ref={file} type="file" accept="application/json,.json" hidden aria-label="백업 파일" onChange={(e) => { void importData(e.target.files?.[0]); e.target.value = '' }} />
+    </>
+  )
   const exportBtn = <button type="button" className="icon-btn" onClick={() => void exportData()}><Icon d={I.download} /> 데이터 내보내기</button>
   if (!ready) return null
   if (!me) {
@@ -92,7 +112,7 @@ export default function AccountPage() {
         <h1>휴지통·내보내기</h1>
         <span className="stat">이 기기에만 저장돼 있어요 · <a href={href.login(href.account())}>로그인</a>하면 계정에 저장됩니다</span>
         {trashSection}
-        <div className="actions">{exportBtn}</div>
+        <div className="actions">{exportBtn}{importBtn}</div>
       </section>
     )
   }
@@ -182,6 +202,7 @@ export default function AccountPage() {
 
       <div className="actions">
         {exportBtn}
+        {importBtn}
         <button type="button" className="icon-btn" onClick={() => void signOut()}><Icon d={logOut} /> 로그아웃</button>
       </div>
 
