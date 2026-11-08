@@ -32,8 +32,9 @@ export default function Minimap({ nodes, rootId, currentId, colors, onGo }: Prop
   } as React.CSSProperties
   const lit = (id: ID) => id === currentId || byId.get(id)?.parentId === currentId
 
+  // U39: 마우스 보조 — 키보드·스크린리더는 경로·카드로 이동(Tab 정지점 0)
   return (
-    <figure className={`minimap${open ? ' open' : ''}`} aria-label="미니맵" style={focus}>
+    <figure className={`minimap${open ? ' open' : ''}`} aria-label="미니맵" aria-hidden style={focus}>
       <svg viewBox={`0 0 ${g.width} ${g.height}`} preserveAspectRatio="xMidYMin meet">
         {g.edges.map(([p, c]) => {
           const a = g.boxes.get(p)!
@@ -53,7 +54,7 @@ export default function Minimap({ nodes, rootId, currentId, colors, onGo }: Prop
               aria-current={id === currentId ? 'location' : undefined}
               {...(go && {
                 role: 'button',
-                tabIndex: 0,
+                tabIndex: -1,
                 'aria-label': `${n.title}(으)로 이동`,
                 onClick: () => onGo(id),
                 onKeyDown: (e: React.KeyboardEvent) => {
@@ -67,7 +68,7 @@ export default function Minimap({ nodes, rootId, currentId, colors, onGo }: Prop
           )
         })}
       </svg>
-      <button type="button" className="minimap-toggle ghost" aria-expanded={open} aria-label={open ? '미니맵 접기' : '미니맵 펼치기'} data-tip={open ? '접기' : '펼치기'} onClick={() => setOpen((o) => !o)}>
+      <button type="button" tabIndex={-1} className="minimap-toggle ghost" aria-expanded={open} aria-label={open ? '미니맵 접기' : '미니맵 펼치기'} data-tip={open ? '접기' : '펼치기'} onClick={() => setOpen((o) => !o)}>
         <Icon d={chevronDown} className="chev" />
       </button>
     </figure>

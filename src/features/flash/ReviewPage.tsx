@@ -1,5 +1,6 @@
 // 오늘의 복습 (plan §1 F2): 오늘 기한 노드의 부모 큐를 플래시카드로 차례 복습. Dexie 직접(계약 §3.5 — 공유 보기에 없음)
 import { useEffect, useMemo, useState } from 'react'
+import { ancestorsOf } from '../../core/path'
 import { getTreeNodes, listTrees } from '../../core/repo'
 import { dexieSource } from '../../core/source'
 import { colorMap, dueByTree, getSrsMap } from '../../core/srs'
@@ -7,9 +8,10 @@ import type { ID, NodeSrs, Tree, TreeNode } from '../../core/types'
 import { href } from '../../router'
 import { Icon } from '../../ui/Icon'
 import { I } from '../../ui/icons'
+import { NodePath } from '../../ui/NodePath'
 import { arrowRight } from '../../ui/icons.all'
 import FlashCard from './FlashCard'
-import { parentQueue } from './flash'
+import { byOverdue, parentQueue } from './flash'
 import './flash.css'
 
 interface Session { tree: Tree; nodes: TreeNode[]; queue: ID[]; i: number }
@@ -30,7 +32,7 @@ export default function ReviewPage() {
   useEffect(() => {
     if (session) return
     Promise.all([listTrees(), dueByTree(endOfToday())]).then(([trees, due]) =>
-      setRows(trees.filter((t) => due.get(t.id)?.length).map((t) => ({ tree: t, due: due.get(t.id)! }))),
+      setRows(byOverdue(trees.filter((t) => due.get(t.id)?.length).map((t) => ({ tree: t, due: due.get(t.id)! })))),
     )
   }, [session])
   const colors = useMemo(() => colorMap(session?.nodes ?? [], srs.map, srs.at), [session?.nodes, srs])
@@ -55,11 +57,12 @@ export default function ReviewPage() {
             <span style={{ width: `${((session.i + 1) / session.queue.length) * 100}%` }} />
           </div>
         </header>
-        {id ? (
+        {id ? (<>
+          <NodePath path={ancestorsOf(new Map(session.nodes.map((n) => [n.id, n])), id)} label="복습 위치" className="flash-path" />
           <FlashCard key={id} treeId={treeId} nodes={session.nodes} conceptId={id} colors={colors}
             source={dexieSource(treeId)}
             onRated={(s) => setSrs(({ map }) => ({ map: new Map(map).set(s.nodeId, s), at: new Date() }))} onNext={last ? undefined : step} />
-        ) : (
+        </>) : (
           <p className="muted">복습할 항목이 없습니다.</p>
         )}
         <div className="actions flash-nav">
@@ -84,7 +87,7 @@ export default function ReviewPage() {
           {rows.map(({ tree, due }) => (
             <li key={tree.id} data-tree-id={tree.id} data-due-count={due.length} className="card">
               <strong>{tree.title}</strong>
-              <span className="due-count muted">{due.length}개</span>
+              <span className="due-count muted">{due.length}항목</span>
               <a className="review-link" href={href.flash(tree.id)}><Icon d={I.layers} /> 플래시카드</a>
               <button type="button" className="primary" aria-label={`복습 시작: ${tree.title}`} onClick={() => start(tree, due)}>복습 시작</button>
             </li>

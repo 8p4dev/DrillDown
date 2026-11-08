@@ -84,6 +84,21 @@ full = attach(attach(full, 'a2', 'B', 'R'), 'b1', 'A', 'R') // 제목 X 둘 교�
 assert.equal(gradeBlank(scope, full).correct, 7)
 full = attach(full, 'c', 'A', 'R')
 assert.equal(gradeBlank(scope, full).ok.c, false)
+// U36: 같은 제목 '방법' 이 다른 공격 아래 — 다른 공격의 '방법' 아래 붙이면 오답(부모 제목만 같아선 안 됨)
+const atk = [N('r', null), N('p', 'r', 'P'), N('pm', 'p', '방법'), N('px', 'pm', 'x'), N('q', 'r', 'Q'), N('qm', 'q', '방법'), N('qy', 'qm', 'y')]
+let wrong: Links = new Map()
+for (const n of atk.slice(1)) wrong = attach(wrong, n.id, n.parentId!, 'r')
+assert.equal(gradeBlank(atk, wrong).correct, 6)
+wrong = attach(wrong, 'px', 'qm', 'r')
+const gw = gradeBlank(atk, wrong)
+assert(gw.ok.px === false && gw.correct === 5, 'U36 다른 공격의 방법 아래 = 오답')
+// 같은 제목 '방법' 카드를 서로 바꿔 놓으면(pm↔qm) 둘 다 정답, 하지만 x 는 사용자 트리에서 Q 의 방법 아래 → 오답
+let sw: Links = new Map([['p', 'r'], ['q', 'r'], ['qm', 'p'], ['pm', 'q'], ['px', 'pm'], ['qy', 'qm']])
+let gs = gradeBlank(atk, sw)
+assert(gs.ok.pm && gs.ok.qm && !gs.ok.px && !gs.ok.qy, 'U36 교환된 방법 아래 자식은 사용자 트리 기준')
+sw = new Map([...sw, ['px', 'qm'], ['qy', 'pm']])
+gs = gradeBlank(atk, sw)
+assert(gs.correct === 6, 'U36 교환해도 각 공격 아래 올바른 자식이면 만점')
 
 // sideLayout: 깊이 = 열, 폭 안에 들어감, 칸 겹침 없음, 최소 카드 폭 유지
 const side = sideLayout(scope, 'R', 360)

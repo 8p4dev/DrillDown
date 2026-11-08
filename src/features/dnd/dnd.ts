@@ -1,4 +1,5 @@
 // D&D 퀴즈 순수 로직 — 셔플·배치 상태 변경·채점 (DOM·Dexie 없음, dnd.check.ts 로 검증)
+import { ancestorsOf } from '../../core/path'
 import type { ID, TreeNode } from '../../core/types'
 import { layout, MARGIN, type Box, type Graph } from '../editor/graph/layout'
 
@@ -135,14 +136,16 @@ export function placedTree(scope: TreeNode[], links: Links): TreeNode[] {
   ]
 }
 
-/** ok = 루트 제외 전 노드. (부모 제목, 제목) 쌍이 원본과 맞으면 정답(같은 제목은 같은 것). 트레이 잔여 = 오답 */
+/** ok = 루트 제외 전 노드. (조상 제목 사슬, 제목)이 원본과 맞으면 정답 — 같은 제목은 같은 것이되(교환 가능),
+ * 사용자 트리에서 다른 공격의 '방법' 아래에 붙이면 오답(U36). 트레이 잔여 = 오답 */
 export function gradeBlank(scope: TreeNode[], links: Links): Score {
-  const title = new Map(scope.map((n) => [n.id, n.title]))
-  const key = (parent: ID, id: ID) => `${title.get(parent)}\u0000${title.get(id)}`
+  const key = (byId: Map<ID, TreeNode>, id: ID) => ancestorsOf(byId, id).map((n) => n.title).join('\u0000')
+  const orig = new Map(scope.map((n) => [n.id, n]))
+  const mine = new Map(placedTree(scope, links).map((n) => [n.id, n])) // 사용자가 붙인 부모 기준
   const rest = scope.slice(1)
   const ok = matchPairs(
-    rest.map((n) => key(n.parentId!, n.id)),
-    [...links].map(([id, p]) => [key(p, id), id]),
+    rest.map((n) => key(orig, n.id)),
+    [...links.keys()].map((id) => [key(mine, id), id]),
   )
   for (const n of rest) ok[n.id] ??= false
   const placed = rest.filter((n) => links.has(n.id)).map((n) => n.id)

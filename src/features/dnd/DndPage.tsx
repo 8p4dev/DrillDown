@@ -12,20 +12,26 @@ import { haptic } from '../feel'
 import { coarseHint, useStudySource } from '../flash/study'
 import TreeHeader from '../TreeHeader'
 import { gradeDnd, leavesOf, moveCard, scopeOf, shuffle, type Place, type Score } from './dnd'
-import { Ghost, Progress, ResultMark, ScopeSelect, ScoreLine, TreeCanvas } from './kit'
+import { Ghost, Progress, ResultMark, ScopeGate, ScopeSelect, ScoreLine, TreeCanvas } from './kit'
 import { useDragDrop } from './useDragDrop'
+
+const MAX_LEAVES = 30 // U30: 이보다 많고 ?root= 가 없으면 범위부터 고른다
 
 export default function DndPage({ treeId, rootId, source }: { treeId: string; rootId?: string; source?: StudySource }) {
   const src = useStudySource(source, treeId)
   const [all, setAll] = useState<TreeNode[] | null>(null)
   useEffect(() => void src.nodes().then((ns) => { setAll(ns); coarseHint('dnd', '카드 탭 → 빈칸 탭', I.squareDashed) }), [src])
   const rid = all && (all.some((n) => n.id === rootId) ? rootId! : getRoot(all).id)
+  const scope = all && rid ? scopeOf(all, rid) : null
+  const to = (id: ID) => (source ? href.shared(treeId, 'dnd', id) : href.dnd(treeId, id))
   return (
     <section>
       <TreeHeader treeId={treeId} active="dnd">
-        {all && rid && <ScopeSelect nodes={all} value={rid} to={(id) => (source ? href.shared(treeId, 'dnd', id) : href.dnd(treeId, id))} />}
+        {all && rid && <ScopeSelect nodes={all} value={rid} to={to} />}
       </TreeHeader>
-      {all && rid && <Quiz treeId={treeId} scope={scopeOf(all, rid)} source={src} />}
+      {all && rid && scope && (rootId === undefined && leavesOf(scope).length > MAX_LEAVES
+        ? <ScopeGate nodes={all} rootId={rid} to={to} />
+        : <Quiz treeId={treeId} scope={scope} source={src} />)}
     </section>
   )
 }

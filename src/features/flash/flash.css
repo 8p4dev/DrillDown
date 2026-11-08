@@ -10,9 +10,7 @@
 .flash .flash-edit-link, .review-link { display: inline-flex; align-items: center; justify-content: center; gap: .35rem; } /* 버튼은 index.css 가 inline-flex */
 
 /* 경로 */
-.flash-path { display: flex; flex-wrap: wrap; align-items: center; gap: .15rem; font-size: var(--fs-sm); color: var(--muted); margin-bottom: .75rem; min-height: 1.4em; }
-.flash-path .sep { margin: 0 .35rem; opacity: .6; }
-.flash-path [aria-current] { color: var(--text); font-weight: 600; }
+.flash-path { margin-bottom: .75rem; } /* 모양은 ui/NodePath(.node-path) */
 .flash-path button.link { color: var(--muted); }
 @media (hover: hover) { .flash-path button.link:hover:not(:disabled) { color: var(--text); } }
 
