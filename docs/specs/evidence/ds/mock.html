@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#f4f4f4" id="tc">
+<title>Drill Down DS 목업</title>
+<!-- FOUC 없는 부팅: 저장된 theme 을 head 에서 먼저 적용 (스펙 §3.7). 외부 요청 0. -->
+<script>(function(){try{var t=localStorage.getItem('theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}catch(e){}})()</script>
+<style>
+/* ===== 토큰 (01_design_system.md §3.1 과 동일) ===== */
+:root{
+  --bg:#f4f4f4;--surface:#fff;--surface-2:#f7f7f7;--border:#cfcfcf;--border-strong:#8a8a8a;
+  --text:#111;--text-2:#3d3d3d;--muted:#5f5f5f;--ok:#1a7f37;--danger:#d1242f;--on-fill:#fff;
+  --radius-sm:0;--radius:2px;--radius-lg:2px;
+  --fs-xs:.75rem;--fs-sm:.85rem;--fs-md:.95rem;--fs-lg:1.1rem;--fs-xl:1.4rem;--fs-2xl:2rem;
+  --nav-h:52px;--tap:auto;--t-fast:120ms;--t-med:200ms;--t-slow:320ms;
+  --ease-out:cubic-bezier(.2,.8,.2,1);--ease-press:cubic-bezier(.3,.7,.4,1);
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){
+  --bg:#121212;--surface:#1b1b1b;--surface-2:#161616;--border:#333;--border-strong:#7a7a7a;
+  --text:#ededed;--text-2:#c4c4c4;--muted:#a0a0a0;--ok:#3fb950;--danger:#f85149;--on-fill:#121212;color-scheme:dark}}
+:root[data-theme=dark]{
+  --bg:#121212;--surface:#1b1b1b;--surface-2:#161616;--border:#333;--border-strong:#7a7a7a;
+  --text:#ededed;--text-2:#c4c4c4;--muted:#a0a0a0;--ok:#3fb950;--danger:#f85149;--on-fill:#121212;color-scheme:dark}
+/* 다크: 어두운 바탕에서 글자가 가늘어 보이는 보정 — 가중치가 아니라 안티앨리어싱으로(스펙 §3.4) */
+:root[data-theme=dark],:root:not([data-theme=light]){-webkit-font-smoothing:antialiased}
+
+/* ===== 기본 ===== */
+*{box-sizing:border-box}
+html{font-family:system-ui,-apple-system,'Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR','Segoe UI',sans-serif;font-size:15px;line-height:1.55;color:var(--text);background:var(--bg);-webkit-text-size-adjust:100%}
+body{margin:0;padding:0 0 4rem}
+h1{font-size:var(--fs-xl);font-weight:750;letter-spacing:-.02em;margin:.25rem 0 1rem}
+h2{font-size:var(--fs-lg);font-weight:650;margin:2rem 0 .75rem;padding-bottom:.35rem;border-bottom:1px solid var(--border)}
+a{color:var(--text);text-decoration:underline;text-underline-offset:.15em;text-decoration-thickness:1px}
+:focus-visible{outline:2px solid var(--text);outline-offset:2px}
+::selection{background:var(--text);color:var(--bg)}
+main{max-width:1100px;margin:0 auto;padding:1.25rem}
+.muted{color:var(--muted)}
+.row{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center}
+.col{display:flex;flex-direction:column;gap:.4rem}
+.cap{font-size:var(--fs-xs);color:var(--muted);font-variant-numeric:tabular-nums}
+svg.i{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+svg.i.l{width:20px;height:20px;stroke-width:1.75}
+
+/* ===== 상단 바 (backdrop-filter·그라데이션 없음, 1px 선) ===== */
+.topnav{position:sticky;top:0;z-index:10;display:flex;align-items:center;gap:.25rem;height:var(--nav-h);padding:0 1.25rem;background:var(--surface);border-bottom:1px solid var(--border)}
+.topnav a{text-decoration:none;color:var(--muted);padding:.35rem .6rem;font-size:var(--fs-md);font-weight:550;display:inline-flex;align-items:center;gap:.4rem;border-bottom:2px solid transparent}
+.topnav a.active{color:var(--text);border-bottom-color:var(--text)}
+.brand{color:var(--text)!important;font-weight:800;letter-spacing:-.03em;margin-right:.5rem;padding-left:0!important}
+.brand::before{content:'';width:14px;height:14px;background:var(--text)}
+.spacer{flex:1}
+
+/* ===== 버튼 ===== */
+button{font:inherit;font-size:var(--fs-sm);font-weight:550;line-height:1.2;min-height:var(--tap);padding:.45rem .85rem;border-radius:var(--radius);cursor:pointer;color:var(--text);background:var(--surface);border:1px solid var(--border-strong);display:inline-flex;align-items:center;gap:.4rem;transition:background var(--t-fast),border-color var(--t-fast),color var(--t-fast),transform var(--t-fast) var(--ease-press)}
+button:hover:not(:disabled),button.is-hover{background:var(--surface-2);border-color:var(--text)}
+button:active:not(:disabled),button.is-active{transform:scale(.97);background:var(--border)}
+button.is-focus{outline:2px solid var(--text);outline-offset:2px}
+button:disabled{color:var(--muted);border-color:var(--border);background:var(--surface);cursor:default}
+button.primary{color:var(--bg);background:var(--text);border-color:var(--text)}
+button.primary:hover:not(:disabled),button.primary.is-hover{background:var(--text-2);border-color:var(--text-2)}
+button.primary:active:not(:disabled),button.primary.is-active{background:var(--text)}
+button.danger{color:var(--danger);border-color:var(--danger)}
+button.danger:hover:not(:disabled),button.danger.is-hover{color:var(--on-fill);background:var(--danger)}
+button.ok{color:var(--ok);border-color:var(--ok)}
+button.ok:hover:not(:disabled),button.ok.is-hover{color:var(--on-fill);background:var(--ok)}
+button.ghost{border-color:transparent;background:transparent;padding:.4rem}
+button.ghost:hover:not(:disabled){background:var(--surface-2);border-color:var(--border)}
+button.link{border:none;background:none;padding:0;min-height:0;text-decoration:underline;text-underline-offset:.15em;font-weight:inherit;font-size:inherit}
+.icon-btn{width:36px;height:36px;padding:0;justify-content:center}
+[data-tip]{position:relative}
+[data-tip]::after{content:attr(data-tip);position:absolute;left:50%;top:calc(100% + 6px);transform:translateX(-50%);white-space:nowrap;font-size:var(--fs-xs);font-weight:500;padding:.2rem .45rem;color:var(--bg);background:var(--text);opacity:0;pointer-events:none;transition:opacity var(--t-fast)}
+[data-tip]:hover::after,[data-tip]:focus-visible::after,[data-tip].show::after{opacity:1}
+
+/* ===== 입력 ===== */
+input:not([type=checkbox]),textarea,select{font:inherit;color:var(--text);background:var(--surface);min-height:var(--tap);border:1px solid var(--border-strong);border-radius:var(--radius);padding:.45rem .65rem}
+input:hover{border-color:var(--text)}
+input:focus,input.is-focus{outline:none;border-color:var(--text);box-shadow:inset 0 0 0 1px var(--text)}
+input::placeholder{color:var(--muted)}
+input:disabled{color:var(--muted);border-color:var(--border);background:var(--surface-2)}
+input[type=checkbox]{accent-color:var(--text);width:15px;height:15px}
+
+/* ===== 탭 (캡슐 → 직사각 세그먼트, 선택 = 반전) ===== */
+.mode-tabs{display:inline-flex;border:1px solid var(--border-strong);border-radius:var(--radius);overflow:hidden}
+.mode-tabs a{text-decoration:none;padding:.35rem .9rem;font-size:var(--fs-sm);font-weight:600;color:var(--muted);background:var(--surface);display:inline-flex;align-items:center;gap:.4rem}
+.mode-tabs a+a{border-left:1px solid var(--border-strong)}
+.mode-tabs a[aria-current=page]{color:var(--bg);background:var(--text)}
+
+/* ===== 카드 · 배지 · 아바타 ===== */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem 1.15rem}
+.tree-cards{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:.9rem}
+.tree-cards li{display:flex;flex-direction:column;gap:.6rem}
+.tree-cards li:hover{border-color:var(--text)}
+.tree-top{display:flex;align-items:flex-start;gap:.65rem}
+.tree-title{flex:1;font-size:var(--fs-lg);font-weight:650;line-height:1.35;letter-spacing:-.015em}
+.avatar{flex:none;width:2.25rem;height:2.25rem;display:grid;place-items:center;font-weight:700;font-size:var(--fs-md);color:var(--text);background:var(--surface-2);border:1px solid var(--border-strong);border-radius:var(--radius-sm)}
+.avatar.img{background:var(--border);border-color:var(--border-strong)}
+.tree-modes{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--border);border-radius:var(--radius)}
+.tree-modes a{display:flex;align-items:center;justify-content:center;gap:.3rem;padding:.4rem .3rem;font-size:.8rem;font-weight:500;color:var(--muted);text-decoration:none}
+.tree-modes a+a{border-left:1px solid var(--border)}
+.tree-modes a:hover{color:var(--text);background:var(--surface-2)}
+.badge{display:inline-flex;align-items:center;gap:.25rem;min-width:1.3rem;padding:0 .4rem;font-size:var(--fs-xs);font-weight:600;line-height:1.25rem;color:var(--muted);background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--radius-sm)}
+.badge.on{color:var(--bg);background:var(--text);border-color:var(--text)}
+.badge.miss{color:var(--danger);border-color:var(--danger)}
+.badge.vis{color:var(--text-2)}
+
+/* ===== 에디터 노드 카드: --heat 0..1 → 붉은 농도. 색 아닌 단서 = 오답 수 배지 ===== */
+.node-row{--heat:0;position:relative;width:200px;display:flex;flex-direction:column;color:var(--text);
+  background:color-mix(in srgb,var(--danger) calc(var(--heat)*30%),var(--surface));
+  border:1px solid color-mix(in srgb,var(--danger) calc(var(--heat)*100%),var(--border-strong));
+  border-radius:var(--radius-lg)}
+.node-row.root{border-width:2px;border-color:var(--text)}
+.node-row.selected{outline:2px solid var(--text);outline-offset:2px}
+.node-title{padding:.5rem .75rem;font-size:var(--fs-md);font-weight:600;line-height:1.35;text-align:center}
+.node-row.root .node-title{font-size:var(--fs-lg);font-weight:750}
+.node-note{padding:.4rem .75rem .5rem;border-top:1px solid var(--border);color:var(--text-2);font-size:.82rem;line-height:1.5}
+.node-row .badge{position:absolute;left:50%;bottom:0;transform:translate(-50%,50%)}
+.node-row .badge.miss{left:auto;right:.4rem;transform:translateY(50%)}
+mark{color:inherit;padding:0 .08em;border-radius:0}
+mark.hl-g{background:color-mix(in srgb,var(--ok) 28%,var(--surface))}
+mark.hl-r{background:color-mix(in srgb,var(--danger) 24%,var(--surface))}
+mark.hl-u{background:none;text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:.12em}
+
+/* ===== 플래시 카드: 숙련도 4단계 = 색 + 띠 패턴 + 마크 ===== */
+.flash-concept{display:flex;flex-direction:column;align-items:center;gap:.5rem;padding:2rem 1.5rem 1.25rem;text-align:center;background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--radius-lg)}
+.flash-concept-title{font-size:1.6rem;font-weight:750;letter-spacing:-.02em;line-height:1.25}
+.flash-kids{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:.75rem}
+.flash-kid{position:relative;display:flex;flex-direction:column;gap:.75rem;padding:1rem 1rem .9rem;background:var(--tone,var(--surface));border:1px solid var(--edge,var(--border));border-top:4px var(--band-style,solid) var(--band,var(--border));border-radius:var(--radius)}
+.flash-kid strong{font-size:var(--fs-lg);font-weight:650}
+.c-green{--tone:color-mix(in srgb,var(--ok) 8%,var(--surface));--edge:var(--ok);--band:var(--ok)}
+.c-lightgreen{--tone:color-mix(in srgb,var(--ok) 6%,var(--surface));--edge:var(--border-strong);--band:color-mix(in srgb,var(--ok) 45%,var(--surface));--band-style:dashed}
+.c-none{--band:var(--border)}
+.c-red{--tone:color-mix(in srgb,var(--danger) 8%,var(--surface));--edge:var(--danger);--band:var(--danger)}
+.state{position:absolute;top:.5rem;right:.5rem;display:inline-flex;align-items:center;gap:.2rem;font-size:var(--fs-xs);font-weight:700}
+.c-green .state,.c-lightgreen .state{color:var(--ok)}.c-red .state{color:var(--danger)}
+.flash-rate{display:flex;gap:.4rem}.flash-rate button{flex:1;justify-content:center}
+.flash-result{flex:1;justify-content:center;font-weight:650}
+.flash-result.known{color:var(--on-fill);background:var(--ok);border-color:var(--ok)}
+.flash-result.unknown{color:var(--danger);background:color-mix(in srgb,var(--danger) 8%,var(--surface));border-color:var(--danger)}
+
+/* ===== D&D ===== */
+.dnd-node,.dnd-slot,.dnd-card{width:148px;min-height:44px;display:flex;align-items:center;justify-content:center;text-align:center;font-size:var(--fs-sm);padding:.2rem .55rem;border-radius:var(--radius-lg)}
+.dnd-node{background:var(--surface);border:1px solid var(--border-strong);font-weight:650}
+.dnd-node.root{border:2px solid var(--text);font-weight:750}
+.dnd-slot{background:var(--surface-2);border:1.5px dashed var(--border-strong)}
+.dnd-slot.over{border-style:solid;border-color:var(--text);background:var(--surface);outline:2px solid var(--text);outline-offset:1px}
+.dnd-card{background:var(--surface);border:1px solid var(--border-strong);font-weight:550;cursor:grab}
+.dnd-card.sel,.dnd-card.lifted{border-color:var(--text);outline:2px solid var(--text);outline-offset:1px}
+.dnd-card.lifted{transform:scale(1.04)}
+[data-result=ok]{border-color:var(--ok)!important;background:color-mix(in srgb,var(--ok) 8%,var(--surface))!important}
+[data-result=wrong]{border-color:var(--danger)!important;border-style:dashed!important;background:color-mix(in srgb,var(--danger) 8%,var(--surface))!important}
+.mark{font-weight:800;margin-left:.3rem}.mark.ok{color:var(--ok)}.mark.no{color:var(--danger)}
+
+/* ===== 미니맵 ===== */
+.minimap{padding:.6rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);display:inline-block}
+.minimap rect{fill:var(--surface-2);stroke:var(--border-strong);stroke-width:1}
+.minimap .g rect{fill:var(--ok);stroke:var(--ok)}
+.minimap .lg rect{fill:color-mix(in srgb,var(--ok) 45%,var(--surface));stroke:var(--ok);stroke-dasharray:2 2}
+.minimap .r rect{fill:var(--danger);stroke:var(--danger)}
+.minimap .cur rect{stroke:var(--text);stroke-width:3}
+.minimap path{fill:none;stroke:var(--border-strong);stroke-width:1.5}
+
+/* ===== 토스트 · 메뉴 · 상태 ===== */
+.toast{display:inline-flex;align-items:center;gap:.9rem;padding:.55rem .6rem .55rem 1rem;font-size:var(--fs-sm);font-weight:500;color:var(--surface);background:var(--text);border-radius:var(--radius)}
+.toast button{min-height:0;padding:.3rem .65rem;font-weight:650;color:var(--surface);background:transparent;border:1px solid var(--border-strong)}
+.menu{display:inline-flex;flex-direction:column;min-width:8rem;padding:.3rem;background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--radius)}
+.menu button{justify-content:flex-start;border-color:transparent;background:none;text-align:left}
+.menu button:hover{background:var(--surface-2)}
+.sync{display:inline-flex;align-items:center;gap:.35rem;font-size:var(--fs-sm);color:var(--muted);font-variant-numeric:tabular-nums}
+.sync .dot{width:8px;height:8px;background:var(--border-strong)}
+.sync.saved .dot{background:var(--ok)}.sync.saved{color:var(--ok)}
+.sync.err .dot{background:var(--danger)}.sync.err{color:var(--danger)}
+.sync.busy .dot{animation:blink 1s steps(2) infinite}
+@keyframes blink{to{opacity:.3}}
+
+/* ===== 테마 토글(3상태 세그먼트) ===== */
+.theme{display:inline-flex;border:1px solid var(--border-strong);border-radius:var(--radius);overflow:hidden}
+.theme button{min-height:0;height:32px;width:36px;padding:0;justify-content:center;border:0;border-radius:0;background:var(--surface);color:var(--muted)}
+.theme button+button{border-left:1px solid var(--border-strong)}
+.theme button[aria-pressed=true]{color:var(--bg);background:var(--text)}
+
+/* 스와치 */
+.sw{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:.5rem}
+.sw div{height:48px;border:1px solid var(--border-strong);border-radius:var(--radius);display:flex;align-items:flex-end;padding:.25rem .4rem;font-size:var(--fs-xs);font-variant-numeric:tabular-nums}
+@media (prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation:none!important}}
+</style>
+</head>
+<body>
+<nav class="topnav">
+  <a class="brand" href="#">Drill Down</a>
+  <a class="active" href="#"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5h13"/><path d="M13 12h8"/><path d="M13 19h8"/><path d="M3 10a2 2 0 0 0 2 2h3"/><path d="M3 5v12a2 2 0 0 0 2 2h3"/></svg>내 트리</a>
+  <a href="#"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 2v3"/><path d="M16 2v3"/><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="m9 15 2 2 4-4"/></svg>오늘의 복습</a>
+  <span class="spacer"></span>
+  <span class="sync saved" role="status"><span class="dot"></span>저장됨</span>
+  <div class="theme" role="group" aria-label="테마" id="theme">
+    <button type="button" data-theme="auto" aria-label="테마: 자동" data-tip="자동"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v2"/><path d="M14.837 16.385a6 6 0 1 1-7.223-7.222c.624-.147.97.66.715 1.248a4 4 0 0 0 5.26 5.259c.589-.255 1.396.09 1.248.715"/><path d="M16 12a4 4 0 0 0-4-4"/><path d="m19 5-1.256 1.256"/><path d="M20 12h2"/></svg></button>
+    <button type="button" data-theme="light" aria-label="테마: 라이트" data-tip="라이트"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg></button>
+    <button type="button" data-theme="dark" aria-label="테마: 다크" data-tip="다크"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg></button>
+  </div>
+  <button type="button" class="ghost icon-btn" aria-label="로그인" data-tip="로그인"><svg class="i l" viewBox="0 0 24 24" aria-hidden="true"><path d="m10 17 5-5-5-5"/><path d="M15 12H3"/><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/></svg></button>
+</nav>
+<main>
+<h1>디자인 시스템 목업 <span class="cap" id="mode"></span></h1>
+<p class="muted">흰·검 회색 단계 + 초록·빨강. 반경 ≤ 2px, 그림자 0, backdrop-filter 0, 그라데이션 0. 시스템 폰트 스택. 외부 요청 0.</p>
+
+<h2>1. 토큰</h2>
+<div class="sw">
+  <div style="background:var(--bg)">--bg</div><div style="background:var(--surface)">--surface</div><div style="background:var(--surface-2)">--surface-2</div>
+  <div style="background:var(--border)">--border</div><div style="background:var(--border-strong);color:var(--surface)">--border-strong</div>
+  <div style="background:var(--muted);color:var(--surface)">--muted</div><div style="background:var(--text-2);color:var(--surface)">--text-2</div><div style="background:var(--text);color:var(--bg)">--text</div>
+  <div style="background:var(--ok);color:var(--on-fill)">--ok</div><div style="background:var(--danger);color:var(--on-fill)">--danger</div>
+</div>
+
+<h2>2. 버튼 5종 + 상태</h2>
+<div class="row">
+  <button type="button">기본</button>
+  <button type="button" class="primary">만들기</button>
+  <button type="button" class="danger"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>삭제</button>
+  <button type="button" class="ghost icon-btn" aria-label="학습 기록 내보내기" data-tip="학습 기록 내보내기"><svg class="i l" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg></button>
+  <button type="button" class="link">편집으로</button>
+</div>
+<div class="row" style="margin-top:.6rem">
+  <span class="cap">상태 →</span>
+  <button type="button" class="is-hover">호버</button><button type="button" class="is-active">눌림</button><button type="button" class="is-focus">포커스</button><button type="button" disabled>비활성</button>
+  <button type="button" class="primary is-hover">primary 호버</button><button type="button" class="danger is-hover">danger 호버</button><button type="button" class="ok">알음</button><button type="button" class="ok is-hover">알음 호버</button>
+</div>
+
+<h2>3. 입력 · 탭 · 배지 · 아바타 · 메뉴</h2>
+<div class="row">
+  <input aria-label="새 트리 제목" placeholder="새 트리 제목 (예: 노동법)">
+  <input aria-label="포커스 예" class="is-focus" value="포커스 상태">
+  <input aria-label="비활성 예" disabled value="비활성">
+  <nav class="mode-tabs" aria-label="학습 모드">
+    <a href="#" aria-current="page"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg>편집</a>
+    <a href="#"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/><path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/></svg>플래시</a>
+    <a href="#"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3a2 2 0 0 0-2 2"/><path d="M19 3a2 2 0 0 1 2 2"/><path d="M21 19a2 2 0 0 1-2 2"/><path d="M5 21a2 2 0 0 1-2-2"/><path d="M9 3h1"/><path d="M9 21h1"/><path d="M14 3h1"/><path d="M14 21h1"/><path d="M3 9v1"/><path d="M21 9v1"/><path d="M3 14v1"/><path d="M21 14v1"/></svg>빈칸</a>
+    <a href="#"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/></svg>백지</a>
+  </nav>
+</div>
+<div class="row" style="margin-top:.6rem">
+  <span class="badge">3</span><span class="badge on">3</span><span class="badge miss">✕2</span>
+  <span class="badge vis"><svg class="i" style="width:12px;height:12px" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>링크</span>
+  <span class="avatar">노</span><span class="avatar img" aria-label="프로필 이미지"></span>
+  <div class="menu" role="menu">
+    <button type="button" role="menuitem"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg>이름 변경</button>
+    <button type="button" role="menuitem"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>공유</button>
+    <button type="button" role="menuitem" class="danger"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>삭제</button>
+  </div>
+  <span class="sync"><span class="dot"></span>로컬</span><span class="sync busy"><span class="dot"></span>동기화 중</span><span class="sync err"><span class="dot"></span>동기화 실패</span>
+</div>
+
+<h2>4. 목록 카드</h2>
+<ul class="tree-cards">
+  <li class="card"><div class="tree-top"><span class="avatar">노</span><span class="tree-title">노동법 2차 목차</span><button type="button" class="ghost icon-btn" aria-label="더 보기" data-tip="더 보기"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button></div>
+    <div class="row cap"><span>노드 128</span><span class="badge vis">비공개</span></div>
+    <nav class="tree-modes" aria-label="학습 모드"><a href="#"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/><path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/></svg>플래시</a><a href="#"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3a2 2 0 0 0-2 2"/><path d="M19 3a2 2 0 0 1 2 2"/><path d="M21 19a2 2 0 0 1-2 2"/><path d="M5 21a2 2 0 0 1-2-2"/><path d="M9 3h1"/><path d="M9 21h1"/><path d="M14 3h1"/><path d="M14 21h1"/><path d="M3 9v1"/><path d="M21 9v1"/><path d="M3 14v1"/><path d="M21 14v1"/></svg>빈칸</a><a href="#"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/></svg>백지</a></nav></li>
+  <li class="card"><div class="tree-top"><span class="avatar">민</span><span class="tree-title">민법총칙</span><button type="button" class="ghost icon-btn" aria-label="더 보기"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button></div>
+    <div class="row cap"><span>노드 64</span><span class="badge vis">공개</span></div>
+    <nav class="tree-modes" aria-label="학습 모드"><a href="#">플래시</a><a href="#">빈칸</a><a href="#">백지</a></nav></li>
+</ul>
+
+<h2>5. 에디터 노드 카드 — heat 0 / .5 / 1 (오답 수 배지 = 색 아닌 단서)</h2>
+<div class="row" style="align-items:flex-start;gap:1.25rem;padding-bottom:1rem">
+  <div class="node-row root"><div class="node-title">노동법</div></div>
+  <div class="node-row" style="--heat:0"><div class="node-title">근로기준법</div><div class="node-note">• 총칙<br>• <mark class="hl-g">근로계약</mark> · <mark class="hl-r">임금</mark> · <mark class="hl-u">근로시간</mark></div><span class="badge on">4</span></div>
+  <div class="node-row" style="--heat:.5"><div class="node-title">쟁의행위</div><span class="badge miss">✕1</span></div>
+  <div class="node-row selected" style="--heat:1"><div class="node-title">부당노동행위</div><div class="node-note">구제절차</div><span class="badge miss">✕3</span></div>
+</div>
+
+<h2>6. 플래시 카드 — 숙련도 4단계 (색 + 띠 패턴 + 마크)</h2>
+<div class="flash-concept"><div class="flash-concept-title">집단적 노사관계법</div><span class="badge">하위 4 <svg class="i" style="width:12px;height:12px" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></div>
+<ul class="flash-kids" style="margin-top:.75rem">
+  <li class="flash-kid c-green"><span class="state" aria-label="외움"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><svg class="i" viewBox="0 0 24 24" aria-hidden="true" style="margin-left:-8px"><path d="M20 6 9 17l-5-5"/></svg></span><strong>노동조합</strong><div class="flash-rate"><button type="button" class="flash-result known">알음</button></div></li>
+  <li class="flash-kid c-lightgreen"><span class="state" aria-label="알음 1회"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span><strong>단체교섭</strong><div class="flash-rate"><button type="button" class="flash-result known">알음</button></div></li>
+  <li class="flash-kid c-none"><strong>단체협약</strong><div class="flash-rate"><button type="button" class="ok">알음</button><button type="button" class="danger">모름</button></div></li>
+  <li class="flash-kid c-red"><span class="state" aria-label="모름"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span><strong>쟁의행위</strong><div class="flash-rate"><button type="button" class="flash-result unknown">모름</button></div></li>
+</ul>
+
+<h2>7. 빈칸·백지 퀴즈 카드 / 슬롯 / 결과 · 미니맵</h2>
+<div class="row" style="align-items:flex-start;gap:1rem">
+  <div class="col"><div class="dnd-node root">노동법</div><div class="dnd-node">근로기준법</div></div>
+  <div class="col"><div class="dnd-slot" aria-label="근로기준법 아래 빈칸"></div><div class="dnd-slot over" aria-label="놓을 수 있음"></div></div>
+  <div class="col"><div class="dnd-card">임금</div><div class="dnd-card lifted">근로시간</div></div>
+  <div class="col"><div class="dnd-card" data-result="ok">휴게 <span class="mark ok">✓</span></div><div class="dnd-card" data-result="wrong">휴일 <span class="mark no">✕</span></div></div>
+  <figure class="minimap" aria-label="미니맵" style="margin:0"><svg width="160" height="90" viewBox="0 0 160 90" aria-hidden="true">
+    <path d="M80 18v12M80 30H30v12M80 30h50v12M80 30v12"/>
+    <g class="cur"><rect x="60" y="6" width="40" height="12"/></g>
+    <g class="g"><rect x="12" y="42" width="36" height="12"/></g><g class="lg"><rect x="62" y="42" width="36" height="12"/></g><g class="r"><rect x="112" y="42" width="36" height="12"/></g>
+    <g><rect x="12" y="66" width="36" height="12"/></g><g class="g"><rect x="62" y="66" width="36" height="12"/></g>
+  </svg></figure>
+</div>
+
+<h2>8. 토스트 · 점수 · 요약 숫자</h2>
+<div class="row">
+  <div class="toast" role="status">"임금" 삭제 (하위 3개)<button type="button">실행 취소</button></div>
+  <div class="toast" role="status">링크를 복사했습니다</div>
+  <span class="card" style="padding:.4rem .8rem;display:inline-flex;gap:.6rem;align-items:baseline"><b style="font-size:var(--fs-lg)">7</b><span class="muted">/ 9</span></span>
+  <span class="card" style="padding:.4rem .8rem;display:inline-flex;gap:.6rem;align-items:baseline;border-color:var(--ok);color:var(--ok)"><b style="font-size:var(--fs-lg)">9 / 9</b><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span>
+  <span style="font-size:2.2rem;font-weight:750;letter-spacing:-.03em;color:var(--ok);font-variant-numeric:tabular-nums">12 <span class="cap" style="font-size:var(--fs-sm)">알음</span></span>
+  <span style="font-size:2.2rem;font-weight:750;letter-spacing:-.03em;color:var(--danger);font-variant-numeric:tabular-nums">3 <span class="cap" style="font-size:var(--fs-sm)">모름</span></span>
+</div>
+</main>
+<script>
+// 테마 상태 기계(스펙 §3.7): auto|light|dark. auto 면 data-theme 제거 → prefers-color-scheme 가 결정.
+(function(){
+  var root=document.documentElement, btns=document.querySelectorAll('#theme button'), mq=matchMedia('(prefers-color-scheme: dark)');
+  function get(){try{var t=localStorage.getItem('theme');return t==='light'||t==='dark'?t:'auto'}catch(e){return 'auto'}}
+  function effective(t){return t==='auto'?(mq.matches?'dark':'light'):t}
+  function apply(t){
+    if(t==='auto')delete root.dataset.theme;else root.dataset.theme=t;
+    try{t==='auto'?localStorage.removeItem('theme'):localStorage.setItem('theme',t)}catch(e){}
+    var eff=effective(t);
+    document.getElementById('tc').content=eff==='dark'?'#121212':'#f4f4f4';
+    document.getElementById('mode').textContent=t+' → '+eff;
+    btns.forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.theme===t))});
+  }
+  btns.forEach(function(b){b.addEventListener('click',function(){apply(b.dataset.theme)})});
+  mq.addEventListener('change',function(){if(get()==='auto')apply('auto')});
+  apply(get());
+})();
+</script>
+</body>
+</html>
