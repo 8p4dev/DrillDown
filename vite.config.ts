@@ -11,7 +11,7 @@ export default defineConfig({
       manifest: { name: 'Drill Down', short_name: 'DrillDown', lang: 'ko', display: 'standalone', theme_color: '#f4f4f4', background_color: '#f4f4f4', icons: [] },
       workbox: {
         // 01 §3.8: 관리자 청크·웹폰트는 precache 밖(폰트 런타임 캐시 전략은 다음 단계). /api·/t/ 는 서버가 서빙
-        globIgnores: ['**/AdminPage-*.js', '**/admin-*.css', '**/fonts/**'],
+        globIgnores: ['**/AdminPage-*.js', '**/admin-*.css', '**/AdminPage-*.css', '**/fonts/**'],
         navigateFallbackDenylist: [/^\/api/, /^\/t\//],
       },
     }),

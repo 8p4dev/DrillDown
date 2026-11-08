@@ -65,4 +65,5 @@ CREATE TABLE attempts(
   overridden_count INTEGER NOT NULL
 );
 CREATE INDEX attempts_user ON attempts(user_id, completed_at);
-CREATE TABLE user_seq(user_id TEXT PRIMARY KEY, seq INTEGER NOT NULL DEFAULT 0);
+-- purged_seq: purgeTombstones 가 물리 삭제한 행의 최대 seq. pull since < purged_seq 면 410 cursor_expired (C18)
+CREATE TABLE user_seq(user_id TEXT PRIMARY KEY, seq INTEGER NOT NULL DEFAULT 0, purged_seq INTEGER NOT NULL DEFAULT 0);

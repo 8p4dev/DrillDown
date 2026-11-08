@@ -36,6 +36,8 @@ export default function TreeListPage() {
   useEffect(() => {
     startViewport()
     purgeDeletedTrees().then(reload) // 지난 세션에서 되돌리지 않은 삭제를 마무리
+    addEventListener('dd:remote', reload) // 동기화 pull 뒤 목록 갱신
+    return () => removeEventListener('dd:remote', reload)
   }, [reload])
   // D8: PC 는 빈 상태에서 자동 포커스, 터치 기기는 키보드가 화면을 가리므로 탭해야 포커스
   useEffect(() => {
