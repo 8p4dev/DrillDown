@@ -61,7 +61,18 @@
 - 임시 Playwright 재실행: 기존 검사 전부 통과 + 터치 컨텍스트(`isMobile`·`hasTouch`)에서 플래시 "카드 탭 = 펼치기"·빈칸 "카드 탭 → 빈칸 탭" 힌트가 첫 진입 때 1회, 새로고침 뒤 없음 확인. 스크린샷 8장을 DS 머지 뒤 모양으로 갱신.
 - 주의(스크립트에서 본 것): 힌트는 동시 1개 큐라 에디터 힌트(LM)를 [확인] 하지 않고 플래시로 오면 플래시 힌트가 그 뒤에 대기한다 — 02 §3.5 규칙대로의 동작.
 
+## QA 결함 수정 (2026-11-08, `06_ui_qa.md` main e5e9456 머지 후)
+| # | 수정 | 재확인(임시 Playwright) |
+|---|---|---|
+| 1 | `.minimap svg` → `.minimap > svg`(접힘·펼침 규칙 포함) — 토글 `Icon` 이 더는 폭 100% 가 아님 | 390: 토글 svg 16×16, 접힌 미니맵 66px |
+| 4 | 원인은 `.dnd-card span { -webkit-box; overflow: hidden }` 이 `.dnd-mark` 스팬에도 걸려 0×0 으로 접힌 것(기준 요소는 이미 `position: relative`). 제목 스팬만 `> span:first-child` 로 좁히고 `.dnd-mark` 에 16px 크기·`svg { display: block }` | 1440: 정답 카드 ✓·오답 카드 ✕·빈 슬롯 ✕ 모두 16×16, 기준 요소 rect 안쪽, 색 ok/danger; 백지 캔버스 카드 ✓ 동일 |
+| 11 | `@media (prefers-reduced-motion: reduce) { [data-result] { --d: 0s } }` | reduce 컨텍스트: 채점 80ms 뒤 마크 8개 전부 `animation-delay 0s`·opacity 1, shake delay 0s |
+| 19 | `.flash-dive::after { inset: -10px -8px }` | 표적 66×45 |
+| 21 | `FlashCard`·빈칸·백지 `Quiz` 가 `record` 콜백 대신 `source: StudySource` 를 받고 `source.ephemeral` 이면 `logEvent` 생략. `ReviewPage` 는 `dexieSource(treeId)` 를 넘김 | `/t/3fK9pQ2xT7m?m=flash` 평가 2회 + `?m=dnd` 채점 → Dexie `events` 0→0, `srs` 0→0, 체험 토스트 1회, 메모리 색 반영 |
+- typecheck(server 포함)·lint·check·build 통과(precache 60개 570.86 KiB). 스크린샷 8장 갱신.
+- 관찰: 터치 컨텍스트에서 AA 의 상단 바 힌트(`hint:login`)가 큐 앞에 떠 있으면 플래시 힌트(`hint:flash` 저장됨)는 [확인] 뒤에 나온다 — 동시 1개 규칙대로, 결함 아님.
+
 ## 다른 워커에게 / 미해결
 - DS: 아이콘 문자열의 자식 사이 공백(위) 제거를 권함(집계 textContent 공백 2개).
-- SH: `SharedPage` 가 `source={ nodes, srs, record, ephemeral: true }` 를 넘기면 첫 `record` 때 토스트 1회가 나간다(페이지 마운트당 1회). `logEvent` 는 공유 보기에서도 로컬 Dexie `events` 에 기록된다(계약은 `srs` 만 금지) — 원치 않으면 `treeId` 대신 slug 를 넘기지 말고 알려 달라.
-- 메모리 소스 렌더의 IndexedDB 무변경 검사는 앱에 진입점이 없어 직접 재현 못 함(위 "변경 사항"). SH 머지 뒤 `/t/<slug>` 에서 QA 가 `srs` 행 수를 세면 된다.
+- SH: `SharedPage` 의 ephemeral 소스에서 첫 `record` 때 토스트 1회(마운트당), `logEvent` 는 이제 생략된다(QA #21).
+- ~~메모리 소스 렌더의 IndexedDB 무변경 검사~~ → QA #21 수정 때 `/t/<slug>` 에서 `events`·`srs` 불변 확인(위 표).

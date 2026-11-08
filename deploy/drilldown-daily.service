@@ -1,0 +1,17 @@
+# 일일 작업 (03 §3.8 표 1~7) — drilldown-daily.timer 가 04:00 에 실행
+[Unit]
+Description=Drill Down daily maintenance
+
+[Service]
+Type=oneshot
+User=drilldown
+Group=drilldown
+WorkingDirectory=/opt/drilldown
+EnvironmentFile=/etc/drilldown/env
+Environment=DATA_DIR=/var/lib/drilldown
+ExecStart=/usr/bin/node --no-warnings=ExperimentalWarning server/account/daily.ts
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ReadWritePaths=/var/lib/drilldown

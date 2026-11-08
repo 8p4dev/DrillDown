@@ -1,0 +1,20 @@
+# 백업 (03 §3.8) — sqlite backup → age → rclone. BACKUP_AGE_RECIPIENT·BACKUP_RCLONE_REMOTE 는 /etc/drilldown/env
+# rclone 설정 파일은 RCLONE_CONFIG=/etc/drilldown/rclone.conf (B2 쓰기 전용 키)
+[Unit]
+Description=Drill Down backup
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=drilldown
+Group=drilldown
+WorkingDirectory=/opt/drilldown
+EnvironmentFile=/etc/drilldown/env
+Environment=DATA_DIR=/var/lib/drilldown RCLONE_CONFIG=/etc/drilldown/rclone.conf
+ExecStart=/usr/bin/node --no-warnings=ExperimentalWarning server/account/backup.ts
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ReadWritePaths=/var/lib/drilldown

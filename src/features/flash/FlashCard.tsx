@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { logEvent } from '../../core/events'
 import { childrenOf } from '../../core/repo'
+import type { StudySource } from '../../core/source'
 import { colorClass, type ColorInfo, type NodeColor } from '../../core/srs'
 import type { ID, NodeSrs, TreeNode } from '../../core/types'
 import { Icon } from '../../ui/Icon'
@@ -31,8 +32,8 @@ interface Props {
   nodes: TreeNode[]
   conceptId: ID
   colors: Map<ID, ColorInfo>
-  /** 평가 기록 — 데이터 소스 경유(StudySource.record). 돌려준 NodeSrs 로 색을 갱신한다 */
-  record: (nodeId: ID, ok: boolean) => Promise<NodeSrs>
+  /** 데이터 소스(04 §3.4.2): record 로 기록, ephemeral 이면 이벤트 로그도 남기지 않는다 */
+  source: StudySource
   /** 평가 기록 후 호출 — 부모가 srs 맵·집계를 갱신 */
   onRated: (s: NodeSrs, known: boolean) => void
   /** 자식 있는 하위 노드로 더 들어가기. 없으면 버튼 숨김 */
@@ -47,7 +48,7 @@ interface Props {
 const typing = (e: KeyboardEvent) =>
   e.ctrlKey || e.metaKey || e.altKey || e.isComposing || (e.target as HTMLElement).closest?.('input, textarea, select, [contenteditable]')
 
-export default function FlashCard({ treeId, nodes, conceptId, colors, record, onRated, onDive, initialRated, onNext }: Props) {
+export default function FlashCard({ treeId, nodes, conceptId, colors, source, onRated, onDive, initialRated, onNext }: Props) {
   const concept = nodes.find((n) => n.id === conceptId)
   const kids = useMemo(() => childrenOf(nodes, conceptId), [nodes, conceptId])
   const [open, setOpen] = useState(false)
@@ -61,8 +62,8 @@ export default function FlashCard({ treeId, nodes, conceptId, colors, record, on
     haptic(known ? 'success' : 'warn')
     setRated((m) => new Map(m).set(n.id, known))
     setShook(known ? null : n.id)
-    const s = await record(n.id, known)
-    await logEvent('flash_rated', { nodeId: n.id, known }, treeId)
+    const s = await source.record(n.id, known)
+    if (!source.ephemeral) await logEvent('flash_rated', { nodeId: n.id, known }, treeId)
     onRated(s, known)
   }
 

@@ -1,0 +1,30 @@
+# /etc/systemd/system/drilldown-server.service — docs/ops/runbook.md "설치"
+# 앱: /opt/drilldown (git clone, npm ci && npm run build), 데이터: /var/lib/drilldown, 비밀값: /etc/drilldown/env (600)
+[Unit]
+Description=Drill Down server (Node + node:sqlite)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=drilldown
+Group=drilldown
+WorkingDirectory=/opt/drilldown
+EnvironmentFile=/etc/drilldown/env
+Environment=NODE_ENV=production DATA_DIR=/var/lib/drilldown ADMINS_FILE=/etc/drilldown/admins.json
+ExecStart=/usr/bin/node --no-warnings=ExperimentalWarning server/index.ts
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+ReadWritePaths=/var/lib/drilldown
+MemoryMax=512M
+
+[Install]
+WantedBy=multi-user.target

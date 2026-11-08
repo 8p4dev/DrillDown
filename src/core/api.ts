@@ -16,6 +16,10 @@ export class ApiError extends Error {
   }
 }
 
+/** 모든 api() 오류를 한 곳에서 본다(me.ts 가 설치: 503 maintenance → 배너, 429 → 토스트 1회) */
+let onError: ((e: ApiError) => void) | undefined
+export const setApiErrorHook = (f: (e: ApiError) => void) => { onError = f }
+
 /** 네트워크 실패는 ApiError(0, 'offline'). 2xx 가 아니면 봉투를 읽어 ApiError. 204 는 undefined */
 export async function api<T>(path: string, init: { method?: string; body?: unknown; signal?: AbortSignal } = {}): Promise<T> {
   let res: Response
@@ -36,12 +40,15 @@ export async function api<T>(path: string, init: { method?: string; body?: unkno
   if (!res.ok) {
     const err = (data as ApiErrorBody | null)?.error
     const ra = Number(res.headers.get('retry-after')) || undefined
-    throw new ApiError(res.status, err?.code ?? 'internal', err?.message ?? `HTTP ${res.status}`, err?.field, ra)
+    const e = new ApiError(res.status, err?.code ?? 'internal', err?.message ?? `HTTP ${res.status}`, err?.field, ra)
+    onError?.(e)
+    throw e
   }
   return data as T
 }
 
-export type Provider = 'google' | 'kakao'
+/** 'fake' = AUTH_FAKE=1 개발·E2E 로그인 (orchestration_server.md A1) */
+export type Provider = 'google' | 'kakao' | 'fake'
 export type Role = 'user' | 'admin'
 
 export interface User {
@@ -51,6 +58,35 @@ export interface User {
   avatar_url: string | null
   role: Role
   created_at: number
+  /** 제공자 사진 토글(03 §3.6 PATCH /api/me). 서버가 안 주면 avatar_url 로 추정 */
+  use_provider_avatar?: boolean
+}
+
+/** GET /api/auth/providers */
+export interface Providers {
+  google: boolean
+  kakao: boolean
+  fake: boolean
+  privacy_contact: string
+}
+
+/** PATCH /api/me */
+export interface PatchMeRes {
+  user: User
+  relogin_required?: boolean
+}
+
+/** GET /api/me/export */
+export interface MeExport {
+  exported_at: number
+  user: User
+  sessions: Session[]
+}
+
+/** cursor 페이지 — /api/admin/{users,trees,audit} */
+export interface Page<T> {
+  items: T[]
+  next: string | null
 }
 
 /** GET /api/me */
@@ -96,6 +132,12 @@ export interface AdminUser {
   tree_count: number
 }
 
+/** GET /api/admin/users/:id */
+export interface AdminUserDetail extends AdminUser {
+  sessions: number
+  trees: { id: ID; title: string; visibility: Visibility; updated_at: number }[]
+}
+
 export interface AdminTree {
   id: ID
   title: string
@@ -136,6 +178,8 @@ export interface AuditRow {
 
 /** GET /api/t/:slug — 공유 보기 (04 §3.4). nodes 는 TreeNode 와 같은 모양(camelCase, 클라이언트 타입 재사용) */
 export interface SharedTree {
+  /** 원본 트리 id (복제 sourceTreeId) */
+  id: ID
   slug: string
   title: string
   visibility: Exclude<Visibility, 'private'>
