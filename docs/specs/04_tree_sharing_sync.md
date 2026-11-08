@@ -73,7 +73,7 @@ outbox에는 페이로드를 넣지 않는다. 비울 때 현재 행을 읽어 �
 **push** [결정] — `POST /api/sync`. 디바운스 2초, 500행 또는 1MB 단위, 트리 → 노드 → srs → attempts 순서(서버 FK 만족). 응답의 `superseded`(서버 버전이 이긴 행)는 outbox 없이 로컬에 put하고 토스트 "다른 기기 변경 반영됨 n건 · 내 버전 유지"를 띄운다. "내 버전 유지"는 보관해 둔 패자 행을 `updatedAt=now`로 다시 put해 되돌린다(LWW를 역이용) [결정]. 트리거: 쓰기 후 2초, `online`, `visibilitychange→visible`, 앱 시작.
 **pull** [결정] — `GET /api/sync?since=`. 트리거: 앱 시작, 포커스 복귀, 화면이 보이는 동안 60초 폴링, push 직후는 생략(push 응답 seq가 커서를 올림). WebSocket·SSE는 쓰지 않는다: Pi 1대·터널에서 유휴 연결 수천 개를 유지할 이유가 없고 60초 지연은 "폰에서 고치고 PC에서 이어 쓰기" 사용 사례에 충분하다 [결정]. 적용 규칙과 고아 처리는 [`sequences.md`](evidence/sh/sequences.md) S2.
 **LWW 비교 키** [결정] — `updatedAt`(클라이언트 epoch ms). 서버는 `updatedAt > serverNow + 5분`이면 `serverNow`로 깎는다(시계가 앞선 기기가 영원히 이기는 것 방지). 삭제도 `deletedAt`을 같은 키로 비교하는 쓰기다. 동률은 먼저 도착한 쪽.
-**삭제 유예와 톰스톤** [결정] — 복구 가능 기간(유예)은 **7일**(AA 탈퇴 유예와 동일, RV M1). 일일 작업(스케줄러는 AA, 함수는 SH `purgeDeleted()`)이 `deleted_at`이 7일 지난 트리의 **내용**(nodes·srs·attempts 행, `title`은 빈 문자열)을 지우고 `trees` 행은 톰스톤으로 남긴다. 톰스톤 행 자체(trees·nodes의 `deleted_at` 있는 행)는 **30일** 보존한다(`purgeTombstones()`). 유예(7일)와 톰스톤 보존(30일)이 다른 이유: 톰스톤은 복구용이 아니라 최대 30일 꺼져 있던 기기가 "지워졌다"는 사실을 받기 위한 것이고(C18 커서 만료 기준), 내용을 비운 톰스톤 행은 0.2 KB라 보존 비용이 없다. 30일보다 오래된 커서로 pull하면 410 `cursor_expired` → 클라이언트는 outbox를 먼저 비우고 `since=0` 스냅샷을 받는다(C18).
+**삭제 유예와 톰스톤** [결정] — 복구 가능 기간(유예)과 톰스톤 보존 기간은 **둘 다 7일**이다(AA 탈퇴 유예와 동일, RV M1, AA 3차 요청). AA 일일 작업이 SH `purgeTombstones()`를 불러 `deleted_at`이 7일 지난 trees 행과 그 nodes·srs·attempts, 그리고 `deleted_at`이 7일 지난 nodes·srs 행을 물리 삭제한다. 커서 만료 기준도 7일이다: 마지막 pull이 7일보다 오래된 기기는 410 `cursor_expired` → outbox를 먼저 비우고 `since=0` 스냅샷을 받는다(C18). 두 값을 하나로 묶은 비용: 7~30일 꺼져 있던 기기도 스냅샷과 "이 기기에만 있는 트리" 확인(§3.8 M4)을 거친다. 숫자 하나·작업 하나가 운영상 더 단순해서 이 비용을 받아들인다. 30일 톰스톤 안(내용만 7일에 비우기)은 기각했다.
 **충돌 시나리오** — 20개 시나리오와 기대 결과: [`evidence/sh/conflicts.md`](evidence/sh/conflicts.md). 요약: 제목·이동·삭제·순서·삭제된 부모 아래 삽입·트리 삭제 vs 노드 수정·srs 동시 채점·시계 편차·id 충돌·커서 만료가 모두 "엔티티 LWW + 톰스톤도 쓰기 + 고아는 루트로" 세 규칙으로 결정된다. 유일한 데이터 보강 코드 변경은 `childrenOf`의 정렬을 `(order, id)`로 안정화하는 1줄이다(C4·C5).
 
 ### 3.2 무엇을 동기화하나 [R10-2]
@@ -100,7 +100,7 @@ outbox에는 페이로드를 넣지 않는다. 비울 때 현재 행을 읽어 �
 | public → unlisted | owner | — | slug 유지 | 열림 | 제외 | 갤러리 60초 |
 | public → private | owner | — | slug 회수 | 404 | 제외 | 위와 같음 |
 | (any) → 링크 재발급 | owner | unlisted·public | 새 slug, 옛 slug는 즉시 404(재사용 금지 테이블 불필요: 64비트 공간) | 새 URL | 유지 | 옛 HTML 60초 |
-| (any) → deleted | owner | — | `deleted_at=now`, slug **유지**(복구 대비), 7일 뒤 내용 purge(행은 톰스톤으로 30일, §3.1) | 410 "삭제된 트리"(7일) → 404 | 제외 | JSON 즉시 차단 |
+| (any) → deleted | owner | — | `deleted_at=now`, slug **유지**(복구 대비), 7일 뒤 행 전체 물리 삭제(`purgeTombstones`, §3.1) | 410 "삭제된 트리"(7일) → 404 | 제외 | JSON 즉시 차단 |
 | deleted → (이전 visibility) | owner | 7일 이내 | `deleted_at=NULL` (`POST /api/trees/:id/restore`) | 복원 | 이전이 public이면 재등재 | — |
 | (any) → hidden | admin | 신고 처리 | `hidden_by_admin_at=now`(AA `audit_log` 기록은 AA) | 403 "운영 정책으로 숨김"(소유자에게는 배너와 함께 보임) | 제외 | JSON 즉시 차단 |
 | hidden → (any) | admin만 | — | `hidden_by_admin_at=NULL` | 복원 | 복원 | — |
@@ -112,7 +112,7 @@ outbox에는 페이로드를 넣지 않는다. 비울 때 현재 행을 읽어 �
 - 재발급은 소유자 명시 동작만. private 전이 시 자동 회수(위 표).
 - URL은 `https://<domain>/t/<slug>`뿐. 제목 슬러그(`/t/<slug>/근로기준법`)는 넣지 않는다(한글 URL 인코딩이 메신저에서 길어지고, slug만으로 충분).
 
-**소유자가 트리를 지우면**: 7일간 410(제목 없이 "삭제된 트리입니다"), 이후 404. 이미 복제한 사람의 복제본은 영향 없음(C20). 소유자가 계정을 탈퇴하면 AA의 탈퇴 흐름이 `markTreesDeleted(owner_id)`로 `deleted_at`을 일괄 설정하고, 7일 내 재로그인(탈퇴 취소)이면 `restoreTreesOf(owner_id, since)`로 되돌린다 — `since` = 탈퇴 요청 시각이며 그 이전에 사용자가 스스로 지운 트리는 그대로 삭제 상태로 둔다(AA 요청, RV M1)(AA 의존 D3).
+**소유자가 트리를 지우면**: 7일간 410(제목 없이 "삭제된 트리입니다"), 이후 404. 이미 복제한 사람의 복제본은 영향 없음(C20). 소유자가 계정을 탈퇴하면 AA의 탈퇴 흐름이 `softDeleteTreesOfUser(ownerId)`로 `deleted_at`을 일괄 설정하고, 7일 내 재로그인(탈퇴 취소)이면 `restoreTreesOfUser(ownerId, since)`로 되돌린다. `since`는 `users.deleted_at`이다. 일괄 삭제 시각이 트리 `deleted_at`과 같으므로 `deleted_at >= since`인 행만 되살리면, 탈퇴 전에 사용자가 직접 지운 트리는 지운 채로 남는다(AA 의존 D3).
 **저작권·신고 고지** [결정]: 첫 public 전환 시 1회 "공개하면 누구나 열람·복제할 수 있습니다. 타인의 교재·강의 목차를 그대로 올리면 신고로 숨김 처리될 수 있습니다." 공유 보기 하단에 "신고" 링크(§3.5). 숨김은 AA가 요청한 `hidden_by_admin_at`을 내 스키마에 넣어 수용한다(§3.6).
 
 ### 3.4 공유 보기 `/t/<slug>` [R10-4]
@@ -190,7 +190,7 @@ CREATE TABLE trees (
   copy_count         integer NOT NULL DEFAULT 0,
   created_at         bigint NOT NULL,                        -- epoch ms (클라이언트 값 그대로 — LWW 비교와 동일 단위)
   updated_at         bigint NOT NULL,
-  deleted_at         bigint,                                 -- 소유자 삭제(30일 보존)
+  deleted_at         bigint,                                 -- 소유자 삭제(7일 유예 = 톰스톤 보존)
   hidden_by_admin_at bigint,                                 -- AA 요청 필드(관리자 숨김)
   seq                bigint NOT NULL                         -- 사용자별 변경 순번(아래 user_seq)
 );
@@ -218,7 +218,7 @@ CREATE INDEX nodes_owner_seq ON nodes(owner_id, seq);
 
 CREATE TABLE srs (
   user_id           uuid NOT NULL REFERENCES users(id),
-  node_id           uuid NOT NULL,                           -- FK 아님: 노드 톰스톤 뒤에도 30일 보존
+  node_id           uuid NOT NULL,                           -- FK 아님: 노드 톰스톤 뒤에도 7일 보존
   tree_id           uuid NOT NULL,
   card              jsonb NOT NULL,                          -- ts-fsrs Card 그대로(형태는 core/srs 소유)
   due               bigint NOT NULL,
@@ -355,7 +355,7 @@ CREATE TABLE user_seq (user_id uuid PRIMARY KEY, seq bigint NOT NULL DEFAULT 0);
 | M4 | 커서 만료(C18) 또는 서버에 없는 로컬 트리 발견 | "이 기기에만 있는 트리 n개" → 올리기(기본) / 지우기 | 대화 1개(M1과 같은 컴포넌트) |
 | M5 | id 충돌(C17, 409 `idTaken`) | 트리·노드 id 재발급 후 재전송. 사용자에게 안 보임 | 없음 |
 | M6 | 로그아웃 | 로컬 데이터 **유지**(오프라인 학습 계속), outbox는 유지(재로그인 시 push), `meta.userId`는 유지(소유자 기록). 공용 기기 대비 "이 기기에서 데이터 지우기" 선택은 AA 계정 화면 | 로그아웃 시 선택지 1개 |
-| M7 | 탈퇴 | 서버: `markTreesDeleted(owner_id)` 일괄 소프트 삭제 → 7일 뒤 내용 purge. 7일 내 재로그인 = 탈퇴 취소 → `restoreTreesOf(owner_id)`. Kakao unlink 웹훅은 유예 없이 즉시 purge(AA 결정). 로컬: M6과 같음(지우기 선택 제공) | 탈퇴·취소 흐름이 두 함수 호출(D3) |
+| M7 | 탈퇴 | 서버: `softDeleteTreesOfUser(ownerId)` 일괄 소프트 삭제 → 7일 뒤 AA 일일 작업이 `purgeUser(ownerId)`. 7일 내 재로그인 = 탈퇴 취소 → `restoreTreesOfUser(ownerId, since = users.deleted_at)`. Kakao unlink 웹훅도 같은 7일 규칙(AA 3차, 가입 미완료만 즉시 purge). 로컬: M6과 같음(지우기 선택 제공) | 탈퇴·취소 흐름이 함수 호출(D3) |
 
 "선택해서 올리기"를 두지 않는 이유: 비로그인 시절 트리는 보통 1~5개이고, 올린 뒤 지우는 것이 선택 UI보다 쉽다 [결정]. 트리 200개 상한을 넘기면 M1에서 `tree_limit`이 나며 "가장 오래된 것부터 n개는 올리지 못했습니다"로 알린다.
 
@@ -369,7 +369,7 @@ CREATE TABLE user_seq (user_id uuid PRIMARY KEY, seq bigint NOT NULL DEFAULT 0);
 | SQLite `nodes` 300행 + 인덱스 2개 | ≈ 106 KB(행 361 B. UUID 3개가 TEXT 36자라 Postgres 추정 240 B보다 큼) | [측정] `measure_sqlite.mjs`, 6,000행 VACUUM 후 |
 | SQLite `srs` 300행(완전 학습) | ≈ 134 KB(행 458 B, Card JSON 220 B) | [측정] |
 | 사용자 1명(트리 5개, 학습 50%) | ≈ 0.9 MB | [계산], 04_tech §7의 1 MB 가정 안 |
-| 1천 명 DB | ≈ 0.9~1.1 GB(+톰스톤 70 MB) | [계산] |
+| 1천 명 DB | ≈ 0.9~1.1 GB(+톰스톤 20 MB) | [계산] |
 | 일 요청 | MAU 300 × 40회 = 12,000/일 ≈ 0.14 req/s, 피크 ≈ 6 req/s | [계산] |
 | Pi 1대 여유 | 11 §2.3의 Pi 3B 200 TPS 기준으로도 30배 | [출처 8]/[추론] |
 | 백업 | `sqlite.backup()` 파일 ≈ 1 GB → gzip 30% [가정] ≈ 300 MB/일 × 14일 = 4.2 GB < B2 무료 10 GB(파이프라인은 AA §2: backup → age → rclone) | [계산], [출처 8] |
@@ -392,14 +392,14 @@ CREATE TABLE user_seq (user_id uuid PRIMARY KEY, seq bigint NOT NULL DEFAULT 0);
 | 오류 | 4xx(리밋·용량 초과·401). 503은 오류가 아니라 오프라인 | 아이콘(danger) | 탭하면 사유 1줄(예: "트리가 너무 큽니다(5,000노드)" / "다시 로그인") |
 | 충돌 반영(토스트) | push 응답 `superseded` ≥ 1 또는 pull에서 열린 트리의 노드가 바뀜 | "다른 기기 변경 반영됨 n건 · [내 버전 유지]" 1회 | 내 버전 유지 → 패자 행 재-put(§3.1) |
 비로그인은 상태 표시 자체가 없다(로컬만).
-**공유 보기 화면** — 상단: 제목, "노드 N개 · 작성자 닉네임", 모드 탭(보기·플래시·빈칸·백지), 헤더 오른쪽 아이콘 `내 트리로 복제`(주 동작, 모든 탭에서 같은 자리), ⋯ 메뉴에 `신고`(AA API). 하단 고정 요소는 **화면별 행동 바 하나**뿐이다(RV M10·L20, LM과 동일): 보기 탭은 없음, 플래시 탭은 `.flash-nav`(다음·요약), 빈칸·백지 탭은 `.dnd-dock`. 복제·신고를 하단에 두지 않는 이유는 퀴즈 탭의 dock과 겹치기 때문이다. 비로그인 체험 중 기록이 저장되지 않음을 첫 채점 시 토스트 1회로 알림. 복제 완료 토스트 "복제됨 · 원본이 바뀌어도 이 트리는 바뀌지 않습니다 · [열기]".
+**공유 보기 화면** — 상단: 제목, "노드 N개 · 작성자 닉네임", 모드 탭(보기·플래시·빈칸·백지). 하단 고정 요소는 **탭별 행동 바 하나**뿐이다(RV M10·L20, LM §3.1과 동일): 보기 탭은 `내 트리로 복제` 바, 플래시 탭은 `.flash-nav`(다음·요약), 빈칸·백지 탭은 `.dnd-dock`. 보기 외 탭에서 복제는 헤더 오른쪽 아이콘으로 옮긴다. 퀴즈 탭의 dock과 겹치지 않게 하기 위해서다. **신고는 모든 탭에서 헤더 `⋯` 메뉴 → 하단 시트**다(LM 요청). `⋯` 메뉴 항목은 신고·링크 복사 2개다. 시트 안에는 사유 선택과 메모 ≤300자(선택)가 있고, 제출은 AA API `POST /api/t/:slug/report`다. 시트 배치·키보드 규칙은 LM I12를 따른다. 비로그인 체험 중 기록이 저장되지 않음을 첫 채점 시 토스트 1회로 알림. 복제 완료 토스트 "복제됨 · 원본이 바뀌어도 이 트리는 바뀌지 않습니다 · [열기]".
 
 ### 3.11 구현 공수와 순서 [R10-11]
 
 | 단계 | 내용 | 공수 | 선행 |
 |---|---|---|---|
-| ① 서버 저장 | Dexie v2(outbox·meta), repo/srs 훅, 트리 소프트 삭제(`markTreeDeleted`/`restoreTree`/`purgeDeletedTrees`) + 되돌리기 토스트 10초(`confirm()` 제거), `sync.ts` push·pull(LWW·톰스톤·커서·고아), 서버 `trees nodes srs attempts user_seq` + `POST/GET /api/sync` + `/api/trees*`(restore 포함) + `purgeDeleted`·`purgeTombstones` 함수, 첫 로그인 병합 M1·M2·M5·M6, 상태 표시 4상태 | **M~L**(클라 M, 서버 M) | AA 세션 쿠키·users·`api.ts`·일일 작업 스케줄러 |
-| ② 공유 링크 | visibility API·slug·`GET /t/:slug` 라우트(OG 치환)·`/api/t/:slug`·복제·`copy`·라우터 `parseLocation`·공유 보기 화면(읽기 전용 소스 주입, 헤더 복제 아이콘, ⋯ 신고)·공유 시트 | **M** | ①, Hono 라우트 등록 순서(AA D1) |
+| ① 서버 저장 | Dexie v2(outbox·meta), repo/srs 훅, 트리 소프트 삭제(`markTreeDeleted`/`restoreTree`/`purgeDeletedTrees`) + 되돌리기 토스트 10초(`confirm()` 제거), `sync.ts` push·pull(LWW·톰스톤·커서·고아), 서버 `trees nodes srs attempts user_seq` + `POST/GET /api/sync` + `/api/trees*`(restore 포함) + `softDeleteTreesOfUser`·`restoreTreesOfUser`·`purgeUser`·`purgeTombstones` 함수, 첫 로그인 병합 M1·M2·M5·M6, 상태 표시 4상태 | **M~L**(클라 M, 서버 M) | AA 세션 쿠키·users·`api.ts`·일일 작업 스케줄러 |
+| ② 공유 링크 | visibility API·slug·`GET /t/:slug` 라우트(OG 치환)·`/api/t/:slug`·복제·`copy`·라우터 `parseLocation`·공유 보기 화면(읽기 전용 소스 주입, 보기 탭 복제 바·그 외 탭 헤더 복제 아이콘, `⋯` → 신고 시트)·공유 시트 | **M** | ①, Hono 라우트 등록 순서(AA D1) |
 | ③ 동기화 다듬기 | 60초 폴링·포커스 pull, `superseded` 토스트·내 버전 유지, srs 합집합 병합, 커서 만료 M4, M3 계정 전환, 휴지통 복구 UI, `childrenOf` 안정 정렬, 두 기기 E2E | **L** | ① |
 | ④ 갤러리 | `/api/gallery`·갤러리 화면(목록 20건·정렬 2개)·⋯ 신고 메뉴(AA API 호출)·관리자 숨김 연동 | **S**(신고 API·처리 화면은 AA) | ②, 사용자 결정 Q1 |
 
@@ -411,7 +411,7 @@ CREATE TABLE user_seq (user_id uuid PRIMARY KEY, seq bigint NOT NULL DEFAULT 0);
 |---|---|---|
 | D1 서버 라우트·바인딩 | AA | Hono에 `GET /t/:slug`(SH 핸들러)를 정적 서빙보다 먼저 등록. `CF-Connecting-IP` 신뢰. Node는 `127.0.0.1`에만 바인딩(외부는 같은 호스트의 `cloudflared` Tunnel로만). `schema.sql`에 SH 절(§3.6) 포함 |
 | D2 첫 로그인 병합 UX | AA | §3.8 M1~M4 대화 4개(컴포넌트 1개 재사용 가능), 로그아웃 시 "기기 데이터 지우기" 선택 |
-| D3 탈퇴·취소·일일 작업 | AA | 탈퇴 시 SH `markTreesDeleted(owner_id)`(`UPDATE trees SET deleted_at=now WHERE owner_id=?`), 7일 내 재로그인(취소) 시 SH `restoreTreesOf(owner_id)`(`UPDATE trees SET deleted_at=NULL WHERE owner_id=?`), Kakao unlink는 즉시 `purgeDeleted(owner_id)`. AA 일일 작업 스케줄러가 SH `purgeDeleted()`(7일 지난 트리 내용 삭제)·`purgeTombstones()`(30일 지난 톰스톤 행 삭제) 호출. `events`는 서버 미저장이라 purge 대상 아님 |
+| D3 탈퇴·취소·일일 작업 | AA | SH가 제공하는 함수 4개, 호출은 AA. ① `softDeleteTreesOfUser(ownerId)` = `UPDATE trees SET deleted_at=now WHERE owner_id=? AND deleted_at IS NULL` (탈퇴). ② `restoreTreesOfUser(ownerId, since)` = `UPDATE trees SET deleted_at=NULL WHERE owner_id=? AND deleted_at >= ?`, `since` = `users.deleted_at` (탈퇴 취소. 탈퇴 전에 직접 지운 트리는 되살리지 않음). ③ `purgeUser(ownerId)` = `trees`·`nodes`·`srs`·`attempts`·`user_seq` 물리 삭제 (7일 경과, AA 일일 작업). **`events`는 서버 미저장이라 대상에 없다.** ④ `purgeTombstones()` = `deleted_at`이 7일 지난 trees(+하위 nodes·srs·attempts)·nodes·srs 행 물리 삭제 (AA 일일 작업) |
 | D4 신고 전체 | AA | `reports` 테이블·`POST /api/t/:slug/report`·처리 화면·숨김 토글(`trees.hidden_by_admin_at` 설정/해제)·`audit_log`. 리밋 anon 5/시·user 20/시. **`hidden_by_admin_at` 필드는 §3.6 DDL에 포함했다** |
 | D8 `src/core/api.ts` | AA | fetch 래퍼 `api<T>()`·`ApiError`(봉투 `{ error: { code, message, field? } }`). SH `sync.ts`는 import만 |
 | D5 공유 시트·상태 표시 모양 | DS | 3상태 세그먼트, 상태 아이콘 5종(저장됨·동기화 중·오프라인·오류·공개 상태), 토스트 액션 버튼 |
@@ -430,7 +430,7 @@ CREATE TABLE user_seq (user_id uuid PRIMARY KEY, seq bigint NOT NULL DEFAULT 0);
 | 로그인 | (AA) 로그인 완료 콜백에서 `sync.onLogin(userId)` 1회 호출 → §3.8 | — |
 | 계정 | (AA) 섹션 2개 요청: "휴지통(7일)" 목록+복구, "이 기기 데이터 지우기" | — |
 | 관리자 | (AA) 공개 트리 목록·신고 목록·숨김 토글 — 데이터는 §3.6 `trees`·`reports` | — |
-| 공유 보기(`/t/<slug>`) 신규 | §3.4·§3.10. 라우트 `shared`, 모드 탭, 복제(헤더 아이콘)·신고(⋯ 메뉴, AA API). 하단은 화면별 행동 바 하나 | 학습 컴포넌트 재사용 |
+| 공유 보기(`/t/<slug>`) 신규 | §3.4·§3.10. 라우트 `shared`, 모드 탭, 복제(보기 탭 하단 바, 그 외 탭 헤더 아이콘)·신고(헤더 `⋯` → 시트, AA API). 하단은 탭별 행동 바 하나 | 학습 컴포넌트 재사용 |
 | 갤러리(미결) 신규 | §3.5 최소형 | — |
 
 ## 5. 검증
@@ -469,7 +469,7 @@ CREATE TABLE user_seq (user_id uuid PRIMARY KEY, seq bigint NOT NULL DEFAULT 0);
 | `src/features/editor/EditorPage.tsx` | `persist`로 `putNodes`·`deleteNodes` | 변경 없음(outbox는 repo). pull 반영용 `useRemoteChanges(treeId)` 구독 1개 추가 |
 | `index.html` | 정적 `<title>` | OG 자리표시자 주석(`<!--OG-->`) 1줄 — 서버가 치환, 정적 서빙 시 그대로 무해 |
 | `vite.config.ts` | PWA manifest | `workbox.navigateFallbackDenylist: [/^\/api/, /^\/t\//]`(AA 값, RV L14) |
-| `server/`(AA 골격) + SH 파일 `sync.ts` `share.ts` `schema.sql` SH 절 | 없음 | §3.6 DDL·API, `GET /t/:slug` OG 치환 라우트, `purgeDeleted`·`purgeTombstones`·`markTreesDeleted`·`restoreTreesOf` 함수(호출은 AA 일일 작업·탈퇴 흐름) |
+| `server/`(AA 골격) + SH 파일 `sync.ts` `share.ts` `schema.sql` SH 절 | 없음 | §3.6 DDL·API, `GET /t/:slug` OG 치환 라우트, `softDeleteTreesOfUser`·`restoreTreesOfUser`·`purgeUser`·`purgeTombstones` 함수(호출은 AA 일일 작업·탈퇴 흐름, D3) |
 | `e2e/` | 13개 | 두 컨텍스트 동기화·공유 보기 비로그인·복제 시나리오(4차 오케스트레이터) |
 
 ### (c) 직접 측정·계산 결과
@@ -527,7 +527,11 @@ CREATE TABLE user_seq (user_id uuid PRIMARY KEY, seq bigint NOT NULL DEFAULT 0);
 |---|---|---|
 | H1 | §2 갤러리 행, §3.5 신고 표(신규), §3.6 DDL(`reports` 삭제), §3.6 API 표 report 행, §3.7 신고 행, §3.11 ④, §3.12 D4 | `reports` 테이블·신고 API·처리 화면 소유 = AA. 내 문서는 "AA 의존" 표로. 경로 `POST /api/t/:slug/report` 채택, `ip_hash` 없음, 리밋 anon 5/시·user 20/시. `hidden_by_admin_at`은 DDL 유지 |
 | H2 | §2 삭제 행, §3.1 훅 표 `deleteTree` 행, §3.6 R-T1·필드 대응표, §3.10 "트리 삭제" 문단(신규), §3.11 ①, §4 목록 행, §5(b) repo·TreeListPage 행, §5(d) W4·W6 | 확인창 없음 + 되돌리기 토스트 10초. 로컬도 소프트 삭제: `Tree.deletedAt`(R-T1 추가), `deleteTree` → `markTreeDeleted`/`restoreTree`/`purgeDeletedTrees`, `listTrees` 필터. 로그인 사용자는 서버 소프트 삭제로 이어짐 |
-| M1 | §3.1 "삭제 유예와 톰스톤", §3.3 전이표 deleted 2행·"소유자가 트리를 지우면", §3.6 restore 행, §3.7 deleted·복구 행, §3.8 M7, §3.12 D3, §4 계정 행, §6 Q4 | 유예 30일 → **7일**, 응답 410 유지. 탈퇴 취소 `restoreTreesOf(owner_id, since)` = `UPDATE trees SET deleted_at=NULL WHERE owner_id=? AND deleted_at>=?` D3에 추가(`since` 인자는 AA 요청). 톰스톤 행 보존은 30일로 유지하고 유예와 다른 이유를 적음(커서 만료 기준, 내용은 7일에 비움) |
+| M1 | §3.1 "삭제 유예와 톰스톤", §3.3 전이표 deleted 2행·"소유자가 트리를 지우면", §3.6 restore 행, §3.7 deleted·복구 행, §3.8 M7, §3.12 D3, §4 계정 행, §6 Q4 | 유예 30일 → **7일**, 응답 410 유지. 탈퇴 취소 `restoreTreesOfUser` = `UPDATE trees SET deleted_at=NULL WHERE owner_id` D3에 추가(AA 요청 3건은 아래 "AA 요청" 행) |
+| AA 요청 1 | §3.3 "소유자가 트리를 지우면", §3.8 M7, §3.12 D3 | `restoreTreesOfUser(ownerId, since)`: `deleted_at >= since`(= `users.deleted_at`)만 복원해 탈퇴 전 직접 지운 트리는 되살리지 않음. 함수명도 AA 문서(`softDeleteTreesOfUser`·`purgeUser`)에 맞춤 |
+| AA 요청 2 | §3.1 "삭제 유예와 톰스톤", §3.3 전이표 deleted 행, §3.6 DDL 주석 2곳, §3.9 표, evidence `conflicts.md` C18·`capacity.md` §3 | 톰스톤 보존 30일 → **7일**(유예와 같은 값). 커서 만료도 7일. 비용(7~30일 꺼진 기기는 스냅샷 + M4 확인)과 기각한 30일 안을 §3.1에 적음 |
+| AA 요청 3 | §3.12 D3 ③ | `purgeUser`는 `trees`·`nodes`·`srs`·`attempts`·`user_seq`만 삭제. `events`는 서버 미저장이라 제외 |
+| LM 요청 | §3.10 공유 보기 문단, §4 공유 보기 행, §3.11 ② | 신고 = 헤더 `⋯` 메뉴(신고·링크 복사) → 하단 시트(사유 + 메모 ≤300자, LM I12 키보드 규칙). 하단 바는 탭별 하나: 보기 탭만 복제 바, 그 외 탭은 헤더 복제 아이콘(LM §3.1과 일치) |
 | M3 | §3.6 API 머리말·sync 행, §3.12 D8(신규), §5(b) api.ts 행 | 에러 봉투 `{ error: { code, message, field? } }`, 코드 snake_case(`idTaken` → `id_taken`, `invalid_row` → `invalid`+`field`). `src/core/api.ts`는 AA 소유 |
 | M5 | §3.4.1 첫 bullet, §3.6 DDL 머리말, §3.9 표(SQLite 실측·백업), §3.11 ②, §3.12 D1, §5(b) vite·server 행, §5(c), §5(d) W2, evidence `capacity.md`·`sequences.md` S4 | Caddy·Postgres 전제 제거. `/t/:slug`는 Node 같은 프로세스의 Hono 라우트가 index.html에 OG 치환. W2는 Node `127.0.0.1` 바인딩 + Tunnel. 백업은 `sqlite.backup()` 기준. 행 크기는 `node:sqlite`로 **실측**(`measure_sqlite.mjs` 신규: 노드 361 B, srs 458 B → 사용자당 0.9 MB) |
 | M10 | §3.10 공유 보기 문단, §4 공유 보기 행, §3.11 ② | 하단 고정은 화면별 행동 바 하나. 복제 = 헤더 아이콘, 신고 = ⋯ 메뉴(LM과 동일) |
@@ -538,6 +542,6 @@ CREATE TABLE user_seq (user_id uuid PRIMARY KEY, seq bigint NOT NULL DEFAULT 0);
 | L9 | §3.9 표, §5(c), evidence `capacity.md` | gzip "≈10.5 KB(실행마다 ±0.5%)" |
 | L14 | §3.4.1 PWA bullet, §5(b) vite 행 | `navigateFallbackDenylist: [/^\/api/, /^\/t\//]`(AA 값) |
 | L17 | §3.10 상태 표 오프라인·오류 행 | 503 + `Retry-After`는 "오프라인(재시도)" |
-| L20 | §3.10 공유 보기 문단, §4 공유 보기 행 | 신고 위치 ⋯ 메뉴 |
+| L20 | §3.10 공유 보기 문단, §4 공유 보기 행 | 신고 위치 `⋯` 메뉴 → 시트 |
 
 3차 커밋은 워커가 사용량 한도로 중단된 뒤 오케스트레이터가 워크트리의 미커밋 수정을 검토해 마무리했다(`since` 인자 한 줄 추가).
