@@ -1,5 +1,6 @@
 // D2 백지 퀴즈: 범위 루트만 놓인 캔버스에 트레이의 노드를 끌어 붙여 트리를 만든다
 import { Fragment, useEffect, useMemo, useState, type CSSProperties } from 'react'
+import type { StudySource } from '../../core/source'
 import { logEvent } from '../../core/events'
 import { getRoot, getTreeNodes } from '../../core/repo'
 import { recordResult } from '../../core/srs'
@@ -11,7 +12,7 @@ import { attach, detach, gradeBlank, isUnder, placedTree, scopeOf, shuffle, type
 import { Ghost, Progress, ScopeSelect, ScoreLine, TreeCanvas } from './kit'
 import { useDragDrop } from './useDragDrop'
 
-export default function BlankDndPage({ treeId, rootId }: { treeId: string; rootId?: string }) {
+export default function BlankDndPage({ treeId, rootId }: { treeId: string; rootId?: string; source?: StudySource }) {
   const [all, setAll] = useState<TreeNode[] | null>(null)
   useEffect(() => void getTreeNodes(treeId).then(setAll), [treeId])
   const rid = all && (all.some((n) => n.id === rootId) ? rootId! : getRoot(all).id)

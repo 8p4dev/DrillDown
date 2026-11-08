@@ -23,6 +23,7 @@ export async function renameTree(treeId: ID, title: string): Promise<void> {
   })
 }
 
+/** 하드 삭제(트리·노드·학습 기록). 화면은 markTreeDeleted → purgeDeletedTrees 경로를 쓴다 (04 §3.10) */
 export async function deleteTree(treeId: ID): Promise<void> {
   await db.transaction('rw', [db.trees, db.nodes, db.srs, db.attempts], async () => {
     await db.trees.delete(treeId)
@@ -32,8 +33,23 @@ export async function deleteTree(treeId: ID): Promise<void> {
   })
 }
 
-export function listTrees(): Promise<Tree[]> {
-  return db.trees.orderBy('updatedAt').reverse().toArray()
+/** 소프트 삭제: 목록에서 숨기고 되돌리기 토스트(10초) 동안 보존 (04 §3.10, 02 D9) */
+export function markTreeDeleted(treeId: ID): Promise<number> {
+  return db.trees.update(treeId, { deletedAt: Date.now() })
+}
+/** 되돌리기 */
+export function restoreTree(treeId: ID): Promise<number> {
+  return db.trees.update(treeId, { deletedAt: undefined })
+}
+/** 토스트 종료·앱 시작 때 호출: deletedAt 이 있는 트리를 하드 삭제. treeId 를 주면 그 트리만 */
+export async function purgeDeletedTrees(treeId?: ID): Promise<void> {
+  const victims = (await db.trees.toArray()).filter((t) => t.deletedAt && (!treeId || t.id === treeId))
+  for (const t of victims) await deleteTree(t.id)
+}
+
+/** 소프트 삭제된 트리는 제외 */
+export async function listTrees(): Promise<Tree[]> {
+  return (await db.trees.orderBy('updatedAt').reverse().toArray()).filter((t) => !t.deletedAt)
 }
 
 export function getTreeNodes(treeId: ID): Promise<TreeNode[]> {
@@ -47,7 +63,8 @@ export function getRoot(nodes: TreeNode[]): TreeNode {
 }
 
 export function childrenOf(nodes: TreeNode[], parentId: ID): TreeNode[] {
-  return nodes.filter((n) => n.parentId === parentId).sort((a, b) => a.order - b.order)
+  // (order, id) 안정 정렬 — 기기 간 동기화 뒤에도 같은 순서 (04 §5(b))
+  return nodes.filter((n) => n.parentId === parentId).sort((a, b) => a.order - b.order || a.id.localeCompare(b.id))
 }
 
 /** rootId 제외, 전위 순회 */

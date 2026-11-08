@@ -1,30 +1,35 @@
 :root {
-  /* 디자인 토큰 — 이름은 공유 계약(docs/plans/orchestration_visual_polish.md §3.1). 값은 오케스트레이터가 조정 */
-  --bg: #f4f5f7; --surface: #ffffff; --surface-2: #f8f9fb; --border: #e3e6eb; --border-strong: #cdd2da;
-  --text: #191c21; --text-2: #3f4651; --muted: #6b7280;
-  --accent: #3b6cf0; --accent-soft: #3b6cf01a; --danger: #d64545;
-  --ok: #2b9a58; --warn: #d9a514;
-  --radius-sm: 6px; --radius: 10px; --radius-lg: 14px;
-  --shadow: 0 1px 2px #10182809, 0 1px 3px #1018280d;
-  --shadow-lift: 0 2px 6px #1018280f, 0 10px 24px #10182817;
-  --shadow-pop: 0 6px 14px #10182814, 0 18px 40px #10182826;
+  /* 디자인 토큰 — 이름은 공유 계약(orchestration_visual_polish.md §3.1), 값은 01_design_system.md §3.1 (오케스트레이터가 교체, DS 가 다듬음)
+     무채색 8단계 + 초록 + 빨강. --accent/--accent-soft 는 이행기 별칭(DS 가 사용처를 지운 뒤 삭제), --warn·--shadow-* 는 폐기 */
+  --bg: #f4f4f4; --surface: #ffffff; --surface-2: #f7f7f7; --border: #cfcfcf; --border-strong: #8a8a8a;
+  --text: #111111; --text-2: #3d3d3d; --muted: #5f5f5f;
+  --ok: #1a7f37; --danger: #d1242f; --on-fill: #ffffff;
+  --accent: var(--text); --accent-soft: color-mix(in srgb, var(--text) 8%, transparent);
+  --radius-sm: 0; --radius: 2px; --radius-lg: 2px;
   /* 글자 크기 단계 */
   --fs-xs: .75rem; --fs-sm: .85rem; --fs-md: .95rem; --fs-lg: 1.1rem; --fs-xl: 1.4rem; --fs-2xl: 2rem;
-  /* 레이아웃 · 터치 */
-  --nav-h: 52px; --tap: auto; --safe-b: env(safe-area-inset-bottom, 0px);
-  /* 모션 토큰 */
+  /* 레이아웃 · 터치 · 키보드 (02 §3.3: --kb 는 viewport.ts 가 쓴다) */
+  --nav-h: 52px; --tap: auto; --safe-b: env(safe-area-inset-bottom, 0px); --safe-t: env(safe-area-inset-top, 0px);
+  --kb: 0px; --vv-h: 100dvh; --tree-head-h: 7rem;
+  /* 모션 토큰 (--ease-spring 폐기) */
   --t-fast: 120ms; --t-med: 200ms; --t-slow: 320ms;
-  --ease-out: cubic-bezier(.2, .8, .2, 1); --ease-spring: cubic-bezier(.34, 1.56, .64, 1); --ease-press: cubic-bezier(.3, .7, .4, 1);
+  --ease-out: cubic-bezier(.2, .8, .2, 1); --ease-press: cubic-bezier(.3, .7, .4, 1);
+  color-scheme: light;
 }
+/* 다크: 자동(시스템) 또는 명시. 두 벌은 같은 값 — 01 §3.7 */
 @media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #111316; --surface: #1a1d21; --surface-2: #16181c; --border: #2a2f36; --border-strong: #3a414a;
-    --text: #e8eaed; --text-2: #c2c7ce; --muted: #8f98a3;
-    --accent: #7aa2ff; --accent-soft: #7aa2ff21; --danger: #f07474; --ok: #4cc27c; --warn: #e8bb3a;
-    --shadow: 0 1px 2px #0006, 0 1px 3px #0004;
-    --shadow-lift: 0 2px 6px #0007, 0 10px 24px #0006;
-    --shadow-pop: 0 6px 14px #0008, 0 18px 40px #0008;
+  :root:not([data-theme='light']) {
+    --bg: #121212; --surface: #1b1b1b; --surface-2: #161616; --border: #333333; --border-strong: #7a7a7a;
+    --text: #ededed; --text-2: #c4c4c4; --muted: #a0a0a0;
+    --ok: #3fb950; --danger: #f85149; --on-fill: #121212;
+    color-scheme: dark;
   }
+}
+:root[data-theme='dark'] {
+  --bg: #121212; --surface: #1b1b1b; --surface-2: #161616; --border: #333333; --border-strong: #7a7a7a;
+  --text: #ededed; --text-2: #c4c4c4; --muted: #a0a0a0;
+  --ok: #3fb950; --danger: #f85149; --on-fill: #121212;
+  color-scheme: dark;
 }
 @media (max-width: 760px) { :root { --nav-h: 48px; } }
 @media (pointer: coarse) { :root { --tap: 44px; } }
@@ -32,7 +37,7 @@
 :root {
   /* 웹폰트 없음(오프라인 PWA·속도): 플랫폼별 한글 시스템 폰트 */
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', 'Segoe UI', sans-serif;
-  font-size: 15px; line-height: 1.55; color-scheme: light dark;
+  font-size: 15px; line-height: 1.55;
   color: var(--text); background: var(--bg);
   -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility;
   -webkit-text-size-adjust: 100%; text-size-adjust: 100%;
@@ -70,6 +75,11 @@ a, button, summary, [role='button'] { touch-action: manipulation; }
     linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 50%, #8b5cf6));
   box-shadow: 0 1px 2px color-mix(in srgb, var(--accent) 40%, transparent);
 }
+/* 상단 바 슬롯(오케스트레이터 최소 규칙 — 모양은 DS 가 index.css 에서 다듬음) */
+.topnav-spacer { flex: 1; }
+.topnav .nav-short { display: none; }
+.topnav .brand-mark { width: 14px; height: 14px; background: currentColor; }
+@media (max-width: 760px) { .topnav .nav-long { display: none; } .topnav .nav-short { display: inline; } }
 @media (max-width: 420px) {
   .topnav { padding-inline: .85rem; }
   .topnav .brand { font-size: 0; gap: 0; margin-right: .35rem; }

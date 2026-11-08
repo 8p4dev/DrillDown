@@ -1,11 +1,22 @@
-// 공유 계약 — 변경은 오케스트레이터만 한다 (docs/plans/orchestration_core_features.md §4)
+// 공유 계약 — 변경은 오케스트레이터만 한다 (docs/plans/orchestration_core_features.md §4, orchestration_ui_first.md §3.1)
 export type ID = string
+
+/** 공개 범위 (04_tree_sharing_sync.md §3.3). 없으면 private */
+export type Visibility = 'private' | 'unlisted' | 'public'
 
 export interface Tree {
   id: ID
   title: string
   createdAt: number
   updatedAt: number
+  /** 04 §3.6 R-T1 — 선택 필드. 서버 동기화 전에는 로컬 표시용 */
+  visibility?: Visibility
+  /** 11자 base58 공유 slug. null/없음 = 링크 없음 */
+  slug?: string | null
+  /** 복제 계보: 원본 트리 id */
+  sourceTreeId?: ID
+  /** 로컬 소프트 삭제 시각(되돌리기 토스트 동안). listTrees 는 이 값이 있는 트리를 숨긴다 */
+  deletedAt?: number
 }
 
 export interface TreeNode {

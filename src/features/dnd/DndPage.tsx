@@ -1,5 +1,6 @@
 // D1 빈칸 퀴즈: 뼈대 트리(리프 = 빈칸) + 섞인 리프 카드 트레이
 import { Fragment, useEffect, useMemo, useState, type CSSProperties } from 'react'
+import type { StudySource } from '../../core/source'
 import { logEvent } from '../../core/events'
 import { getRoot, getTreeNodes } from '../../core/repo'
 import { recordResult } from '../../core/srs'
@@ -11,7 +12,7 @@ import { gradeDnd, leavesOf, moveCard, scopeOf, shuffle, type Place, type Score 
 import { Ghost, Progress, ScopeSelect, ScoreLine, TreeCanvas } from './kit'
 import { useDragDrop } from './useDragDrop'
 
-export default function DndPage({ treeId, rootId }: { treeId: string; rootId?: string }) {
+export default function DndPage({ treeId, rootId }: { treeId: string; rootId?: string; source?: StudySource }) {
   const [all, setAll] = useState<TreeNode[] | null>(null)
   useEffect(() => void getTreeNodes(treeId).then(setAll), [treeId])
   const rid = all && (all.some((n) => n.id === rootId) ? rootId! : getRoot(all).id)

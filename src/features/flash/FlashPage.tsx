@@ -1,5 +1,6 @@
 // 플래시카드 모드 (plan §1 F1)
 import { useEffect, useMemo, useState } from 'react'
+import type { StudySource } from '../../core/source'
 import { getRoot, getTreeNodes } from '../../core/repo'
 import { colorMap, getSrsMap } from '../../core/srs'
 import type { ID, NodeSrs, TreeNode } from '../../core/types'
@@ -21,7 +22,7 @@ function load(treeId: string): Saved {
   }
 }
 
-export default function FlashPage({ treeId, rootId }: { treeId: string; rootId?: string }) {
+export default function FlashPage({ treeId, rootId }: { treeId: string; rootId?: string; source?: StudySource }) {
   const [nodes, setNodes] = useState<TreeNode[] | null>(null)
   const [srs, setSrs] = useState({ map: new Map<ID, NodeSrs>(), at: new Date(0) }) // at = 색 계산 기준 시각
   const [saved] = useState(() => load(treeId))
