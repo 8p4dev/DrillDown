@@ -143,3 +143,4 @@ A6 보강: 초록·빨강 외 유채색 금지는 UI 색에 한한다. 사용자
 - 1차 머지 완료(파일 겹침 없음, 충돌 0건): AA 2ce98a2 → SH 81a16a0 → DS e809ebb → LM d4b5361. 머지마다 typecheck·lint·build 통과, evidence 링크 누락 0건.
 - 2차 머지 16e4218: RV 발견 높음 2·중간 15·낮음 20. 판정 §3.5.
 - 2차 분배: RV `C:/Users/User/orca/workspaces/app/agent-RV-review`, dispatch `ctx_46ebe8961d99` (d4b5361에서 시작).
+- 3차 분배(2026-11-08, `send`로 재개, 같은 워크트리): DS `ctx_8e47f492cc4e`, LM `ctx_4dc3ebbc94bf`, AA `ctx_02ece70e8578`, SH `ctx_37a4733c2978`. 각자 `git merge main`(45645c4) 후 자기 문서만 수정, 끝에 "## 8. 3차 변경 기록" 표.
