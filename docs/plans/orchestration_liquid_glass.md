@@ -163,3 +163,8 @@ BASE=http://localhost:8011 LOOK=lens OUT=<스크래치 폴더> npx playwright te
 - 범위 밖으로 발견한 기존 버그(고치지 않음):
   - `scopeOf`가 `collapsed`를 지우지 않아 빈칸 퀴즈에서 접힌 가지의 빈칸이 그려지지 않는다(백지 퀴즈의 `placedTree`는 지움).
   - 모바일 축소 배율에서 `.badge::after` 터치 영역이 카드 중앙까지 덮어 탭이 접기로 처리될 수 있다.
+
+
+## 9. 폐기 (2026-11-08)
+
+사용자 지시("리퀴드 디자인은 전부 폐기")로 시안 3개·선택기·점검 도구·SVG 필터·`--depth` 훅을 모두 삭제했다. 후속: `orchestration_redesign.md`. 연구 문서 R5는 기록으로 남긴다.
