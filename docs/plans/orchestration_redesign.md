@@ -120,3 +120,5 @@
 | LM | `C:/Users/User/orca/workspaces/app/agent-LM-layout` | `ctx_5325d3cc93a6` |
 | AA | `C:/Users/User/orca/workspaces/app/agent-AA-account` | `ctx_671bd72d2d0e` |
 | SH | `C:/Users/User/orca/workspaces/app/agent-SH-sharing` | `ctx_31aedc7369af` |
+- 1차 머지 완료(파일 겹침 없음, 충돌 0건): AA 2ce98a2 → SH 81a16a0 → DS e809ebb → LM d4b5361. 머지마다 typecheck·lint·build 통과, evidence 링크 누락 0건.
+- 2차 분배: RV `C:/Users/User/orca/workspaces/app/agent-RV-review`, dispatch `ctx_46ebe8961d99` (d4b5361에서 시작).
