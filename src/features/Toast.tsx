@@ -34,7 +34,8 @@ function push(t: Item) {
     if (i < 0) break
     waiting.splice(i, 1)
   }
-  queue = [...queue.slice(0, 1), ...waiting, t]
+  // 되돌리기처럼 동작이 있는 토스트는 떠 있는 힌트를 밀어내고 먼저 보인다(힌트는 그 뒤로) — 되돌릴 기회를 놓치지 않게
+  queue = t.action && queue[0]?.hint ? [t, queue[0], ...waiting] : [...queue.slice(0, 1), ...waiting, t]
   if (queue[0] === t) arm()
   emit()
 }

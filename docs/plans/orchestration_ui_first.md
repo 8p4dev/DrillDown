@@ -117,3 +117,5 @@ DS 의 스타일이 머지되기 전까지 다른 워커는 계약 §3.2 의 클
 - AA 완료 → **머지 65ad52a**. 오케스트레이터 후속: `<Banners/>` 를 App 셸(nav 아래)로 옮기고 계정·관리자 화면 안의 사본 제거. build 통과, precache 55개 545.36 KiB, 관리자 청크 분리 확인(AdminPage js 16.08 kB·css 4.02 kB). AA 미결: 공지 배너는 mock Me 에 실려 비로그인에게 안 보임(서버 단계), MergeDialog M3·M4·exportAll 범위 밖, `index.css table{overflow:hidden}` 이 sticky 헤더를 막아 admin.css 에서 덮음(QA 확인).
 - SH: 재개 후 화면 밖 파일 읽기 권한 프롬프트에서 멈춤(사람 응답 필요) → 사용자에게 요청함.
 - LS 후속(main 머지 반영, hint 직접 호출, DS .sr-only 사용) → **머지 689f601**. build 통과, precache 545.19 KiB.
+- SH 커밋분(975fb51) → **머지 7fa50a3**(shim 정리는 워커 진행 중). build 통과, precache 55개 570.72 KiB.
+- **통합 E2E 1회**: 12/13 → 실패 1건 원인 = 비로그인 1회성 힌트가 [확인] 전까지 "실행 취소" 토스트를 큐 뒤에 막음(실제 UX 버그). Toast 큐 수정: 동작 있는 토스트는 떠 있는 힌트보다 앞에. 재실행 **13/13 통과**.
