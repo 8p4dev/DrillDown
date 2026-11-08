@@ -109,3 +109,4 @@ DS 의 스타일이 머지되기 전까지 다른 워커는 계약 §3.2 의 클
 ## 진행 기록
 
 - groundwork: 토큰 교체·라우터·타입·`api.ts`·mock 스토어 2개·`source.ts`·`repo.ts` 소프트 삭제·아이콘 테이블 58개·`Icon`·스텁 10개·`App.tsx`. typecheck 0 / lint 0 / build OK(precache 43개 499.65 KiB) / E2E 13/13.
+- 1차 dispatch(2026-11-08, 시작 커밋 15b037c): DS ctx_cfe8e7694d3e(agent-DS-ui) · LM ctx_7f1171a3bb43(agent-LM-ui) · LS ctx_8b1293f83036(agent-LS-ui) · AA ctx_c095f6cf24fc(agent-AA-ui) · SH ctx_c327d2e7bf6a(agent-SH-ui). 지시 원문은 오케스트레이터 scratch `specs/spec_ui_*.txt`.
