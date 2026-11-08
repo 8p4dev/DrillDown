@@ -88,7 +88,12 @@ async function run(pullToo: boolean) {
     await pushAll()
     if (pullToo) await pull()
     await db.meta.put({ key: 'lastSyncAt', value: Date.now() })
-    setSyncState((await db.outbox.count()) ? { kind: 'syncing' } : { kind: 'saved' })
+    const pending = await db.outbox.count()
+    if (bad.size) {
+      const reason = `저장 못 한 항목 ${bad.size}개 — ${[...bad.values()].at(-1)}`
+      await db.meta.put({ key: 'lastSyncError', value: reason })
+      setSyncState({ kind: 'error', reason, pending })
+    } else setSyncState(pending ? { kind: 'syncing' } : { kind: 'saved' })
   } catch (e) {
     await fail(e)
   }
@@ -132,6 +137,8 @@ async function pushOnce(slice: OutboxRow[]) {
 
   const body = { trees: [] as Tree[], nodes: [] as TreeNode[], srs: [] as NodeSrs[], attempts: [] as BlankAttempt[], deleted: { trees: [] as { id: ID; deletedAt: number }[], nodes: [] as { id: ID; treeId: ID; deletedAt: number }[] } }
   const sent: OutboxRow[] = []
+  const pos: Record<string, OutboxRow[]> = {} // 'nodes' → 보낸 순서의 outbox 행 — 400 field(nodes[3].title) 역추적용
+  const at = (k: string, r: OutboxRow) => (pos[k] ??= []).push(r)
   let bytes = 0
   for (const r of slice) {
     const v = cur.get(r.kind === 'srs' ? 'srs' + r.id : r.id)
@@ -143,19 +150,42 @@ async function pushOnce(slice: OutboxRow[]) {
         const { deletedAt: _d, hiddenByAdmin: _h, ...rest } = t
         item = rest
       }
-      if (item) (r.op === 'del' || t?.deletedAt ? body.deleted.trees : body.trees).push(item as never)
+      if (item) {
+        const del = r.op === 'del' || !!t?.deletedAt
+        ;(del ? body.deleted.trees : body.trees).push(item as never)
+        at(del ? 'deleted.trees' : 'trees', r)
+      }
     } else if (r.kind === 'node') {
       item = r.op === 'del' ? { id: r.id, treeId: r.treeId, deletedAt: r.at } : v
-      if (item) (r.op === 'del' ? body.deleted.nodes : body.nodes).push(item as never)
+      if (item) {
+        ;(r.op === 'del' ? body.deleted.nodes : body.nodes).push(item as never)
+        at(r.op === 'del' ? 'deleted.nodes' : 'nodes', r)
+      }
     } else if (v) {
       item = v
       ;(r.kind === 'srs' ? body.srs : body.attempts).push(v as never)
+      at(r.kind === 'srs' ? 'srs' : 'attempts', r)
     }
     sent.push(r) // 엔티티가 사라진 put 행도 보낸 것으로 쳐서 지운다
     if (item && (bytes += enc.encode(JSON.stringify(item)).length) > MAX_BYTES) break
   }
 
-  const res = await api<PushRes>('/api/sync', { body })
+  let res: PushRes
+  try {
+    res = await api<PushRes>('/api/sync', { body })
+  } catch (e) {
+    // 행 하나 때문에 큐 전체가 막히지 않게: 400 invalid 는 field 로 범인 행을, 못 찾거나 payload_too_large·413 이면 반씩 나눠 격리
+    if (!(e instanceof ApiError) || !(e.status === 413 || (e.status === 400 && (e.code === 'invalid' || e.code === 'payload_too_large')))) throw e
+    const m = /^((?:deleted\.)?\w+)\[(\d+)\](?:\.(\w+))?/.exec(e.field ?? '')
+    const hit = m ? pos[m[1]]?.[Number(m[2])] : undefined
+    if (hit) return quarantine(hit, why(e, m?.[3]))
+    if (sent.length === 1) return quarantine(sent[0], why(e))
+    const half = Math.ceil(sent.length / 2)
+    await pushOnce(sent.slice(0, half))
+    await pushOnce(sent.slice(half))
+    return
+  }
+  for (const r of sent) bad.delete(r.kind + r.id) // 다시 바뀌어 통과하면 오류 목록에서 뺀다
   const taken = new Set(res.id_taken ?? [])
   // 보낸 행 제거(applied·superseded·dropped 전부). 보낸 뒤 다시 바뀐 행(at 다름)은 남긴다
   await db.transaction('rw', db.outbox, async () => {
@@ -174,6 +204,21 @@ async function pushOnce(slice: OutboxRow[]) {
     toast(`다른 기기 변경 반영됨 ${n}건`, { label: '내 버전 유지', run: () => void keepMine(losers) }, 8000)
   }
   if (taken.size) await reId(taken)
+}
+
+/** 서버가 거부한 행: 로컬 데이터는 그대로 두고 outbox 에서만 뺀다. 같은 엔티티가 다시 바뀌면 track 이 새 행을 넣어 재시도된다 */
+const bad = new Map<string, string>()
+async function quarantine(r: OutboxRow, reason: string) {
+  bad.set(r.kind + r.id, reason)
+  await db.transaction('rw', db.outbox, async () => {
+    if ((await db.outbox.get(r.seq!))?.at === r.at) await db.outbox.delete(r.seq!)
+  })
+}
+function why(e: ApiError, prop?: string): string {
+  if (prop === 'title') return '제목이 너무 깁니다'
+  if (prop === 'note') return '메모가 너무 깁니다'
+  if (prop === 'aliases') return '별칭이 너무 많거나 깁니다'
+  return e.code === 'invalid' ? '올바르지 않은 값이 있습니다' : e.message || '항목이 너무 큽니다'
 }
 
 /** "내 버전 유지": 패자 행을 updatedAt=now 로 다시 put(LWW 역이용, 04 §3.1) */
