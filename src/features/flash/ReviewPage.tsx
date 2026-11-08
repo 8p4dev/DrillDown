@@ -1,7 +1,8 @@
 // 오늘의 복습 (plan §1 F2): 오늘 기한 노드의 부모 큐를 플래시카드로 차례 복습. Dexie 직접(계약 §3.5 — 공유 보기에 없음)
 import { useEffect, useMemo, useState } from 'react'
 import { getTreeNodes, listTrees } from '../../core/repo'
-import { colorMap, dueByTree, getSrsMap, recordResult } from '../../core/srs'
+import { dexieSource } from '../../core/source'
+import { colorMap, dueByTree, getSrsMap } from '../../core/srs'
 import type { ID, NodeSrs, Tree, TreeNode } from '../../core/types'
 import { href } from '../../router'
 import { Icon } from '../../ui/Icon'
@@ -56,7 +57,7 @@ export default function ReviewPage() {
         </header>
         {id ? (
           <FlashCard key={id} treeId={treeId} nodes={session.nodes} conceptId={id} colors={colors}
-            record={(nodeId, ok) => recordResult(nodeId, treeId, ok)}
+            source={dexieSource(treeId)}
             onRated={(s) => setSrs(({ map }) => ({ map: new Map(map).set(s.nodeId, s), at: new Date() }))} onNext={last ? undefined : step} />
         ) : (
           <p className="muted">복습할 항목이 없습니다.</p>

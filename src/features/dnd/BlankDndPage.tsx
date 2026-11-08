@@ -25,12 +25,12 @@ export default function BlankDndPage({ treeId, rootId, source }: { treeId: strin
       <TreeHeader treeId={treeId} active="blank">
         {all && rid && <ScopeSelect nodes={all} value={rid} to={(id) => href.blank(treeId, id)} />}
       </TreeHeader>
-      {all && rid && <Quiz treeId={treeId} scope={scopeOf(all, rid)} record={src.record} />}
+      {all && rid && <Quiz treeId={treeId} scope={scopeOf(all, rid)} source={src} />}
     </section>
   )
 }
 
-function Quiz({ treeId, scope, record }: { treeId: ID; scope: TreeNode[]; record: StudySource['record'] }) {
+function Quiz({ treeId, scope, source }: { treeId: ID; scope: TreeNode[]; source: StudySource }) {
   const rootId = scope[0].id
   const rest = scope.slice(1)
   const byId = new Map(scope.map((n) => [n.id, n]))
@@ -56,8 +56,8 @@ function Quiz({ treeId, scope, record }: { treeId: ID; scope: TreeNode[]; record
     const s = gradeBlank(scope, links)
     setScore(s)
     haptic(s.correct === s.total ? 'success' : 'warn')
-    await Promise.all(rest.map((n) => record(n.id, s.ok[n.id])))
-    await logEvent('dnd_attempt_completed', { mode: 'blank_dnd', rootId, total: s.total, correct: s.correct }, treeId)
+    await Promise.all(rest.map((n) => source.record(n.id, s.ok[n.id])))
+    if (!source.ephemeral) await logEvent('dnd_attempt_completed', { mode: 'blank_dnd', rootId, total: s.total, correct: s.correct }, treeId)
   }
   function retry() {
     setOrder(shuffle(rest.map((n) => n.id)))

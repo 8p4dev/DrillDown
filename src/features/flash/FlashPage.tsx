@@ -122,7 +122,7 @@ export default function FlashPage({ treeId, rootId, source }: { treeId: string; 
                   </span>
                 ))}
               </nav>}
-              <FlashCard key={at} treeId={treeId} nodes={nodes} conceptId={at} colors={colors} record={src.record} onRated={onRated} onDive={go} initialRated={tally} onNext={advance} />
+              <FlashCard key={at} treeId={treeId} nodes={nodes} conceptId={at} colors={colors} source={src} onRated={onRated} onDive={go} initialRated={tally} onNext={advance} />
               <div className="actions flash-nav">
                 <button
                   type="button"
