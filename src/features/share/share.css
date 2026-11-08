@@ -66,10 +66,6 @@
   .shared .share-bar { display: none; }
 }
 
-/* 플래시·빈칸·백지 페이지가 자체 TreeHeader(편집 링크 포함)를 그린다 — 공유 보기에서는 내 헤더가 탭을 제공하므로 숨긴다.
-   ponytail: CSS 숨김은 임시. LS 가 source(ephemeral) 일 때 TreeHeader 를 렌더하지 않게 바꾸면 이 규칙은 삭제 */
-.shared .tree-header { display: none; }
-
 /* ── 보기 탭: 들여쓰기 목록(접기 없음) ── */
 .share-tree { list-style: none; margin: 0; padding: 0 0 0 1rem; border-left: 1px solid var(--border); }
 .share-tree[role='tree'] { padding-left: 0; border-left: 0; }

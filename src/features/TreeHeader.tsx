@@ -32,6 +32,9 @@ export default function TreeHeader(p: { treeId: string; active: Mode; title?: st
     ro.observe(el)
     return () => { ro.disconnect(); root.removeProperty('--tree-head-h') }
   }, [])
+  // 공유 보기(/t/<slug>)는 SharedPage 가 제목·탭을 그린다 → 여기서는 화면별 도구(범위·집계)만. 편집 링크가 #/tree/<slug> 로 새지 않게
+  const shared = location.pathname.startsWith('/t/')
+  if (shared) return children ? <header className="tree-header" ref={ref}><div className="tree-header-tools">{children}</div></header> : null
   return (
     <header className="tree-header" ref={ref}>
       <h1>{p.title ?? title}</h1>

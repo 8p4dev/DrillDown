@@ -27,16 +27,14 @@ function dismiss(t: Item) {
   emit()
 }
 function push(t: Item) {
-  // 대기열은 2개까지(오래된 대기 토스트부터 버림). 힌트는 버리지 않는다
-  const waiting = queue.slice(1)
-  while (waiting.length >= 2) {
-    const i = waiting.findIndex((x) => !x.hint)
-    if (i < 0) break
-    waiting.splice(i, 1)
-  }
-  // 되돌리기처럼 동작이 있는 토스트는 떠 있는 힌트를 밀어내고 먼저 보인다(힌트는 그 뒤로) — 되돌릴 기회를 놓치지 않게
-  queue = t.action && queue[0]?.hint ? [t, queue[0], ...waiting] : [...queue.slice(0, 1), ...waiting, t]
-  if (queue[0] === t) arm()
+  const head = queue[0]
+  // 일반 토스트는 언제나 힌트보다 앞(힌트가 [확인] 전까지 되돌리기·복사됨을 막지 않게). 힌트는 맨 뒤
+  const i = t.hint ? -1 : queue.findIndex((x) => x.hint)
+  const next = i < 0 ? [...queue, t] : [...queue.slice(0, i), t, ...queue.slice(i)]
+  // 기다리는 일반 토스트는 2개까지(오래된 것부터 버림). 힌트는 버리지 않는다
+  while (next.filter((x, k) => k > 0 && !x.hint).length > 2) next.splice(next.findIndex((x, k) => k > 0 && !x.hint), 1)
+  queue = next
+  if (queue[0] !== head) arm()
   emit()
 }
 
