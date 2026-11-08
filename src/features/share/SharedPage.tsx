@@ -13,7 +13,8 @@ import { I } from '../../ui/icons'
 import { copy as copyIcon, eye } from '../../ui/icons.all'
 import { parse, toHtml } from '../editor/content/format'
 import { toast } from '../Toast'
-import { Avatar, Sheet } from './ds'
+import { Avatar } from '../../ui/Avatar'
+import { Sheet } from '../../ui/Sheet'
 import './share.css'
 
 const FlashPage = lazy(() => import('../flash/FlashPage'))
@@ -121,7 +122,7 @@ export default function SharedPage({ slug, mode, rootId }: { slug: string; mode:
       <header className="share-head">
         <div className="share-title">
           <h1>{t.title}</h1>
-          <p className="muted share-owner"><Avatar name={t.owner.nickname} url={t.owner.avatar_url} size={24} />{t.owner.nickname} · 노드 {t.node_count}개</p>
+          <p className="muted share-owner"><Avatar name={t.owner.nickname} url={t.owner.avatar_url} size={32} className="share-avatar" />{t.owner.nickname} · 노드 {t.node_count}개</p>
         </div>
         <nav aria-label="학습 모드" className="share-tabs">
           {TABS.map((tab) => (

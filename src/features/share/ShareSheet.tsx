@@ -8,7 +8,7 @@ import { href } from '../../router'
 import { Icon } from '../../ui/Icon'
 import { I } from '../../ui/icons'
 import { toast } from '../Toast'
-import { Sheet } from './ds'
+import { Sheet } from '../../ui/Sheet'
 import './share.css'
 
 const ACK = 'publicNoticeAck'
