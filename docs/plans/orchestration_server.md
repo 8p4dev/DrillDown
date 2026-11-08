@@ -88,3 +88,4 @@
 - 1차 dispatch(시작 8947541): SA ctx_67cdc9bf76d1(agent-SA-server) · SS ctx_1d63a85a511c(agent-SS-server) · CA ctx_70729b1dadfa(agent-CA-client) · CS ctx_3807f182f266(agent-CS-client). 지시 원문 scratch `specs/spec_srv_*.txt`.
 - 오케스트레이터: `public/og.png`(1200×630, Pretendard OFL, 중앙 안전 영역) 추가 — SS 의 `og:image` 경로.
 - 결정(CS 질문): `GET /api/t/:slug` = api.ts `SharedTree` 평평한 모양 + `id` 추가(SS 응답·CA 타입·CS sourceTreeId). 원격 반영 이벤트 `dd:remote{treeIds}` → EditorPage·TreeListPage 구독은 머지 후 오케스트레이터. 401 → `refreshMe()` 동적 호출. M4(커서 만료 뒤 이 기기에만 있는 트리)는 '올리기' 자동 + 토스트.
+- CA 에게 mock/sync.ts·mock/shared.ts 1줄 임시 수정 허용(CS 가 삭제 → 머지 때 삭제 쪽 채택).
