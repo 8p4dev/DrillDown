@@ -5,6 +5,7 @@
 @media (pointer: coarse) { .mode-tabs a { min-height: 44px; } }
 .mode-tabs a svg { flex: none; }
 .tree-header-tools { margin-left: auto; display: flex; gap: .5rem; align-items: center; }
+.tree-header-sub { flex: 1 0 100%; display: flex; flex-wrap: wrap; align-items: center; gap: .25rem .75rem; min-width: 0; }
 
 /* 모바일: 제목 한 줄 → 탭 전체 폭(4칸 균등) → 도구 */
 @media (max-width: 760px) {

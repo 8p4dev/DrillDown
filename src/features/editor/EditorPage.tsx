@@ -4,13 +4,17 @@ import { logEvent } from '../../core/events'
 import { nodesToOutline, outlineToNodes, parseOutline, serializeOutline, splitTitle } from '../../core/outline'
 import { childrenOf, deleteNodes, descendantsOf, getTreeNodes, putNodes } from '../../core/repo'
 import { getSrsMap, missHeat } from '../../core/srs'
+import { ancestorsOf } from '../../core/path'
 import { CAP, type ID, type NodeSrs, type TreeNode } from '../../core/types'
 import { href } from '../../router'
 import { Icon } from '../../ui/Icon'
-import { clipboardPaste, copy, eraser, highlighter, keyboard, list, maximize, network, zoomIn, zoomOut } from '../../ui/icons.all'
+import { NodePath } from '../../ui/NodePath'
+import { clipboardPaste, copy, eraser, highlighter, keyboard, list, maximize, network, search, zoomIn, zoomOut } from '../../ui/icons.all'
 import NodeRow from './NodeRow'
 import NoteEditor, { type NoteApi, type NoteOp } from './content/NoteEditor'
 import GraphView from './graph/GraphView'
+import { isOpen } from './graph/layout'
+import { searchNodes, SEARCH_LIMIT } from './search'
 import TreeHeader from '../TreeHeader'
 import { hint, toast } from '../Toast'
 import { haptic } from '../feel'
@@ -35,12 +39,13 @@ const orderAfter = (ns: TreeNode[], node: TreeNode) => {
   const next = sib[sib.indexOf(node) + 1]
   return next ? (node.order + next.order) / 2 : node.order + 1
 }
-const visibleRows = (ns: TreeNode[], root: TreeNode) => {
-  const out: { node: TreeNode; depth: number; hasChildren: boolean }[] = []
+type Open = (n: TreeNode, depth: number) => boolean
+/** 화면에 그려지는 노드(전위 순서). open = 접기 + 보기 깊이(C3), depth 는 root(포커스 루트) 기준 */
+const visibleRows = (ns: TreeNode[], root: TreeNode, open: Open = isOpen) => {
+  const out: { node: TreeNode; depth: number }[] = []
   const walk = (n: TreeNode, depth: number) => {
-    const kids = childrenOf(ns, n.id)
-    out.push({ node: n, depth, hasChildren: kids.length > 0 })
-    if (!n.collapsed) for (const k of kids) walk(k, depth + 1)
+    out.push({ node: n, depth })
+    if (open(n, depth)) for (const k of childrenOf(ns, n.id)) walk(k, depth + 1)
   }
   walk(root, 0)
   return out
@@ -50,30 +55,57 @@ const newNode = (treeId: ID, parentId: ID, order: number): TreeNode => ({
 })
 const FULL_MSG = '트리 하나에 노드는 5,000개까지입니다' // 계약 C5
 const isComposing = (e: React.KeyboardEvent) => e.nativeEvent.isComposing || e.keyCode === 229
-/** 노드별 자식 유무·하위 수를 한 번에 계산 (O(n)). 노드마다 childrenOf/descendantsOf 를 부르면 O(n²) */
+/** 노드별 자식 유무·하위 수·형제 위치를 한 번에 계산 (O(n log n)). 노드마다 childrenOf/descendantsOf 를 부르면 O(n²) */
 function countTree(ns: TreeNode[]) {
-  const kids = new Map<ID, ID[]>()
+  const kids = new Map<ID, TreeNode[]>()
   for (const n of ns) {
     if (n.parentId === null) continue
     const k = kids.get(n.parentId)
-    if (k) k.push(n.id)
-    else kids.set(n.parentId, [n.id])
+    if (k) k.push(n)
+    else kids.set(n.parentId, [n])
   }
+  const pos = new Map<ID, [number, number]>()
+  for (const k of kids.values()) k.sort((a, b) => a.order - b.order).forEach((n, i) => pos.set(n.id, [i + 1, k.length]))
   const desc = new Map<ID, number>()
   const walk = (id: ID): number => {
-    const total = (kids.get(id) ?? []).reduce((sum, k) => sum + 1 + walk(k), 0)
+    const total = (kids.get(id) ?? []).reduce((sum, k) => sum + 1 + walk(k.id), 0)
     desc.set(id, total)
     return total
   }
   for (const n of ns) if (n.parentId === null) walk(n.id)
-  return { hasKids: (id: ID) => kids.has(id), desc: (id: ID) => desc.get(id) ?? 0 }
+  return { hasKids: (id: ID) => kids.has(id), desc: (id: ID) => desc.get(id) ?? 0, pos: (id: ID) => pos.get(id) ?? [1, 1] }
 }
 
-/** rootId = 서브트리 포커스(T1, P1 WE1 이 구현) */
-export default function EditorPage({ treeId }: { treeId: string; rootId?: string }) {
+// ---- 트리별 보기 상태(U18): 선택·배율·스크롤·보기 깊이. 실패해도(사생활 모드 등) 기본값으로 동작 ----
+type View = { sel?: ID; zoom?: number; sx?: number; sy?: number; depth?: number; root?: string }
+const viewKey = (treeId: string) => `dd:editor-view:${treeId}`
+function loadView(treeId: string): View {
+  try {
+    const v = JSON.parse(localStorage.getItem(viewKey(treeId)) ?? '{}')
+    return v && typeof v === 'object' ? v : {}
+  } catch {
+    return {}
+  }
+}
+function saveView(treeId: string, v: View) {
+  try {
+    localStorage.setItem(viewKey(treeId), JSON.stringify(v))
+  } catch { /* 저장 못 해도 편집은 계속 */ }
+}
+const DEPTHS = [1, 2, 3, 0] as const // 0 = ∞ (보기 깊이 제한 없음)
+const mapOf = (ns: TreeNode[]) => new Map(ns.map((n) => [n.id, n]))
+
+/** rootId = 서브트리 포커스(T1, C2): 그 가지만 그린다. 없거나 지워진 노드면 전체 */
+export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?: string }) {
+  const [saved] = useState(() => loadView(treeId))
+  const sameRoot = (saved.root ?? '') === (rootId ?? '')
   const [nodes, setNodes] = useState<TreeNode[] | null>(null)
   const [srs, setSrs] = useState<Map<ID, NodeSrs>>(new Map())
   const [selId, setSelId] = useState<ID>('')
+  // 보기 깊이(C3): 에디터 로컬 상태. collapsed·outbox·undo 와 무관. reveal = 깊이 제한을 넘어 펼친 노드(배지·검색·추가)
+  const [viewDepth, setViewDepth] = useState<number>(() => ((DEPTHS as readonly number[]).includes(saved.depth ?? 0) ? (saved.depth ?? 0) : 0))
+  const [reveal, setReveal] = useState<ReadonlySet<ID>>(new Set())
+  const [searching, setSearching] = useState(false)
   const [editId, setEditId] = useState<ID | null>(null)
   const [draft, setDraft] = useState('')
   const [noteEditId, setNoteEditId] = useState<ID | null>(null) // 카드 안에서 내용 편집 중인 노드
@@ -103,12 +135,12 @@ export default function EditorPage({ treeId }: { treeId: string; rootId?: string
       redoRef.current = []
       setNodes(ns)
       setIoOpen(ns.length === 1)
-      setSelId(ns.find((n) => n.parentId === null)?.id ?? '')
+      setSelId(ns.some((n) => n.id === saved.sel) ? saved.sel! : (ns.find((n) => n.id === rootId)?.id ?? ns.find((n) => n.parentId === null)?.id ?? ''))
     })
     return () => {
       alive = false
     }
-  }, [treeId])
+  }, [treeId]) // oxlint-disable-line react-hooks/exhaustive-deps -- 진입 시 1회: saved·rootId 는 처음 값
 
   const loaded = nodes !== null
   useEffect(() => {
@@ -140,6 +172,18 @@ export default function EditorPage({ treeId }: { treeId: string; rootId?: string
       if (v.open) document.getElementById(KEYS_ID)?.hidePopover()
     })
   }, [])
+  // '/' = 검색 (입력 중이 아닐 때). Ctrl+F 는 브라우저 찾기 그대로
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return
+      const t = e.target as HTMLElement | null
+      if (t?.isContentEditable || t?.closest?.('input, textarea, select')) return
+      e.preventDefault()
+      setSearching(true)
+    }
+    addEventListener('keydown', onKey)
+    return () => removeEventListener('keydown', onKey)
+  }, [])
 
   // 편집 종료로 입력창이 사라지면 아웃라이너로 포커스 복귀 (메모 칸 등 다른 곳으로 간 경우는 건드리지 않음)
   useLayoutEffect(() => {
@@ -148,8 +192,8 @@ export default function EditorPage({ treeId }: { treeId: string; rootId?: string
   }, [editId])
 
   // ---- 확대·축소: 버튼, Ctrl+휠, 핀치, 탐색 모드 키 - = 0 ----
-  const [zoom, setZoom] = useState(1)
-  const zoomRef = useRef(1)
+  const [zoom, setZoom] = useState(() => (sameRoot && saved.zoom ? clampZoom(saved.zoom) : 1))
+  const zoomRef = useRef(zoom)
   /** 화면 좌표 (cx, cy) 아래의 그래프 지점을 그대로 둔 채 배율 변경. 기준점을 안 주면 캔버스 중앙 */
   function zoomTo(next: number, cx?: number, cy?: number) {
     const box = outlineRef.current
@@ -174,7 +218,17 @@ export default function EditorPage({ treeId }: { treeId: string; rootId?: string
     const g = box?.querySelector<HTMLElement>('.graph')
     if (!box || !g) return
     zoomTo(Math.min(1, (box.clientWidth - 16) / g.offsetWidth, (box.clientHeight - 16) / g.offsetHeight))
-    box.scrollTo(0, 0)
+    centerOn(selRef.current) // U15: 맞춤 뒤에도 선택 노드가 화면 가운데에 남는다
+  }
+  /** 카드 중심을 캔버스 가운데로. 카드 rect 는 재배치 트랜지션 중일 수 있어 목표 좌표(style left/top)를 쓴다 */
+  function centerOn(id: ID) {
+    const box = outlineRef.current
+    const g = box?.querySelector('.graph')
+    const card = box?.querySelector<HTMLElement>(`[data-node-id="${CSS.escape(id)}"]`)
+    if (!box || !g || !card) return
+    const [r, b, z] = [g.getBoundingClientRect(), box.getBoundingClientRect(), zoomRef.current]
+    box.scrollLeft += r.left + (parseFloat(card.style.left) + card.offsetWidth / 2) * z - (b.left + box.clientWidth / 2)
+    box.scrollTop += r.top + (parseFloat(card.style.top) + card.offsetHeight / 2) * z - (b.top + box.clientHeight / 2)
   }
   useEffect(() => {
     const el = outlineRef.current
@@ -190,8 +244,12 @@ export default function EditorPage({ treeId }: { treeId: string; rootId?: string
   }, [loaded]) // oxlint-disable-line react-hooks/exhaustive-deps -- zoomTo 는 ref 와 setState 만 쓴다
 
   // ---- 자동 맞춤: 진입·개요 가져오기 뒤 1회, 넘칠 때만. 일반 편집 중에는 카드가 튀지 않게 하지 않는다 ----
-  const fitPending = useRef(true)
+  const restorePending = useRef(sameRoot && typeof saved.sx === 'number' ? { x: saved.sx, y: saved.sy ?? 0 } : null)
+  const fitPending = useRef(!restorePending.current)
   const centerPending = useRef<number | null>(null)
+  const centerAfter = useRef<ID | null>(null) // 검색·포커스 해제 뒤 배치가 끝나면 이 카드를 가운데로
+  const settledRoot = useRef(rootId)
+  const settled = useRef(false) // 첫 배치 전에는 보기 상태를 저장하지 않는다(복원 전 0 으로 덮지 않게)
   /** rootX = 배치 좌표의 루트 중심. 루트 카드의 rect 는 재배치 트랜지션 중이라 쓸 수 없다 */
   function centerRoot(rootX: number) {
     const box = outlineRef.current
@@ -203,7 +261,27 @@ export default function EditorPage({ treeId }: { treeId: string; rootId?: string
   /** GraphView 가 실측 크기로 배치를 마칠 때마다 호출 (FALLBACK 크기로는 호출되지 않음) */
   function onSettled(w: number, h: number, rootX: number) {
     const box = outlineRef.current
-    if (!fitPending.current || !box) return
+    if (!box) return
+    settled.current = true
+    // 포커스가 바뀐 뒤 첫 배치: 들어가면 그 가지를 맞추고, 전체로 나오면 선택을 가운데로. (부모 이펙트는 이 콜백보다 늦게 돈다)
+    if (settledRoot.current !== rootId) {
+      settledRoot.current = rootId
+      if (rootId) fitPending.current = true
+      else centerAfter.current ??= selRef.current
+    }
+    const r = restorePending.current
+    if (r) {
+      restorePending.current = null
+      fitPending.current = false
+      return box.scrollTo(r.x, r.y)
+    }
+    if (centerAfter.current) {
+      fitPending.current = false
+      centerOn(centerAfter.current)
+      centerAfter.current = null
+      return
+    }
+    if (!fitPending.current) return
     fitPending.current = false
     box.scrollIntoView({ block: 'nearest' }) // 모바일: 아래쪽 개요 칸에서 가져오면 캔버스로 돌아온다
     const [cw, ch] = [box.clientWidth, box.clientHeight]
@@ -222,8 +300,39 @@ export default function EditorPage({ treeId }: { treeId: string; rootId?: string
   }, [zoom])
 
   const counts = useMemo(() => countTree(nodes ?? []), [nodes])
+  const open = useMemo<Open>(() => (n, d) => !n.collapsed && (!viewDepth || d + 1 < viewDepth || reveal.has(n.id)), [viewDepth, reveal])
 
   const root = nodes?.find((n) => n.parentId === null)
+  const top = (rootId && nodes?.find((n) => n.id === rootId)) || root
+  const focused = !!top && top !== root
+  const rows = useMemo(() => (nodes && top ? visibleRows(nodes, top, open) : []), [nodes, top, open])
+  const shown = useMemo(() => new Set(rows.map((r) => r.node.id)), [rows])
+  const byId = useMemo(() => mapOf(nodes ?? []), [nodes])
+  // 선택이 숨겨지면(보기 깊이·접기·포커스 밖) 보이는 가장 가까운 조상을 선택으로 본다. 상태(selId)는 그대로 — 다시 보이면 돌아온다
+  const sel = (shown.has(selId) ? byId.get(selId) : ancestorsOf(byId, selId).reverse().find((n) => shown.has(n.id))) ?? top
+  // NodeRow 콜백은 이전 렌더의 것이 불릴 수 있다(memo) → 최신 보기 상태는 ref 로
+  const viewRef = useRef({ open, depth: viewDepth, top: '' as ID })
+  const selRef = useRef<ID>('')
+  useLayoutEffect(() => {
+    viewRef.current = { open, depth: viewDepth, top: top?.id ?? '' }
+    selRef.current = sel?.id ?? ''
+  })
+  // U18: 선택·배율·깊이가 바뀔 때, 스크롤이 멈출 때, 떠날 때 저장
+  const saveNow = () => {
+    const box = outlineRef.current
+    if (!settled.current || !box) return
+    saveView(treeId, { sel: selRef.current, zoom: zoomRef.current, sx: Math.round(box.scrollLeft), sy: Math.round(box.scrollTop), depth: viewRef.current.depth, root: rootId ?? '' })
+  }
+  const saveRef = useRef(saveNow)
+  useLayoutEffect(() => void (saveRef.current = saveNow))
+  useEffect(() => void saveRef.current(), [sel?.id, zoom, viewDepth, rootId])
+  useEffect(() => {
+    const on = () => saveRef.current()
+    addEventListener('pagehide', on)
+    return () => (removeEventListener('pagehide', on), on())
+  }, [])
+  const scrollTimer = useRef(0)
+
   if (!nodes) return <p>불러오는 중…</p>
   if (!root) return <p>트리를 찾을 수 없습니다. <a href={href.trees()}>목록으로</a></p>
 
@@ -256,7 +365,7 @@ export default function EditorPage({ treeId }: { treeId: string; rootId?: string
     persist(nodesRef.current, snap)
     nodesRef.current = snap
     setNodes(snap)
-    if (!snap.some((n) => n.id === selId)) setSelId(root!.id)
+    if (!snap.some((n) => n.id === selId)) setSelId(topNode().id)
     if (cutId && !snap.some((n) => n.id === cutId)) setCutId(null)
   }
 
@@ -277,6 +386,43 @@ export default function EditorPage({ treeId }: { treeId: string; rootId?: string
     setNoteEditId(id)
   }
   const toOutline = () => outlineRef.current?.focus()
+  /** 루트 또는 포커스 루트: 지우기·내어쓰기·형제 추가·순서 바꾸기 불가(C2) */
+  const isTop = (n: TreeNode) => n.parentId === null || n.id === viewRef.current.top
+  const topNode = () => get(viewRef.current.top) ?? root!
+  /** 포커스 루트 기준 깊이 */
+  const depthOf = (id: ID) => {
+    const p = ancestorsOf(mapOf(nodesRef.current), id)
+    return p.length - 1 - Math.max(0, p.findIndex((n) => n.id === viewRef.current.top))
+  }
+  /** 보기 깊이에 막힌 노드의 자식을 보이게 (collapsed 는 건드리지 않음) */
+  const showKids = (...ids: ID[]) => setReveal((s) => (ids.every((id) => s.has(id)) ? s : new Set([...s, ...ids])))
+  /** 접기 배지·H·↓: collapsed 와 보기 깊이를 함께 다룬다 */
+  function setOpen(n: TreeNode, want: boolean) {
+    const vd = viewRef.current.depth
+    const byDepth = !!vd && depthOf(n.id) + 1 >= vd // 보기 깊이 때문에 닫히는 자리
+    if (want) {
+      if (n.collapsed) commit(patch(nodesRef.current, n.id, { collapsed: false }), false)
+      if (byDepth) showKids(n.id)
+    } else if (byDepth) setReveal((s) => new Set([...s].filter((x) => x !== n.id)))
+    else commit(patch(nodesRef.current, n.id, { collapsed: true }), false)
+  }
+  const toggle = (n: TreeNode) => setOpen(n, !viewRef.current.open(n, depthOf(n.id)))
+  /** 검색 결과로 이동(U16): 포커스 밖이면 포커스 해제, 조상 펼침(collapsed·보기 깊이), 선택, 가운데 */
+  function jump(id: ID) {
+    const ns = nodesRef.current
+    const path = ancestorsOf(mapOf(ns), id)
+    const outside = !path.some((n) => n.id === viewRef.current.top)
+    const anc = path.slice(0, -1)
+    const had = !outside && shown.has(id)
+    flushSync(() => {
+      if (anc.some((n) => n.collapsed)) commit(ns.map((n) => (n.collapsed && anc.includes(n) ? { ...n, collapsed: false, updatedAt: Date.now() } : n)), false)
+      showKids(...anc.map((n) => n.id))
+      setSelId(id)
+    })
+    if (had) centerOn(id)
+    else centerAfter.current = id // 새로 그려지는 카드: 배치가 끝난 뒤(onSettled)
+    if (outside) location.hash = href.edit(treeId)
+  }
 
   // ---- 편집 모드 ----
   function startEdit(id: ID, text = get(id)?.title ?? '') {
@@ -301,11 +447,11 @@ export default function EditorPage({ treeId }: { treeId: string; rootId?: string
       return true
     }
     const ns = nodesRef.current
-    if (allowRemove && n.parentId !== null && !childrenOf(ns, n.id).length) {
-      const rows = visibleRows(ns, root!)
+    if (allowRemove && !isTop(n) && !childrenOf(ns, n.id).length) {
+      const rows = visibleRows(ns, topNode(), viewRef.current.open)
       const i = rows.findIndex((r) => r.node.id === n.id)
       commit(ns.filter((x) => x.id !== n.id))
-      setSelId(rows[i - 1]?.node.id ?? root!.id)
+      setSelId(rows[i - 1]?.node.id ?? topNode().id)
       return false
     }
     return true // 빈 제목은 무시하고 기존 제목 유지
@@ -343,38 +489,39 @@ export default function EditorPage({ treeId }: { treeId: string; rootId?: string
     toast(FULL_MSG)
     return true
   }
-  /** 형제로 아래에 삽입(루트면 첫 자식). 새 id 반환 */
+  /** 형제로 아래에 삽입(루트·포커스 루트면 첫 자식). 새 id 반환 */
   function insertBelow(id: ID): ID {
     const n = get(id)!
     const ns = nodesRef.current
-    const nn =
-      n.parentId === null
-        ? newNode(treeId, n.id, (childrenOf(ns, n.id)[0]?.order ?? 1) - 1)
-        : newNode(treeId, n.parentId, orderAfter(ns, n))
-    commit([...(n.parentId === null ? patch(ns, n.id, { collapsed: false }) : ns), nn])
+    const first = isTop(n)
+    const nn = first ? newNode(treeId, n.id, (childrenOf(ns, n.id)[0]?.order ?? 1) - 1) : newNode(treeId, n.parentId!, orderAfter(ns, n))
+    commit([...(first ? patch(ns, n.id, { collapsed: false }) : ns), nn])
+    if (first) showKids(n.id)
     return nn.id
   }
   /** 직전 형제의 마지막 자식으로 */
   function indent(id: ID) {
     const n = get(id)!
-    if (n.parentId === null) return
+    if (isTop(n) || n.parentId === null) return
     const ns = nodesRef.current
     const sib = childrenOf(ns, n.parentId)
     const prev = sib[sib.indexOf(n) - 1]
     if (!prev) return toast('첫 항목은 들여쓸 수 없음')
     commit(patch(patch(ns, prev.id, { collapsed: false }), n.id, { parentId: prev.id, order: nextOrder(ns, prev.id) }))
+    showKids(prev.id)
   }
   /** 부모 바로 뒤 형제로 */
   function outdent(id: ID) {
     const n = get(id)!
     const parent = n.parentId ? get(n.parentId) : undefined
-    if (!parent || parent.parentId === null) return toast('더 내어쓸 수 없음')
+    if (!parent || parent.parentId === null || isTop(n)) return toast('더 내어쓸 수 없음')
+    if (parent.id === viewRef.current.top) return toast('포커스 밖으로는 내어쓸 수 없음 · 전체 보기에서')
     const ns = nodesRef.current
     commit(patch(ns, n.id, { parentId: parent.parentId, order: orderAfter(ns, parent) }))
   }
   function moveSibling(id: ID, dir: -1 | 1) {
     const n = get(id)!
-    if (n.parentId === null) return
+    if (isTop(n) || n.parentId === null) return
     const ns = nodesRef.current
     const sib = childrenOf(ns, n.parentId)
     const other = sib[sib.indexOf(n) + dir]
@@ -383,15 +530,15 @@ export default function EditorPage({ treeId }: { treeId: string; rootId?: string
   }
   function removeSubtree(id: ID) {
     const n = get(id)!
-    if (n.parentId === null) return toast('루트는 지울 수 없음')
+    if (isTop(n)) return toast(n.parentId === null ? '루트는 지울 수 없음' : '포커스 루트는 지울 수 없음 · 전체 보기에서')
     const ns = nodesRef.current
     const sub = descendantsOf(ns, id)
     const gone = new Set([id, ...sub.map((x) => x.id)])
-    const rows = visibleRows(ns, root!)
+    const rows = visibleRows(ns, topNode(), viewRef.current.open)
     const i = rows.findIndex((r) => r.node.id === id)
     commit(ns.filter((x) => !gone.has(x.id)))
     haptic('warn')
-    setSelId(rows[i - 1]?.node.id ?? root!.id)
+    setSelId(rows[i - 1]?.node.id ?? topNode().id)
     if (cutId && gone.has(cutId)) setCutId(null)
     // 확인창 대신 되돌리기. 그 사이 다른 변경이 있으면 엉뚱한 단계를 되돌리지 않는다
     toast(`"${n.title}" 삭제${sub.length ? ` (하위 ${sub.length}개)` : ''}`, {
@@ -411,14 +558,14 @@ export default function EditorPage({ treeId }: { treeId: string; rootId?: string
     if (targetId === cutId || descendantsOf(ns, cutId).some((d) => d.id === targetId))
       return toast('자기 하위에는 붙여넣기 불가')
     commit(patch(patch(ns, targetId, { collapsed: false }), cutId, { parentId: targetId, order: nextOrder(ns, targetId) }))
+    showKids(targetId)
     setSelId(cutId)
     setCutId(null)
   }
 
   // ---- 탐색 모드 ----
   function onNavKey(e: React.KeyboardEvent<HTMLDivElement>) {
-    if (e.target !== e.currentTarget || isComposing(e)) return
-    const sel = get(selId) ?? root!
+    if (e.target !== e.currentTarget || isComposing(e) || !sel) return
     const ctrl = e.ctrlKey || e.metaKey
     const hasKids = childrenOf(nodesRef.current, sel.id).length > 0
     let handled = true
@@ -429,7 +576,7 @@ export default function EditorPage({ treeId }: { treeId: string; rootId?: string
     else if (ctrl && e.code === 'KeyZ') restore(e.shiftKey ? redoRef : undoRef, e.shiftKey ? undoRef : redoRef, e.shiftKey ? '다시 실행' : '실행 취소')
     else if (ctrl && e.code === 'KeyY') restore(redoRef, undoRef, '다시 실행')
     else if (ctrl && e.code === 'KeyX') {
-      if (sel.parentId === null) toast('루트는 잘라낼 수 없음')
+      if (isTop(sel)) toast(sel.parentId === null ? '루트는 잘라낼 수 없음' : '포커스 루트는 잘라낼 수 없음')
       else {
         setCutId(sel.id)
         haptic('warn')
@@ -441,14 +588,18 @@ export default function EditorPage({ treeId }: { treeId: string; rootId?: string
     else if (e.altKey && e.key === 'ArrowLeft') moveSibling(sel.id, -1)
     else if (e.altKey && e.key === 'ArrowRight') moveSibling(sel.id, 1)
     else if (e.key === 'ArrowUp') {
-      if (sel.parentId) setSelId(sel.parentId)
+      if (sel.parentId && !isTop(sel)) setSelId(sel.parentId)
     } else if (e.key === 'ArrowDown') {
       if (hasKids) {
-        if (sel.collapsed) commit(patch(nodesRef.current, sel.id, { collapsed: false }), false)
-        setSelId(childrenOf(nodesRef.current, sel.id)[0].id)
+        const first = childrenOf(nodesRef.current, sel.id)[0]
+        if (!shown.has(first.id)) setOpen(sel, true)
+        setSelId(first.id)
       }
-    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-      const sib = sel.parentId ? childrenOf(nodesRef.current, sel.parentId) : [sel]
+    } else if (e.key === 'Home') setSelId(top!.id) // U19: 루트(포커스면 포커스 루트)
+    else if (e.key === 'End') setSelId(rows[rows.length - 1].node.id) // 마지막 보이는 노드(전위 순서, R6-M6)
+    else if (e.key === '.') centerOn(sel.id) // U15: 선택으로 이동
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      const sib = sel.parentId && !isTop(sel) ? childrenOf(nodesRef.current, sel.parentId) : [sel]
       const to = sib[sib.indexOf(sel) + (e.key === 'ArrowLeft' ? -1 : 1)]
       if (to) setSelId(to.id)
     } else if (e.key === ' ' || e.key === 'F2') startEdit(sel.id)
@@ -456,8 +607,8 @@ export default function EditorPage({ treeId }: { treeId: string; rootId?: string
       if (!isFull()) startEdit(insertBelow(sel.id), '')
     }
     // Tab 은 가로채지 않는다(U49: 키보드 트랩 금지). 자식 추가 = Enter 후 Tab(편집 중 들여쓰기)
-    else if (e.code === 'KeyH' && !e.altKey) {
-      if (hasKids) commit(patch(nodesRef.current, sel.id, { collapsed: !sel.collapsed }), false)
+    else if (e.code === 'KeyH' && !e.altKey && !e.shiftKey) {
+      if (hasKids) toggle(sel)
     }
     else if (e.key === 'Delete') removeSubtree(sel.id)
     else if (e.key === 'Escape') {
@@ -474,7 +625,7 @@ export default function EditorPage({ treeId }: { treeId: string; rootId?: string
     const items = parseOutline(importText)
     if (!items.length) return toast('가져올 항목 없음')
     const ns = nodesRef.current
-    const target = asRoot ? root! : (get(selId) ?? root!)
+    const target = asRoot ? root! : sel!
     const list = asRoot ? [...items[0].children, ...items.slice(1)] : items
     const added = outlineToNodes(list, treeId, target.id, nextOrder(ns, target.id))
     if (isFull(added.length)) return
@@ -485,6 +636,7 @@ export default function EditorPage({ treeId }: { treeId: string; rootId?: string
     const cut = added.filter((n) => n.note !== undefined).length + (rootTitle?.note !== undefined ? 1 : 0)
     if (added.length) fitPending.current = true // 통째로 들어온 트리는 진입과 같게 맞춘다
     commit([...base, ...added])
+    showKids(target.id)
     void logEvent('outline_imported', { nodeCount: added.length + (asRoot ? 1 : 0) }, treeId)
     setImportText('')
     toast(`${added.length + (asRoot ? 1 : 0)}개 가져옴${cut ? ` · 긴 제목 ${cut}개를 잘라 메모로 옮겼습니다` : ''}`)
@@ -507,22 +659,45 @@ export default function EditorPage({ treeId }: { treeId: string; rootId?: string
     if (!ns.some((n) => n.offset)) return
     commit(ns.map((n) => (n.offset ? { ...n, offset: undefined, updatedAt: Date.now() } : n)))
   }
-  const toggle = (n: TreeNode) => commit(patch(nodesRef.current, n.id, { collapsed: !n.collapsed }), false)
+  function pickDepth(d: number) {
+    setViewDepth(d)
+    setReveal(new Set())
+    fitPending.current = true // 깊이를 바꾸면 보이는 만큼 다시 맞춘다(넘칠 때만)
+  }
+  const cur = sel!
+  const selPath = ancestorsOf(byId, cur.id)
+  const panelPath = selPath.slice(Math.max(0, selPath.findIndex((n) => n.id === top!.id)))
 
-  const sel = nodes.find((n) => n.id === selId) ?? root
+  const header = focused && (
+    <>
+      <NodePath path={ancestorsOf(byId, top!.id)} label="포커스 위치" onPick={(id) => (location.hash = href.edit(treeId, id === root.id ? undefined : id))} />
+      <a className="focus-all" href={href.edit(treeId)}>전체 보기</a>
+    </>
+  )
   return (
     <section className="editor">
-      <TreeHeader treeId={treeId} active="edit" title={root.title} />
+      <TreeHeader treeId={treeId} active="edit" title={root.title} rootId={focused ? top!.id : undefined} sub={header} />
       <div className="canvas">
-      <div className="outline" role="tree" aria-label="아웃라이너" tabIndex={0} ref={outlineRef} onKeyDown={onNavKey}>
+      <div
+        className="outline"
+        role="tree"
+        aria-label="아웃라이너"
+        aria-activedescendant={`node-${cur.id}`}
+        tabIndex={0}
+        ref={outlineRef}
+        onKeyDown={onNavKey}
+        onScroll={() => (clearTimeout(scrollTimer.current), (scrollTimer.current = window.setTimeout(() => saveRef.current(), 300)))}
+      >
         <GraphView
           zoom={zoom}
           nodes={nodes}
-          rootId={root.id}
+          rootId={top!.id}
+          open={open}
           onZoomAt={zoomTo}
           onSettled={onSettled}
           onMove={(id, offset) => commit(patch(nodesRef.current, id, { offset }))}
           renderNode={(n, box, m) => {
+            const [pos, setSize] = n.id === top!.id ? [1, 1] : counts.pos(n.id)
             return (
               <NodeRow
                 key={n.id}
@@ -531,8 +706,10 @@ export default function EditorPage({ treeId }: { treeId: string; rootId?: string
                 x={box.x}
                 y={box.y}
                 hasChildren={counts.hasKids(n.id)}
-                hiddenCount={n.collapsed ? counts.desc(n.id) : 0}
-                selected={n.id === sel.id}
+                pos={pos}
+                setSize={setSize}
+                hiddenCount={open(n, box.depth) ? 0 : counts.desc(n.id)}
+                selected={n.id === cur.id}
                 cut={n.id === cutId}
                 heat={missHeat(srs.get(n.id))}
                 miss={srs.get(n.id)?.miss ?? 0}
@@ -567,7 +744,22 @@ export default function EditorPage({ treeId }: { treeId: string; rootId?: string
           }}
         />
       </div>
+      {searching && (
+        <SearchBox
+          nodes={nodes}
+          byId={byId}
+          onPick={(id) => (setSearching(false), jump(id), toOutline())}
+          onClose={() => (setSearching(false), toOutline())}
+        />
+      )}
       <div className="zoom-tools">
+        <span className="zoom-group depth-group" role="group" aria-label="보기 깊이">
+          {DEPTHS.map((d) => (
+            <button key={d} type="button" aria-label={d ? `깊이 ${d}까지 보기` : '모두 보기'} data-tip={d ? `깊이 ${d}까지` : '모두 보기'} aria-pressed={viewDepth === d} onClick={() => pickDepth(d)}>
+              {d || '∞'}
+            </button>
+          ))}
+        </span>
         <span className="zoom-group" role="group" aria-label="확대·축소">
           <button type="button" aria-label="축소" data-tip="축소 (-)" onClick={() => zoomBy(1 / 1.2)}><Icon d={zoomOut} size={20} /></button>
           <button type="button" className="zoom-reset" data-tip="100%로 (0)" onClick={() => zoomTo(1)}>
@@ -579,21 +771,24 @@ export default function EditorPage({ treeId }: { treeId: string; rootId?: string
         {nodes.some((n) => n.offset) && (
           <button type="button" className="arrange" aria-label="자동 정렬" data-tip="자동 정렬" onClick={autoArrange}><Icon d={network} size={20} /></button>
         )}
+        <button type="button" aria-label="검색" data-tip="검색 (/)" aria-expanded={searching} onMouseDown={(e) => e.preventDefault()} onClick={() => setSearching((v) => !v)}><Icon d={search} size={20} /></button>
         <button type="button" aria-label="단축키" data-tip="단축키 (?)" popoverTarget={KEYS_ID}><Icon d={keyboard} size={20} /></button>
       </div>
       </div>
       <aside className="side">
         <DetailPanel
-          key={sel.id}
-          node={sel}
-          titleDraft={editId === sel.id ? draft : null}
+          key={cur.id}
+          node={cur}
+          path={<NodePath path={panelPath} label="선택 위치" onPick={setSelId} />}
+          focusHref={cur.id !== top!.id && counts.hasKids(cur.id) ? href.edit(treeId, cur.id) : undefined}
+          titleDraft={editId === cur.id ? draft : null}
           api={panelNote}
-          onLive={(p) => live(sel.id, p)}
+          onLive={(p) => live(cur.id, p)}
           onBegin={beginLive}
           onEnd={endLive}
           onEscape={toOutline}
-          onWidth={(width) => width !== (sel.width ?? 1) && commit(patch(nodesRef.current, sel.id, { width }))}
-          onFormat={(op) => (noteEditId === sel.id ? cardNote : panelNote).current?.apply(op)}
+          onWidth={(width) => width !== (cur.width ?? 1) && commit(patch(nodesRef.current, cur.id, { width }))}
+          onFormat={(op) => (noteEditId === cur.id ? cardNote : panelNote).current?.apply(op)}
         />
         <details className="io" open={ioOpen} onToggle={(e) => setIoOpen(e.currentTarget.open)}>
           <summary><Icon d={clipboardPaste} />개요 붙여넣기 · 내보내기</summary>
@@ -652,6 +847,9 @@ const KEYS: [string, string][] = [
   ['Ctrl+Shift+Z', '다시 실행'],
   ['- = 0', '축소 · 확대 · 100%'],
   ['Shift+H', '형광펜'],
+  ['Home End', '처음 · 마지막'],
+  ['/', '검색'],
+  ['.', '선택으로 이동'],
   ['Esc', '편집 끝내기'],
 ]
 
@@ -674,11 +872,21 @@ function DetailPanel({ api, ...p }: {
   onEscape: () => void
   onWidth: (w: 1 | 2 | 3) => void
   onFormat: (op: NoteOp) => void
+  /** 제목 위 경로(포커스 루트부터, U15·U51) */
+  path: React.ReactNode
+  /** '이 가지만 보기' 링크(포커스 루트·잎이면 없음) */
+  focusHref?: string
 }) {
   const [title, setTitle] = useState<string | null>(null) // 입력 중일 때만 로컬 값 (빈 제목은 저장하지 않음)
   const width = p.node.width ?? 1
   return (
     <div className="detail">
+      {(p.path || p.focusHref) && (
+        <div className="detail-path">
+          {p.path}
+          {p.focusHref && <a className="focus-here" href={p.focusHref}>이 가지만 보기</a>}
+        </div>
+      )}
       <input
         className="detail-title"
         aria-label="패널 제목"
@@ -730,6 +938,62 @@ function DetailPanel({ api, ...p }: {
         onBlur={p.onEnd}
         onEscape={p.onEscape}
       />
+    </div>
+  )
+}
+
+/** '/' 검색(U16): 제목 부분 일치, 각 줄에 경로. ↑↓ 고르기 · Enter 이동 · Esc 닫기 */
+function SearchBox({ nodes, byId, onPick, onClose }: { nodes: TreeNode[]; byId: ReadonlyMap<ID, TreeNode>; onPick: (id: ID) => void; onClose: () => void }) {
+  const [q, setQ] = useState('')
+  const [i, setI] = useState(0)
+  const res = useMemo(() => searchNodes(nodes, q), [nodes, q])
+  const at = Math.min(i, res.length - 1)
+  return (
+    <div className="search" role="search">
+      <input
+        autoFocus
+        role="combobox"
+        aria-label="노드 검색"
+        aria-expanded={res.length > 0}
+        aria-controls="editor-search-results"
+        aria-activedescendant={res[at] ? `sr-${res[at].id}` : undefined}
+        placeholder="제목 검색"
+        value={q}
+        onChange={(e) => (setQ(e.target.value), setI(0))}
+        onBlur={onClose}
+        onKeyDown={(e) => {
+          if (e.nativeEvent.isComposing || e.keyCode === 229) return
+          if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            e.preventDefault()
+            if (res.length) setI((at + (e.key === 'ArrowDown' ? 1 : -1) + res.length) % res.length)
+          } else if (e.key === 'Enter') {
+            e.preventDefault()
+            if (res[at]) onPick(res[at].id)
+          } else if (e.key === 'Escape') {
+            e.preventDefault()
+            onClose()
+          }
+        }}
+      />
+      {q.trim() && (
+        <ul id="editor-search-results" role="listbox" aria-label="검색 결과">
+          {res.map((n, k) => (
+            <li
+              key={n.id}
+              id={`sr-${n.id}`}
+              role="option"
+              aria-selected={k === at}
+              onMouseDown={(e) => e.preventDefault()} // 입력칸 blur(닫힘) 전에 클릭을 받는다
+              onClick={() => onPick(n.id)}
+            >
+              <span className="search-title">{n.title}</span>
+              <NodePath path={ancestorsOf(byId, n.id).slice(0, -1)} skipRoot label="경로" />
+            </li>
+          ))}
+          {!res.length && <li className="search-none">찾는 제목이 없습니다</li>}
+          {res.length >= SEARCH_LIMIT && <li className="search-none">처음 {SEARCH_LIMIT}개만 보입니다</li>}
+        </ul>
+      )}
     </div>
   )
 }

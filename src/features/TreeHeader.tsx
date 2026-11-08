@@ -8,15 +8,18 @@ import { I } from '../ui/icons'
 import { Icon } from '../ui/Icon'
 import './tree-header.css'
 
-const MODES: { mode: Mode; label: string; short: string; icon: string; to: (id: string) => string }[] = [
+const MODES: { mode: Mode; label: string; short: string; icon: string; to: (id: string, rootId?: string) => string }[] = [
   { mode: 'edit', label: '편집', short: '편집', icon: I.pencil, to: href.edit },
   { mode: 'flash', label: '플래시카드', short: '플래시', icon: I.layers, to: href.flash },
   { mode: 'dnd', label: '빈칸 퀴즈', short: '빈칸', icon: I.squareDashed, to: href.dnd },
   { mode: 'blank', label: '백지 퀴즈', short: '백지', icon: I.file, to: href.blank },
 ]
 
-/** title = 이미 아는 경우 넘기면 DB 조회 대신 사용(편집 중 루트 제목 즉시 반영). children = 헤더 오른쪽 화면별 도구 */
-export default function TreeHeader(p: { treeId: string; active: Mode; title?: string; children?: React.ReactNode }) {
+/**
+ * title = 이미 아는 경우 넘기면 DB 조회 대신 사용(편집 중 루트 제목 즉시 반영). children = 헤더 오른쪽 화면별 도구.
+ * rootId = 지금 범위(?root=, C2) — 모드 탭이 그대로 넘긴다. sub = 탭 아래 전체 폭 한 줄(에디터 포커스 경로)
+ */
+export default function TreeHeader(p: { treeId: string; active: Mode; title?: string; rootId?: string; sub?: React.ReactNode; children?: React.ReactNode }) {
   const { treeId, active, children } = p
   const [title, setTitle] = useState('')
   const ref = useRef<HTMLElement>(null)
@@ -40,12 +43,13 @@ export default function TreeHeader(p: { treeId: string; active: Mode; title?: st
       <h1>{p.title ?? title}</h1>
       <nav aria-label="학습 모드" className="mode-tabs seg">
         {MODES.map((m) => (
-          <a key={m.mode} href={m.to(treeId)} aria-label={m.label} aria-current={m.mode === active ? 'page' : undefined}>
+          <a key={m.mode} href={m.to(treeId, p.rootId)} aria-label={m.label} aria-current={m.mode === active ? 'page' : undefined}>
             <Icon d={m.icon} /><span>{m.short}</span>
           </a>
         ))}
       </nav>
       {children && <div className="tree-header-tools">{children}</div>}
+      {p.sub && <div className="tree-header-sub">{p.sub}</div>}
     </header>
   )
 }

@@ -26,6 +26,9 @@ export interface NodeRowProps {
   x: number
   y: number
   hasChildren: boolean
+  /** 형제 중 위치(1부터)·형제 수 — aria-posinset/setsize (U50) */
+  pos: number
+  setSize: number
   /** 접혀서 숨은 하위 노드 수 (펼쳐져 있으면 0) */
   hiddenCount: number
   selected: boolean
@@ -80,7 +83,7 @@ function NodeRow(p: NodeRowProps) {
   const handle = (side: 1 | -1) => (
     <span
       className={`w-handle ${side > 0 ? 'r' : 'l'}`}
-      aria-label="너비 조절"
+      aria-hidden // 포인터 전용: 키보드·SR 은 패널의 너비 1·2·3 (U50)
       data-tip="끌어서 너비 조절"
       onPointerDown={(e) => {
         if (e.button !== 0 || !e.isPrimary) return
@@ -111,10 +114,14 @@ function NodeRow(p: NodeRowProps) {
   return (
     <div
       ref={ref}
+      id={`node-${p.node.id}`} // aria-activedescendant 대상(EditorPage)
       role="treeitem"
+      aria-label={p.node.title || '제목 없음'}
+      aria-posinset={p.pos}
+      aria-setsize={p.setSize}
       aria-level={p.depth + 1}
       aria-selected={p.selected}
-      aria-expanded={p.hasChildren ? !p.node.collapsed : undefined}
+      aria-expanded={p.hasChildren ? !p.hiddenCount : undefined}
       data-node-id={p.node.id}
       data-width={step}
       data-miss={p.heat}
@@ -140,7 +147,7 @@ function NodeRow(p: NodeRowProps) {
           }
         />
       ) : (
-        <div className="node-title">{p.node.title || ' '}</div>
+        <div className="node-title" title={p.node.title}>{p.node.title || ' '}</div>
       )}
       {p.noteEditor ? (
         <div className="node-note" onDoubleClick={stop}>{p.noteEditor}</div>
@@ -166,8 +173,7 @@ function NodeRow(p: NodeRowProps) {
       {p.hasChildren && (
         <span
           className={`badge${p.hiddenCount ? ' folded' : ''}`}
-          role="button"
-          aria-label={p.hiddenCount ? `펼치기 (하위 ${p.hiddenCount}개)` : '접기'}
+          aria-hidden // 접기 상태는 treeitem aria-expanded, 키보드는 H (U50)
           data-tip={p.hiddenCount ? '펼치기 (H)' : '접기 (H)'}
           onClick={(e) => (stop(e), p.onToggle())}
           onDoubleClick={stop}

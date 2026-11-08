@@ -1,6 +1,7 @@
 // 레이아웃 점검 (npx tsx src/features/editor/graph/layout.check.ts) — plan G2 완료 기준
 import type { TreeNode } from '../../../core/types'
-import { HGAP, layout, type Box } from './layout'
+import { HGAP, isOpen, layout, type Box } from './layout'
+import { searchNodes } from '../search'
 
 // node:assert 대신 (앱 tsconfig 에 node 타입 없음)
 function assert(ok: unknown, msg = '점검 실패'): asserts ok {
@@ -82,5 +83,17 @@ assert(Math.min(...[...neg.boxes.values()].map((b) => b.x)) === 32)
 const wide = layout([mk('아주 긴 루트 제목입니다 정말로 깁니다', null), mk('a', '아주 긴 루트 제목입니다 정말로 깁니다')], '아주 긴 루트 제목입니다 정말로 깁니다', measure)
 const [r, a] = [...wide.boxes.values()]
 assert.equal(center(r), center(a))
+
+// 보기 깊이(C3): 깊이 2(루트=0) 이상의 자식은 그리지 않는다, 포커스(rootId = 가지)는 그 가지만
+const d2 = layout(base, '노동법', measure, (n, d) => isOpen(n) && d + 1 < 2)
+assert(d2.boxes.has('해고') && !d2.boxes.has('해고예고') && d2.boxes.size === 4)
+const focus = layout(base, '해고', measure)
+assert(focus.boxes.size === 4 && !focus.boxes.has('노동법') && focus.boxes.get('해고')!.depth === 0)
+
+// 검색(U16): 부분 일치·대소문자 무시·상한
+assert.equal(searchNodes(base, ' 해고 ').map((n) => n.id).join(','), ['해고', '해고예고', '부당해고 구제'].join(','))
+assert.equal(searchNodes(base, '해고', 2).length, 2)
+assert.equal(searchNodes([mk('TCP SYN', null)], 'syn').length, 1)
+assert.equal(searchNodes(base, '  ').length, 0)
 
 console.log('layout.check: ok')

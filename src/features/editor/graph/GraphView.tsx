@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode }
 import { descendantsOf } from '../../../core/repo'
 import type { ID, TreeNode } from '../../../core/types'
 import { haptic } from '../../feel'
-import { layout, type Box, type Size } from './layout'
+import { isOpen, layout, type Box, type Size } from './layout'
 
 const DRAG_MIN = 4 // 이보다 적게 움직이면 클릭
 const FALLBACK: Size = { w: 64, h: 34 }
@@ -15,6 +15,8 @@ const offsetOf = (n: TreeNode, dx: number, dy: number) => ({ x: (n.offset?.x ?? 
 export default function GraphView(p: {
   nodes: TreeNode[]
   rootId: ID
+  /** 자식을 그릴지(접기·보기 깊이). 안 주면 collapsed 만 본다 */
+  open?: (n: TreeNode, depth: number) => boolean
   /** still = 위치 트랜지션 끔(측정 전·드래그로 따라오는 중), lifted = 끌고 있는 카드, spawn = 진입 뒤에 새로 생긴 카드 */
   renderNode: (n: TreeNode, box: Box, m: { still: boolean; lifted: boolean; spawn: boolean }) => ReactNode
   onMove: (id: ID, offset: { x: number; y: number }) => void
@@ -35,7 +37,8 @@ export default function GraphView(p: {
     () => (drag ? p.nodes.map((n) => (n.id === drag.id ? { ...n, offset: offsetOf(n, drag.dx, drag.dy) } : n)) : p.nodes),
     [p.nodes, drag],
   )
-  const g = useMemo(() => layout(shown, p.rootId, (n) => sizes.get(n.id) ?? FALLBACK), [shown, p.rootId, sizes])
+  const open = p.open ?? isOpen
+  const g = useMemo(() => layout(shown, p.rootId, (n) => sizes.get(n.id) ?? FALLBACK, open), [shown, p.rootId, sizes, open])
   const byId = useMemo(() => new Map(shown.map((n) => [n.id, n])), [shown])
 
   // 위치 정착한 카드 id. 처음엔 FALLBACK 크기로 놓였다가 측정 후 옮겨지므로, 정착 전엔 미끄러지지 않게 still
