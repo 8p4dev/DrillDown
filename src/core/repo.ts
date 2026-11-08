@@ -95,10 +95,9 @@ export async function listTreeMeta(dueBy = Infinity): Promise<TreeMeta[]> {
   return summarizeTrees(trees, srs, keys as ID[], dueBy)
 }
 
-/** 소프트 삭제 제외, 최근 사용(편집·학습 중 늦은 쪽) 순 */
+/** 소프트 삭제 제외, updatedAt 내림차순. 최근 사용 정렬은 listTreeMeta(목록 화면)만 — 여기서 srs 를 읽지 않는다 */
 export async function listTrees(): Promise<Tree[]> {
-  const [trees, srs] = await Promise.all([db.trees.toArray(), db.srs.toArray()])
-  return summarizeTrees(trees, srs, [], 0).map((x) => x.tree)
+  return (await db.trees.orderBy('updatedAt').reverse().toArray()).filter((t) => !t.deletedAt)
 }
 
 /** 목록 검색(U42): 대소문자·공백 무시 부분 일치 */
