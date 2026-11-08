@@ -79,6 +79,26 @@
 - 입력칸: 에디터 노드 제목 `input.title-input`, 내용 `textarea`(EditorPage 558·631), 목록 새 트리·이름 변경 `input`. 하단 고정 UI: `.dnd-dock`(sticky, 38dvh) `.flash-nav` 에디터 `.side`.
 - 이전 사용자 결정: `orchestration_modes.md` §0. 사업 전제: `../drilldown-biz/brief/decisions.md`, `../drilldown-biz/reports/11_cost_recovery.md`, `04_tech.md` §4(데이터 모델 초안), 연구 `docs/research/R4_platform.md`(#9 #10 #13), `feature_backlog.md`.
 
+### 3.5 3차 결정 (오케스트레이터, RV `05_review.md` 발견에 대한 판정, 2026-11-08)
+
+| RV # | 결정 | 반영 |
+|---|---|---|
+| H1 | `reports` 테이블·신고 API 소유 = **AA**. 스키마는 AA 안, 경로는 SH 안 `POST /api/t/:slug/report`(tree id 비노출), `ip_hash` 없음. 리밋: anon IP당 5/시(메모리 카운터만, 저장·로그 없음), user 20/시 | AA 확정, SH는 "AA 의존" 표로 |
+| H2 | 트리 삭제 = **확인창 없음 + 되돌리기 토스트 10초**(노드 삭제와 같은 패턴). 로컬은 `Tree.deletedAt` 소프트 삭제 → 목록에서 숨김 → 토스트 종료·앱 재시작 시 하드 삭제. 로그인 사용자는 SH 서버 소프트 삭제(복구 기간은 M1)로 이어진다. `confirm()`은 앱 전체에서 제거 | SH(데이터 규칙), LM(D9 유지, SH 참조), DS(confirm 글자 항목 삭제) |
+| M1 | 삭제 유예 **7일**(탈퇴·트리 공통), 삭제된 공유 링크는 **410**, 탈퇴 취소 = `UPDATE trees SET deleted_at=NULL WHERE owner_id`, `events`는 서버 미저장이므로 purge 대상에서 제외 | AA·SH |
+| M3 | 에러 봉투 = AA 형식 `{ error: { code, message, field? } }`, 코드명 snake_case. `src/core/api.ts` 소유 = AA(구현 단계) | SH |
+| M4 | 동기화 상태 집합 = **SH** `저장됨 / 동기화 중 / 오프라인(n건 대기, 탭=재시도) / 오류(탭=사유)`, 비로그인은 표시 없음. 503+`Retry-After`는 오프라인으로 분류(L17) | DS·LM |
+| M6 | 예산 재설정: precache **≤ 600 KiB(비압축)**, 첫 화면 **gzip ≤ 120 KB**, 관리자 청크는 precache 제외(`globIgnores`), 아이콘은 화면별 분할 import. 구현 1단계 뒤 `bundle.md` 재측정을 완료 기준에 넣는다 | DS |
+| M7 | 관리자 라우트는 해시 `#/admin` 유지, Cloudflare Access는 `/api/admin/*`만. 관리자 청크 노출은 허용(비밀 없음) | AA |
+| M11 | 파괴적 확인 = **2단계 버튼**(`[탈퇴]` → `[정말 탈퇴]` 3초) 하나로 통일(계정 탈퇴·관리자 정지/삭제). DS 카탈로그 #22 | DS·AA·LM |
+| M12 | DS는 웹폰트 후보 1개(SUIT 또는 Pretendard 서브셋)의 x-height·자폭·숫자 폭을 실측해 **"추천 웹폰트 1개 vs 시스템 스택"** 트레이드오프 표를 만든다. 사용자 결정 기본값 = 서브셋 웹폰트(사용자 원문이 폰트 선택을 명시) | DS |
+| M13 | 형광펜 3색은 **현행 유지가 기본값**(2026-11-01 사용자 결정 > 가정 A6). A6에 "사용자 데이터 색은 예외" 추가 | DS·plan A6 |
+| M14 | 오프라인 편집 동기화 범위는 사용자 결정(기본값: SH 설계대로 전체, 구현은 ③ L 단계로 분리) | SH 한 줄 |
+| L6 | `--shadow-*` 토큰 삭제 **승인**(계약 §3.2 예외) | — |
+| 나머지 M·L | RV 수정 제안대로 담당자가 반영 | 각 담당 |
+
+A6 보강: 초록·빨강 외 유채색 금지는 UI 색에 한한다. 사용자가 고르는 데이터 색(형광펜)과 외부 브랜드 색(OAuth 버튼)은 예외다.
+
 ## 4. 작업 분할
 
 | 에이전트 | 담당 요구사항 | 수정 소유 파일 | 읽기만 하는 파일 | 선행 의존성 |
@@ -121,4 +141,5 @@
 | AA | `C:/Users/User/orca/workspaces/app/agent-AA-account` | `ctx_671bd72d2d0e` |
 | SH | `C:/Users/User/orca/workspaces/app/agent-SH-sharing` | `ctx_31aedc7369af` |
 - 1차 머지 완료(파일 겹침 없음, 충돌 0건): AA 2ce98a2 → SH 81a16a0 → DS e809ebb → LM d4b5361. 머지마다 typecheck·lint·build 통과, evidence 링크 누락 0건.
+- 2차 머지 16e4218: RV 발견 높음 2·중간 15·낮음 20. 판정 §3.5.
 - 2차 분배: RV `C:/Users/User/orca/workspaces/app/agent-RV-review`, dispatch `ctx_46ebe8961d99` (d4b5361에서 시작).
