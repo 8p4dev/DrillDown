@@ -94,3 +94,4 @@
 - **CA 완료 → 머지 4d37d56**(me.ts 실구현·로그인·계정·관리자·처리방침, mock/me·admin 삭제, QA #8 #17 #18 #20 #22). SA·CS 에 CA 요청 전달.
 - **SA 완료 → 머지(2e6281b)**: 세션·OAuth(PKCE+fake)·/api/me*·관리자 API·신고·점검·일일 작업·백업·systemd·runbook, account.check ≈120 assert. 변경: auth 리밋은 start·callback·logout·webhook 만, 점검 면제는 GET /api/me 만, 관리자 trees `?deleted=1`·reports `?status=`, 숨김 처리 시 그 트리의 열린 신고 전부 종결. `.env.example` 에 BACKUP_* 추가. SA 후속(use_provider_avatar) 진행 중 ctx_94a051615a1a.
 - 실서버 스모크(가짜 로그인 → /api/me → push → pull → 공개 범위 unlisted slug 발급) 통과. E2E 13/13.
+- SA 후속 → 머지(e857a04): /api/me user.use_provider_avatar, 관리자 trees 첫 페이지에 7일 유예 삭제 트리 덧붙임(100건 상한).
