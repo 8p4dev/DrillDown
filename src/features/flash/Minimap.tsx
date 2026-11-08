@@ -2,6 +2,8 @@
 import { useMemo, useState } from 'react'
 import type { ColorInfo } from '../../core/srs'
 import type { ID, TreeNode } from '../../core/types'
+import { Icon } from '../../ui/Icon'
+import { chevronDown } from '../../ui/icons.all'
 import { layout, VGAP } from '../editor/graph/layout'
 import { minimapNodes } from './flash'
 
@@ -60,13 +62,13 @@ export default function Minimap({ nodes, rootId, currentId, colors, onGo }: Prop
               })}
             >
               <title>{n.title}</title>
-              <rect x={b.x} y={b.y} width={b.w} height={b.h} rx={5} />
+              <rect x={b.x} y={b.y} width={b.w} height={b.h} />
             </g>
           )
         })}
       </svg>
-      <button type="button" className="minimap-toggle" aria-expanded={open} aria-label={open ? '미니맵 접기' : '미니맵 펼치기'} onClick={() => setOpen((o) => !o)}>
-        <span className="chev" aria-hidden="true">▾</span>
+      <button type="button" className="minimap-toggle ghost" aria-expanded={open} aria-label={open ? '미니맵 접기' : '미니맵 펼치기'} data-tip={open ? '접기' : '펼치기'} onClick={() => setOpen((o) => !o)}>
+        <Icon d={chevronDown} className="chev" />
       </button>
     </figure>
   )

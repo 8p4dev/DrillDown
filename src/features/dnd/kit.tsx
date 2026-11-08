@@ -1,6 +1,9 @@
-// 퀴즈 화면 공용 조각: 범위 선택, 트리 캔버스(layout 재사용), 드래그 고스트, 진행 막대, 점수
+// 퀴즈 화면 공용 조각: 범위 선택, 트리 캔버스(layout 재사용), 드래그 고스트, 진행 막대, 점수, 결과 마크
 import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import type { ID, TreeNode } from '../../core/types'
+import { Icon } from '../../ui/Icon'
+import { I } from '../../ui/icons'
+import { crosshair, x } from '../../ui/icons.all'
 import { layout } from '../editor/graph/layout'
 import { CARD, sideLayout } from './dnd'
 import type { DragState } from './useDragDrop'
@@ -11,7 +14,7 @@ const SIDE_MAX = 640 // 캔버스 폭이 이 이하면 좌→우 배치
 const SIDE_BELOW_SCALE = 0.8 // 위→아래 배율이 이보다 작으면 좌→우 배치(글자 약 10.4px 미만)
 const CANVAS_PAD = 4 // dnd.css .dnd-canvas padding 과 같게
 
-/** 자식 있는 노드만, 전위 순서·깊이 들여쓰기. 바꾸면 to(id) 로 이동 */
+/** 자식 있는 노드만, 전위 순서·깊이 들여쓰기. 바꾸면 to(id) 로 이동. 라벨 글자 대신 crosshair 아이콘(aria 는 "범위") */
 export function ScopeSelect(p: { nodes: TreeNode[]; value: ID; to: (id: ID) => string }) {
   const kids = new Map<ID | null, TreeNode[]>()
   for (const n of p.nodes) kids.set(n.parentId, [...(kids.get(n.parentId) ?? []), n])
@@ -24,12 +27,12 @@ export function ScopeSelect(p: { nodes: TreeNode[]; value: ID; to: (id: ID) => s
   }
   ;(kids.get(null) ?? []).forEach((r) => walk(r, 0))
   return (
-    <label className="dnd-scope">
-      <span className="muted">범위</span>
+    <label className="dnd-scope" data-tip="범위">
+      <Icon d={crosshair} />
       <select aria-label="범위" value={p.value} onChange={(e) => (location.hash = p.to(e.target.value))}>
         {!opts.some(([n]) => n.id === p.value) && <option value={p.value}>—</option>}
         {opts.map(([n, d]) => (
-          <option key={n.id} value={n.id}>{'  '.repeat(d) + n.title}</option>
+          <option key={n.id} value={n.id}>{'  '.repeat(d) + n.title}</option>
         ))}
       </select>
     </label>
@@ -100,7 +103,7 @@ function edge(x1: number, y1: number, x2: number, y2: number, side: boolean) {
 
 export function Ghost({ drag, title }: { drag: DragState | null; title: (id: ID) => string }) {
   if (!drag) return null
-  const style = { left: drag.x - drag.ox, top: drag.y - drag.oy, width: drag.w, height: drag.h, '--tilt': `${drag.tilt}deg` } as CSSProperties
+  const style = { left: drag.x - drag.ox, top: drag.y - drag.oy, width: drag.w, height: drag.h } as CSSProperties
   return (
     <div className="dnd-ghost" aria-hidden style={style}>
       <span>{title(drag.id)}</span>
@@ -108,12 +111,17 @@ export function Ghost({ drag, title }: { drag: DragState | null; title: (id: ID)
   )
 }
 
-/** 결과 문구: 정답 n / 전체 */
+/** 채점 결과의 색 아닌 단서(01 §3.6 #10): 카드·슬롯 우상단 ✓ / ✕. 색은 [data-result] 가 정한다 */
+export function ResultMark({ ok }: { ok: boolean | undefined }) {
+  return ok === undefined ? null : <span className="dnd-mark" aria-hidden><Icon d={ok ? I.check : x} /></span>
+}
+
+/** 점수: n / m. 만점은 ok 테두리 카드 + ✓(#12) */
 export function ScoreLine({ correct, total }: { correct: number; total: number }) {
+  const perfect = correct === total
   return (
-    <p role="status" className={`dnd-score${correct === total ? ' perfect' : ''}`} data-correct={correct} data-total={total}>
-      정답 <b>{correct}</b> / {total}
-      {correct === total ? ' — 완벽해요!' : ''}
+    <p role="status" className={`dnd-score${perfect ? ' perfect' : ''}`} data-correct={correct} data-total={total} aria-label={`정답 ${correct} / ${total}`}>
+      {perfect && <Icon d={I.check} />}<b>{correct}</b> / {total}
     </p>
   )
 }
@@ -121,7 +129,7 @@ export function ScoreLine({ correct, total }: { correct: number; total: number }
 /** 배치 진행: 얇은 막대 + n/m */
 export function Progress({ n, total }: { n: number; total: number }) {
   return (
-    <span className="dnd-progress" title="배치">
+    <span className="dnd-progress" data-tip="배치">
       <span aria-hidden><i style={{ width: `${(n / total) * 100}%` }} /></span>
       {n}/{total}
     </span>

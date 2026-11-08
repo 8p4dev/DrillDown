@@ -1,9 +1,12 @@
-// 오늘의 복습 (plan §1 F2): 오늘 기한 노드의 부모 큐를 플래시카드로 차례 복습
+// 오늘의 복습 (plan §1 F2): 오늘 기한 노드의 부모 큐를 플래시카드로 차례 복습. Dexie 직접(계약 §3.5 — 공유 보기에 없음)
 import { useEffect, useMemo, useState } from 'react'
 import { getTreeNodes, listTrees } from '../../core/repo'
-import { colorMap, dueByTree, getSrsMap } from '../../core/srs'
+import { colorMap, dueByTree, getSrsMap, recordResult } from '../../core/srs'
 import type { ID, NodeSrs, Tree, TreeNode } from '../../core/types'
 import { href } from '../../router'
+import { Icon } from '../../ui/Icon'
+import { I } from '../../ui/icons'
+import { arrowRight } from '../../ui/icons.all'
 import FlashCard from './FlashCard'
 import { parentQueue } from './flash'
 import './flash.css'
@@ -41,6 +44,7 @@ export default function ReviewPage() {
     const id = session.queue[session.i]
     const last = session.i >= session.queue.length - 1
     const step = () => setSession({ ...session, i: session.i + 1 })
+    const treeId = session.tree.id
     return (
       <section className="review flash">
         <header className="review-head">
@@ -51,13 +55,14 @@ export default function ReviewPage() {
           </div>
         </header>
         {id ? (
-          <FlashCard key={id} treeId={session.tree.id} nodes={session.nodes} conceptId={id} colors={colors}
+          <FlashCard key={id} treeId={treeId} nodes={session.nodes} conceptId={id} colors={colors}
+            record={(nodeId, ok) => recordResult(nodeId, treeId, ok)}
             onRated={(s) => setSrs(({ map }) => ({ map: new Map(map).set(s.nodeId, s), at: new Date() }))} onNext={last ? undefined : step} />
         ) : (
           <p className="muted">복습할 항목이 없습니다.</p>
         )}
         <div className="actions flash-nav">
-          {!last && <button type="button" className="primary" title="다음 복습 (→ / Enter)" onClick={step}>다음 복습 →</button>}
+          {!last && <button type="button" className="primary" aria-label="다음 복습 →" data-tip="다음 복습 (→ / Enter)" onClick={step}><Icon d={arrowRight} /> 다음</button>}
           <button type="button" onClick={() => setSession(null)}>{last ? '복습 마치기' : '그만하기'}</button>
         </div>
       </section>
@@ -67,13 +72,19 @@ export default function ReviewPage() {
   return (
     <section className="review">
       <h1>오늘의 복습</h1>
-      {rows === null ? <p>불러오는 중…</p> : rows.length === 0 ? <p className="empty muted">오늘 복습할 항목이 없습니다.</p> : (
+      {rows === null ? <p>불러오는 중…</p> : rows.length === 0 ? (
+        <div className="empty review-empty">
+          <Icon d={I.check} size={24} />
+          <span>오늘 복습 없음</span>
+          <a href="#/">내 트리 ›</a>
+        </div>
+      ) : (
         <ul aria-label="복습 대상 트리" className="review-list">
           {rows.map(({ tree, due }) => (
             <li key={tree.id} data-tree-id={tree.id} data-due-count={due.length} className="card">
               <strong>{tree.title}</strong>
               <span className="due-count muted">{due.length}개</span>
-              <a href={href.flash(tree.id)}>플래시카드</a>
+              <a className="review-link" href={href.flash(tree.id)}><Icon d={I.layers} /> 플래시카드</a>
               <button type="button" className="primary" aria-label={`복습 시작: ${tree.title}`} onClick={() => start(tree, due)}>복습 시작</button>
             </li>
           ))}

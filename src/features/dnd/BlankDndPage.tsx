@@ -2,31 +2,34 @@
 import { Fragment, useEffect, useMemo, useState, type CSSProperties } from 'react'
 import type { StudySource } from '../../core/source'
 import { logEvent } from '../../core/events'
-import { getRoot, getTreeNodes } from '../../core/repo'
-import { recordResult } from '../../core/srs'
+import { getRoot } from '../../core/repo'
 import type { ID, TreeNode } from '../../core/types'
 import { href } from '../../router'
+import { Icon } from '../../ui/Icon'
+import { checkCheck, rotateCcw } from '../../ui/icons.all'
 import { haptic } from '../feel'
+import { coarseHint, useStudySource } from '../flash/study'
 import TreeHeader from '../TreeHeader'
 import { attach, detach, gradeBlank, isUnder, placedTree, scopeOf, shuffle, type Links, type Score } from './dnd'
-import { Ghost, Progress, ScopeSelect, ScoreLine, TreeCanvas } from './kit'
+import { Ghost, Progress, ResultMark, ScopeSelect, ScoreLine, TreeCanvas } from './kit'
 import { useDragDrop } from './useDragDrop'
 
-export default function BlankDndPage({ treeId, rootId }: { treeId: string; rootId?: string; source?: StudySource }) {
+export default function BlankDndPage({ treeId, rootId, source }: { treeId: string; rootId?: string; source?: StudySource }) {
+  const src = useStudySource(source, treeId)
   const [all, setAll] = useState<TreeNode[] | null>(null)
-  useEffect(() => void getTreeNodes(treeId).then(setAll), [treeId])
+  useEffect(() => void src.nodes().then((ns) => { setAll(ns); coarseHint('dnd', '카드 탭 → 빈칸 탭') }), [src])
   const rid = all && (all.some((n) => n.id === rootId) ? rootId! : getRoot(all).id)
   return (
     <section>
       <TreeHeader treeId={treeId} active="blank">
         {all && rid && <ScopeSelect nodes={all} value={rid} to={(id) => href.blank(treeId, id)} />}
       </TreeHeader>
-      {all && rid && <Quiz treeId={treeId} scope={scopeOf(all, rid)} />}
+      {all && rid && <Quiz treeId={treeId} scope={scopeOf(all, rid)} record={src.record} />}
     </section>
   )
 }
 
-function Quiz({ treeId, scope }: { treeId: ID; scope: TreeNode[] }) {
+function Quiz({ treeId, scope, record }: { treeId: ID; scope: TreeNode[]; record: StudySource['record'] }) {
   const rootId = scope[0].id
   const rest = scope.slice(1)
   const byId = new Map(scope.map((n) => [n.id, n]))
@@ -39,7 +42,7 @@ function Quiz({ treeId, scope }: { treeId: ID; scope: TreeNode[] }) {
   )
   const placed = useMemo(() => placedTree(scope, links), [scope, links]) // 드래그 프레임마다 다시 배치하지 않게
 
-  if (!rest.length) return <p className="muted">이 범위에는 하위 개념이 없어요. 범위를 바꿔 보세요.</p>
+  if (!rest.length) return <p className="dnd-empty muted">하위 개념이 없어요</p>
 
   const tray = order.filter((id) => !links.has(id))
   const title = (id: ID) => byId.get(id)?.title ?? ''
@@ -52,7 +55,7 @@ function Quiz({ treeId, scope }: { treeId: ID; scope: TreeNode[] }) {
     const s = gradeBlank(scope, links)
     setScore(s)
     haptic(s.correct === s.total ? 'success' : 'warn')
-    await Promise.all(rest.map((n) => recordResult(n.id, treeId, s.ok[n.id])))
+    await Promise.all(rest.map((n) => record(n.id, s.ok[n.id])))
     await logEvent('dnd_attempt_completed', { mode: 'blank_dnd', rootId, total: s.total, correct: s.correct }, treeId)
   }
   function retry() {
@@ -74,6 +77,7 @@ function Quiz({ treeId, scope }: { treeId: ID; scope: TreeNode[] }) {
       style={i === undefined ? undefined : ({ '--i': i } as CSSProperties)}
     >
       <span>{title(id)}</span>
+      <ResultMark ok={score ? score.ok[id] : undefined} />
     </button>
   )
 
@@ -94,7 +98,7 @@ function Quiz({ treeId, scope }: { treeId: ID; scope: TreeNode[] }) {
           <TreeCanvas nodes={placed} orient={scope} render={render} label="내 트리" minHeight={240} />
         </div>
         {score && (
-          <div>
+          <div className="dnd-original">
             <h2>원본 트리</h2>
             <TreeCanvas
               nodes={scope}
@@ -111,8 +115,8 @@ function Quiz({ treeId, scope }: { treeId: ID; scope: TreeNode[] }) {
         <div className="dnd-bar">
           {score && <ScoreLine {...score} />}
           {!score && <Progress n={links.size} total={rest.length} />}
-          {!score && <button type="button" className={`primary${tray.length ? '' : ' ready'}`} onClick={grade}>채점</button>}
-          {score && <button type="button" className="primary" onClick={retry}>다시 하기</button>}
+          {!score && <button type="button" className={`primary${tray.length ? '' : ' ready'}`} onClick={grade}><Icon d={checkCheck} /> 채점</button>}
+          {score && <button type="button" className="primary" onClick={retry}><Icon d={rotateCcw} /> 다시 하기</button>}
         </div>
       </div>
       <Ghost drag={drag} title={title} />
