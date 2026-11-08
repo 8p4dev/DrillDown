@@ -1,6 +1,6 @@
 // 앱 셸 — 오케스트레이터 소유 (orchestration_ui_first.md §3.1). 상단 바 배치는 02 §3.1: [■(+이름 ≥421)] 내 트리  복습•n … [테마] [아바타/로그인]
 import { lazy, Suspense, useEffect, useState } from 'react'
-import { href, useRoute } from './router'
+import { href, useRoute, type Route } from './router'
 import { Toaster } from './features/Toast'
 import { TooltipLayer } from './ui/Tooltip'
 import ThemeToggle from './ui/ThemeToggle'
@@ -44,6 +44,16 @@ async function countDue(): Promise<number> {
   const live = new Set((await listTrees()).map((t) => t.id))
   return (await db.srs.where('due').belowOrEqual(+end).toArray()).filter((s) => live.has(s.treeId)).length
 }
+const TITLES: Record<string, string> = { trees: '내 트리', review: '오늘의 복습', login: '로그인', account: '계정', admin: '관리', gallery: '갤러리', privacy: '개인정보 처리방침', edit: '편집', flash: '플래시카드', dnd: '빈칸', blank: '백지' }
+/** 탭 제목(U52): '<트리 이름> · 편집 — Drill Down'. 공유 보기는 서버가 넣은 제목을 둔다 */
+async function titleOf(r: Route): Promise<string | null> {
+  if (r.name === 'shared') return null
+  const page = TITLES[r.name]
+  if (!('treeId' in r)) return `${page} — Drill Down`
+  const { db } = await import('./core/db')
+  const t = await db.trees.get(r.treeId)
+  return `${t ? t.title + ' · ' : ''}${page} — Drill Down`
+}
 async function countTrees(): Promise<number> {
   const { listTrees } = await import('./core/repo')
   return (await listTrees()).length
@@ -60,6 +70,11 @@ export default function App() {
     let on = true
     void countDue().then((n) => on && setDue(n))
     void countTrees().then((n) => on && setLocalTrees(n))
+    return () => { on = false }
+  }, [r])
+  useEffect(() => {
+    let on = true
+    void titleOf(r).then((t) => { if (on && t) document.title = t })
     return () => { on = false }
   }, [r])
   useEffect(() => {
@@ -91,7 +106,7 @@ export default function App() {
       <main className={inShared ? 'main-shared' : undefined}>
         <Suspense fallback={<div className="route-loading" aria-busy="true" />}>
           {r.name === 'trees' && <TreeListPage />}
-          {r.name === 'edit' && <EditorPage treeId={r.treeId} />}
+          {r.name === 'edit' && <EditorPage key={r.treeId} treeId={r.treeId} rootId={r.rootId} />}
           {r.name === 'flash' && <FlashPage key={r.treeId} treeId={r.treeId} rootId={r.rootId} />}
           {r.name === 'dnd' && <DndPage key={r.treeId + r.rootId} treeId={r.treeId} rootId={r.rootId} />}
           {r.name === 'blank' && <BlankDndPage key={r.treeId + r.rootId} treeId={r.treeId} rootId={r.rootId} />}

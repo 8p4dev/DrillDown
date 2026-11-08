@@ -282,3 +282,8 @@ button.empty { cursor: pointer; }
 .sheet-head { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin-bottom: .75rem; }
 .sheet-head h2 { margin: 0; font-size: var(--fs-lg); }
 .sheet-head .link { min-height: var(--tap); padding-inline: .5rem; }
+
+/* ===== 경로 표시 (ui/NodePath, T2): 한 줄 · 넘치면 줄바꿈 · 현재 = text 600 ===== */
+.node-path { display: flex; flex-wrap: wrap; align-items: center; gap: .15rem; font-size: var(--fs-sm); color: var(--muted); min-height: 1.4em; }
+.node-path .sep { margin: 0 .35rem; opacity: .6; }
+.node-path [aria-current] { color: var(--text); font-weight: 600; }

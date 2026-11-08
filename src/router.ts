@@ -57,7 +57,8 @@ export function parseLocation(loc: Pick<Location, 'pathname' | 'search' | 'hash'
 const q = (rootId?: string) => (rootId ? `?root=${rootId}` : '')
 export const href = {
   trees: () => '#/',
-  edit: (treeId: string) => `#/tree/${treeId}`,
+  /** 편집: rootId = 이 가지만 보기(서브트리 포커스, T1) */
+  edit: (treeId: string, rootId?: string) => `#/tree/${treeId}${q(rootId)}`,
   /** 플래시카드: rootId = 시작 개념(없으면 루트) */
   flash: (treeId: string, rootId?: string) => `#/tree/${treeId}/flash${q(rootId)}`,
   /** 드래그 앤 드롭 퀴즈: rootId = 범위 */

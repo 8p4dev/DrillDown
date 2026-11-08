@@ -69,7 +69,8 @@ function countTree(ns: TreeNode[]) {
   return { hasKids: (id: ID) => kids.has(id), desc: (id: ID) => desc.get(id) ?? 0 }
 }
 
-export default function EditorPage({ treeId }: { treeId: string }) {
+/** rootId = 서브트리 포커스(T1, P1 WE1 이 구현) */
+export default function EditorPage({ treeId }: { treeId: string; rootId?: string }) {
   const [nodes, setNodes] = useState<TreeNode[] | null>(null)
   const [srs, setSrs] = useState<Map<ID, NodeSrs>>(new Map())
   const [selId, setSelId] = useState<ID>('')
