@@ -91,3 +91,6 @@
 - CA 에게 mock/sync.ts·mock/shared.ts 1줄 임시 수정 허용(CS 가 삭제 → 머지 때 삭제 쪽 채택).
 - **SS 완료 → 머지 bd948d5**(sync/trees/share/gallery/OG, owner.ts 11함수, sync.check C1~3·C6~11·C13~15·C17·C18·전이표 11행). 변경: 커서 만료 = `since < user_seq.purged_seq`(정확 판정), og:image 절대 URL, 소유자·관리자는 /api/t hidden 통과. CS 에 push.seq 로 커서를 올리지 말 것 전달.
 - UI QA 3차: LM(#16 + `dd:remote` 구독) → 머지 88b495b, DS(#5 #6 #7 #11 #12 #15 #24 + 테마 칸) → 머지 b645e2a. typecheck·lint·check 통과.
+- **CA 완료 → 머지 4d37d56**(me.ts 실구현·로그인·계정·관리자·처리방침, mock/me·admin 삭제, QA #8 #17 #18 #20 #22). SA·CS 에 CA 요청 전달.
+- **SA 완료 → 머지(2e6281b)**: 세션·OAuth(PKCE+fake)·/api/me*·관리자 API·신고·점검·일일 작업·백업·systemd·runbook, account.check ≈120 assert. 변경: auth 리밋은 start·callback·logout·webhook 만, 점검 면제는 GET /api/me 만, 관리자 trees `?deleted=1`·reports `?status=`, 숨김 처리 시 그 트리의 열린 신고 전부 종결. `.env.example` 에 BACKUP_* 추가. SA 후속(use_provider_avatar) 진행 중 ctx_94a051615a1a.
+- 실서버 스모크(가짜 로그인 → /api/me → push → pull → 공개 범위 unlisted slug 발급) 통과. E2E 13/13.
