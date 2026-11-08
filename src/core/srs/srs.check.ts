@@ -128,4 +128,14 @@ assert.equal(cm.size, nodes.length)
   assert.equal(missHeat(undefined), 0)
 }
 
+// U33: fuzz — 같은 시각 첫 Good 100개의 기한이 하루에 다 몰리지 않는다(fuzz 끄면 100개 같은 날)
+{
+  const days = new Map<number, number>()
+  for (let i = 0; i < 100; i++) {
+    const d = Math.floor(grade(undefined, 'exact', t0, 'ok', `f${i}`).next.due / DAY)
+    days.set(d, (days.get(d) ?? 0) + 1)
+  }
+  assert.ok(days.size >= 2 && Math.max(...days.values()) < 60, `fuzz 분포 ${JSON.stringify([...days])}`)
+}
+
 console.log('srs.check: ok')

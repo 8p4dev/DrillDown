@@ -25,6 +25,12 @@ main:has(.dnd) { max-width: 1400px; } /* 넓은 트리: 에디터처럼 폭 제�
 /* 빈 범위 안내: 캔버스 자리 상단 중앙(02 §3.5) */
 .dnd-empty { text-align: center; margin: 1.5rem 0; }
 
+/* U30 범위 고르기 */
+.dnd-gate { max-width: 32rem; margin: 1.5rem auto; display: grid; gap: .75rem; }
+.dnd-gate h2, .dnd-gate p { margin: 0; }
+.dnd-gate ul { list-style: none; margin: 0; padding: 0; display: grid; gap: .4rem; }
+.dnd-gate li button { width: 100%; justify-content: flex-start; text-align: left; }
+
 /* 칸 공통: 노드(제목)·슬롯(빈칸)·카드 */
 .dnd-node, .dnd-slot, .dnd-card {
   box-sizing: border-box; width: 100%; height: 100%; min-height: 44px; border-radius: var(--radius-lg);

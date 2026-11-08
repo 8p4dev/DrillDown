@@ -3,8 +3,8 @@ import { db, track } from '../db'
 import { logEvent } from '../events'
 import type { GradeSource, ID, NodeSrs, Structure, TreeNode } from '../types'
 
-// FSRS-7 기본 설정. 계약 함수가 동기라서 모듈 로드 시 1회 생성한다.
-const scheduler = await DefaultScheduler()
+// FSRS-7 기본 설정 + fuzz. 계약 함수가 동기라서 모듈 로드 시 1회 생성한다.
+const scheduler = await DefaultScheduler({ enableFuzz: true }) // U33: 같은 날 평가한 항목의 기한을 흩는다
 type Card = ReturnType<typeof scheduler.newCard>
 
 /** 색 바램 임계값(예상 기억률 R). lightgreen 0.8 은 가정값(FSRS-7 곡선이 완만해 0.7 이면 첫 복습 카드가 ~250일간 연두) */

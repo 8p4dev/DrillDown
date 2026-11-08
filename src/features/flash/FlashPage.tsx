@@ -1,22 +1,26 @@
 // 플래시카드 모드 (plan §1 F1)
 import { useEffect, useMemo, useState } from 'react'
 import type { StudySource } from '../../core/source'
+import { ancestorsOf } from '../../core/path'
 import { getRoot } from '../../core/repo'
 import { colorMap } from '../../core/srs'
 import type { ID, NodeSrs, TreeNode } from '../../core/types'
 import { href } from '../../router'
 import { Icon } from '../../ui/Icon'
 import { I } from '../../ui/icons'
+import { NodePath } from '../../ui/NodePath'
 import { arrowRight, listChecks, rotateCcw, x } from '../../ui/icons.all'
+import { ScopeSelect } from '../dnd/kit'
 import TreeHeader from '../TreeHeader'
 import FlashCard from './FlashCard'
 import Minimap from './Minimap'
-import { nextConcept } from './flash'
-import { coarseHint, useStudySource } from './study'
+import { conceptsIn, nextConcept } from './flash'
+import { coarseHint, goTo, useStudySource } from './study'
 import './flash.css'
 
 // 세션 진행(현재 개념·노드별 마지막 평가)은 탭 세션 동안 유지 — 새로고침해도 집계가 남는다
 type Saved = { current: ID | null; tally: [ID, boolean][] }
+const MINIMAP_MAX = 100 // U39: 이보다 크면 미니맵이 회색 줄이라 숨긴다
 const KEY = (treeId: string) => `flash:${treeId}`
 function load(treeId: string): Saved {
   try {
@@ -56,12 +60,11 @@ export default function FlashPage({ treeId, rootId, source }: { treeId: string; 
   }, [nodes, rootId])
   const colors = useMemo(() => colorMap(nodes ?? [], srs.map, srs.at), [nodes, srs])
   const byId = useMemo(() => new Map((nodes ?? []).map((n) => [n.id, n])), [nodes])
-  const at = current && byId.has(current) ? current : (tree?.scope ?? '') // '' 는 아래 빈 트리 분기에서 걸러진다
-  const path = useMemo(() => {
-    const p: TreeNode[] = []
-    for (let n = byId.get(at); n; n = n.parentId ? byId.get(n.parentId) : undefined) p.unshift(n)
-    return p
-  }, [byId, at])
+  const concepts = useMemo(() => (nodes && tree ? conceptsIn(nodes, tree.scope) : []), [nodes, tree])
+  // 저장된 개념이 범위 밖이면(범위를 바꿨을 때) 범위 루트부터. '' 는 아래 빈 트리 분기에서 걸러진다
+  const at = current && concepts.includes(current) ? current : (tree?.scope ?? '')
+  const path = useMemo(() => ancestorsOf(byId, at), [byId, at])
+  const to = (id: ID) => (source ? href.shared(treeId, 'flash', id) : href.flash(treeId, id))
   const kids = useMemo(() => (nodes ?? []).filter((n) => n.parentId === at), [nodes, at])
   const next = useMemo(() => (nodes && tree ? nextConcept(nodes, tree.scope, at) : null), [nodes, tree, at])
 
@@ -74,6 +77,7 @@ export default function FlashPage({ treeId, rootId, source }: { treeId: string; 
   )
 
   const go = (id: ID) => { setDone(false); setCurrent(id) }
+  const pick = (id: ID) => (concepts.includes(id) ? go(id) : goTo(to(id))) // 범위 밖(경로·미니맵)이면 그 노드로 범위를 옮긴다
   const onRated = (s: NodeSrs, known: boolean) => {
     setSrs(({ map }) => ({ map: new Map(map).set(s.nodeId, s), at: new Date() }))
     setTally((m) => new Map(m).set(s.nodeId, known))
@@ -86,6 +90,8 @@ export default function FlashPage({ treeId, rootId, source }: { treeId: string; 
   return (
     <section className="flash">
       <TreeHeader treeId={treeId} active="flash">
+        <ScopeSelect nodes={nodes} value={tree.scope} to={to} />
+        <span className="flash-progress muted" aria-label="진행">{concepts.indexOf(at) + 1}/{concepts.length}</span>
         {/* 보이는 건 ✓N ✕M, 읽히는 텍스트는 "알음 N · 모름 M"(DS .sr-only) */}
         <span className="flash-tally muted" aria-label="평가 집계">
           <Icon d={I.check} className="ok" /><span className="sr-only">알음 </span><b key={`k${known}`} className="pop-num">{known}</b><span className="sr-only"> · </span>
@@ -109,19 +115,12 @@ export default function FlashPage({ treeId, rootId, source }: { treeId: string; 
               )}
               <div className="actions">
                 <button type="button" className="primary" onClick={() => { setTally(new Map()); go(tree.scope) }}><Icon d={rotateCcw} /> 처음부터 다시</button>
-                <a className="flash-edit-link" href={href.edit(treeId)}><Icon d={I.pencil} /> 편집으로</a>
+                <a className="flash-edit-link" href={href.edit(treeId, rootId)}><Icon d={I.pencil} /> 편집으로</a>
               </div>
             </div>
           ) : (
             <>
-              {path.length > 1 && <nav aria-label="현재 위치" className="flash-path">
-                {path.map((n, i) => (
-                  <span key={n.id}>
-                    {i > 0 && <span className="sep">›</span>}
-                    {i < path.length - 1 ? <button type="button" className="link" onClick={() => go(n.id)}>{n.title}</button> : <span aria-current="location">{n.title}</span>}
-                  </span>
-                ))}
-              </nav>}
+              <NodePath path={path} onPick={pick} className="flash-path" />
               <FlashCard key={at} treeId={treeId} nodes={nodes} conceptId={at} colors={colors} source={src} onRated={onRated} onDive={go} initialRated={tally} onNext={advance} />
               <div className="actions flash-nav">
                 <button
@@ -139,7 +138,7 @@ export default function FlashPage({ treeId, rootId, source }: { treeId: string; 
           )}
         </div>
         <aside className="flash-aside">
-          <Minimap nodes={nodes} rootId={tree.root.id} currentId={at} colors={colors} onGo={go} />
+          {nodes.length <= MINIMAP_MAX && <Minimap nodes={nodes} rootId={tree.root.id} currentId={at} colors={colors} onGo={pick} />}
         </aside>
       </div>
     </section>

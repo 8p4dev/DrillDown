@@ -12,7 +12,7 @@ export function useStudySource(source: StudySource | undefined, treeId: string):
     return {
       ...s,
       record: (id, ok) => {
-        if (!warned) { warned = true; toast('체험 중 — 기록은 저장되지 않아요') }
+        if (!warned) { warned = true; toast('체험 중 — 복제하면 학습 기록이 남습니다') }
         return s.record(id, ok)
       },
     }
@@ -23,3 +23,7 @@ export function useStudySource(source: StudySource | undefined, treeId: string):
 export function coarseHint(id: string, text: string, icon?: string) {
   if (typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches) hint(id, text, icon)
 }
+
+/** 해시 라우트는 해시로, 공유 보기(/t/<slug>?m=)는 pushState + popstate(router navigateShared 와 같게) */
+export const goTo = (h: string) =>
+  h.startsWith('#') ? (location.hash = h) : (history.pushState(null, '', h), dispatchEvent(new PopStateEvent('popstate')))

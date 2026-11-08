@@ -1,10 +1,12 @@
 // 퀴즈 화면 공용 조각: 범위 선택, 트리 캔버스(layout 재사용), 드래그 고스트, 진행 막대, 점수, 결과 마크
 import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { withParent } from '../../core/path'
 import type { ID, TreeNode } from '../../core/types'
 import { Icon } from '../../ui/Icon'
 import { I } from '../../ui/icons'
 import { crosshair, x } from '../../ui/icons.all'
 import { layout } from '../editor/graph/layout'
+import { goTo } from '../flash/study'
 import { CARD, sideLayout } from './dnd'
 import type { DragState } from './useDragDrop'
 import './dnd.css'
@@ -14,32 +16,60 @@ const SIDE_MAX = 640 // 캔버스 폭이 이 이하면 좌→우 배치
 const SIDE_BELOW_SCALE = 0.8 // 위→아래 배율이 이보다 작으면 좌→우 배치(글자 약 10.4px 미만)
 const CANVAS_PAD = 4 // dnd.css .dnd-canvas padding 과 같게
 
-/** 해시 라우트는 해시로, 공유 보기(/t/<slug>?m=)는 pushState + popstate(router navigateShared 와 같게) */
-const go = (h: string) =>
-  h.startsWith('#') ? (location.hash = h) : (history.pushState(null, '', h), dispatchEvent(new PopStateEvent('popstate')))
-
-/** 자식 있는 노드만, 전위 순서·깊이 들여쓰기. 바꾸면 to(id) 로 이동. 라벨 글자 대신 crosshair 아이콘(aria 는 "범위") */
-export function ScopeSelect(p: { nodes: TreeNode[]; value: ID; to: (id: ID) => string }) {
+/** 자식 있는 노드를 전위 순서로 [노드, 깊이, 리프 수] */
+function branches(nodes: TreeNode[]): [TreeNode, number, number][] {
   const kids = new Map<ID | null, TreeNode[]>()
-  for (const n of p.nodes) kids.set(n.parentId, [...(kids.get(n.parentId) ?? []), n])
-  const opts: [TreeNode, number][] = []
-  const walk = (n: TreeNode, d: number) => {
+  for (const n of nodes) kids.set(n.parentId, [...(kids.get(n.parentId) ?? []), n])
+  const out: [TreeNode, number, number][] = []
+  const walk = (n: TreeNode, d: number): number => {
     const ks = (kids.get(n.id) ?? []).sort((a, b) => a.order - b.order)
-    if (!ks.length) return
-    opts.push([n, d])
-    ks.forEach((k) => walk(k, d + 1))
+    if (!ks.length) return 1
+    const row: [TreeNode, number, number] = [n, d, 0]
+    out.push(row)
+    row[2] = ks.reduce((s, k) => s + walk(k, d + 1), 0)
+    return row[2]
   }
   ;(kids.get(null) ?? []).forEach((r) => walk(r, 0))
+  return out
+}
+
+/** 자식 있는 노드만, 전위 순서·깊이 들여쓰기, 라벨 '방법 — TCP SYN Flooding (3)'(U31). 바꾸면 to(id) 로 이동. 라벨 글자 대신 crosshair 아이콘(aria 는 "범위") */
+export function ScopeSelect(p: { nodes: TreeNode[]; value: ID; to: (id: ID) => string }) {
+  const byId = new Map(p.nodes.map((n) => [n.id, n]))
+  const opts = branches(p.nodes)
   return (
     <label className="dnd-scope" data-tip="범위">
       <Icon d={crosshair} />
-      <select aria-label="범위" value={p.value} onChange={(e) => go(p.to(e.target.value))}>
+      <select aria-label="범위" value={p.value} onChange={(e) => goTo(p.to(e.target.value))}>
         {!opts.some(([n]) => n.id === p.value) && <option value={p.value}>—</option>}
-        {opts.map(([n, d]) => (
-          <option key={n.id} value={n.id}>{'  '.repeat(d) + n.title}</option>
+        {opts.map(([n, d, leaves]) => (
+          <option key={n.id} value={n.id}>{`${'  '.repeat(d)}${withParent(byId, n)} (${leaves})`}</option>
         ))}
       </select>
     </label>
+  )
+}
+
+/**
+ * U30: 범위가 크고 URL 에 ?root= 가 없으면 바로 시작하지 않고 루트의 가지(리프 수)를 고르게 한다. 고르면 to(id) — '전체로 시작' 은 to(루트)
+ */
+export function ScopeGate(p: { nodes: TreeNode[]; rootId: ID; to: (id: ID) => string }) {
+  const rows = branches(p.nodes)
+  const all = rows.find(([n]) => n.id === p.rootId)
+  let top = p.rootId // 자식이 하나뿐이면(루트 → '네트워크 기반 공격' 한 줄기) 갈라지는 데까지 내려간다
+  for (let k; (k = p.nodes.filter((n) => n.parentId === top)).length === 1; ) top = k[0].id
+  const opts = rows.filter(([n]) => n.parentId === top)
+  return (
+    <div className="card dnd-gate" role="region" aria-label="범위 고르기">
+      <h2>어디부터 할까요?</h2>
+      <p className="muted">한 번에 하기엔 많아요. 가지를 하나 고르세요.</p>
+      <ul>
+        {opts.map(([n, , leaves]) => (
+          <li key={n.id}><button type="button" onClick={() => goTo(p.to(n.id))}>{n.title} <span className="muted">({leaves})</span></button></li>
+        ))}
+      </ul>
+      <button type="button" className="ghost" onClick={() => goTo(p.to(p.rootId))}>전체로 시작{all ? ` (${all[2]})` : ''}</button>
+    </div>
   )
 }
 
