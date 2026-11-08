@@ -112,3 +112,4 @@ DS 의 스타일이 머지되기 전까지 다른 워커는 계약 §3.2 의 클
 - 1차 dispatch(2026-11-08, 시작 커밋 15b037c): DS ctx_cfe8e7694d3e(agent-DS-ui) · LM ctx_7f1171a3bb43(agent-LM-ui) · LS ctx_8b1293f83036(agent-LS-ui) · AA ctx_c095f6cf24fc(agent-AA-ui) · SH ctx_c327d2e7bf6a(agent-SH-ui). 지시 원문은 오케스트레이터 scratch `specs/spec_ui_*.txt`.
 - 1차 중단(2026-11-08 17:35): 5명 모두 사용량 한도로 멈춤. LM 은 완료 후 멈춤(4커밋) → **머지 086ddfa**(typecheck·lint·check·build 통과, precache 44개 505.35 KiB). DS·LS·AA·SH 는 미커밋 작업 상태에서 계정 교체 후 `send` 로 재개: DS ctx_32671d6d5d39 · LS ctx_8cf28e1fb056 · AA ctx_5c16b1d7f06f · SH ctx_25d0ba95114a.
 - LM 미결: `hint('editor')` 2줄 주석(DS `hint` 머지 후 해제), `:root[data-kb] .toasts` 규칙은 DS 지시에 포함됨, `data-miss` 는 heat 유지 + 정수 miss prop 추가.
+- DS 완료 → **머지 f66e41d**. 오케스트레이터 후속 09b4cbc: App.tsx `<TooltipLayer/>`, 에디터 `hint` 주석 해제, 배율 `.tnum`. build 통과, precache 45개 516.11 KiB. DS 보고: 첫 화면 gzip ≈118.3KB(경계), CSS 합계 54.6KB(목표 44 초과 — 통합 후 재측정에서 판단). LS·AA·SH 에 main 머지 후 shim 제거 지시.
