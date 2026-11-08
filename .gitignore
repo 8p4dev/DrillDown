@@ -31,3 +31,4 @@ data/
 config/admins.json
 .env
 .preview-data/
+.research-data/

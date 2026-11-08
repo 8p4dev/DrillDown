@@ -1,0 +1,2017 @@
+{
+ "tree": {
+  "id": "ec271b37-919c-418e-b021-0bc4bec636bf",
+  "owner_id": "fac99a34-b06b-468d-abb3-8cf4e4f6af9a",
+  "title": "네트워크 기반 공격의 이해",
+  "visibility": "private",
+  "slug": null,
+  "source_tree_id": null,
+  "node_count": 222,
+  "copy_count": 0,
+  "created_at": 1794143722914,
+  "updated_at": 1794143819041,
+  "deleted_at": null,
+  "hidden_by_admin_at": null,
+  "seq": 377
+ },
+ "nodes": [
+  {
+   "id": "c15029e5-1d7b-4eb2-939f-b58ab157d584",
+   "parent_id": null,
+   "order": 0,
+   "title": "네트워크 기반 공격의 이해",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": 0
+  },
+  {
+   "id": "afb460ab-006c-4738-bfa7-889c6630a45e",
+   "parent_id": "c15029e5-1d7b-4eb2-939f-b58ab157d584",
+   "order": 0,
+   "title": "네트워크 기반 공격",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "69f7b9b1-28dd-41a1-ab3e-73f89ee71485",
+   "parent_id": "afb460ab-006c-4738-bfa7-889c6630a45e",
+   "order": 0,
+   "title": "네트워크 기반 공격의 이해",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "71c79153-95bf-426a-b80a-d04956c47965",
+   "parent_id": "69f7b9b1-28dd-41a1-ab3e-73f89ee71485",
+   "order": 0,
+   "title": "TCP SYN Flooding",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "a9de7fd3-81a9-442b-b69c-c431c2d26012",
+   "parent_id": "71c79153-95bf-426a-b80a-d04956c47965",
+   "order": 0,
+   "title": "3-Way Handshake의 Half-Open 연결을 악용",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "89d46213-e0de-4d90-bdc6-23782388b1bc",
+   "parent_id": "71c79153-95bf-426a-b80a-d04956c47965",
+   "order": 1,
+   "title": "방법",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "ad7391f0-d398-4cac-bab3-1f6757c075d6",
+   "parent_id": "89d46213-e0de-4d90-bdc6-23782388b1bc",
+   "order": 0,
+   "title": "공격자가 다수의 SYN을 대상에 전송",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "400595d2-d2b9-405c-be6f-a76414fa551c",
+   "parent_id": "89d46213-e0de-4d90-bdc6-23782388b1bc",
+   "order": 1,
+   "title": "대상은 SYN/ACK를 보내지만 공격자는 ACK로 응답하지 않음",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "e5dca032-9562-424b-bc44-1229d04fffd6",
+   "parent_id": "89d46213-e0de-4d90-bdc6-23782388b1bc",
+   "order": 2,
+   "title": "TCP 연결 테이블(Backlog Queue)이 가득 차 이후 연결 요청 거부",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "97bdad32-c035-407e-abb8-3d1d42473ad0",
+   "parent_id": "71c79153-95bf-426a-b80a-d04956c47965",
+   "order": 2,
+   "title": "대책",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "5fb87197-8441-4d98-8170-24a7cbcecbed",
+   "parent_id": "97bdad32-c035-407e-abb8-3d1d42473ad0",
+   "order": 0,
+   "title": "방화벽·DDoS 대응 장비에서 동일 출발지의 연결 요청 임계치 설정",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "245924d3-29ab-4c86-921b-e55dd23568ff",
+   "parent_id": "97bdad32-c035-407e-abb8-3d1d42473ad0",
+   "order": 1,
+   "title": "SYN Cookie 사용",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "1854315a-9838-45c3-9653-a5b52392ebff",
+   "parent_id": "97bdad32-c035-407e-abb8-3d1d42473ad0",
+   "order": 2,
+   "title": "First SYN Drop 설정",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "8cecc365-056b-453a-9a5d-c5e21ece22b0",
+   "parent_id": "97bdad32-c035-407e-abb8-3d1d42473ad0",
+   "order": 3,
+   "title": "TCP 연결 테이블 엔트리 선택적 삭제 (권장되지 않음)",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "8ec40cf4-66e1-46b4-b1e4-143b9968e898",
+   "parent_id": "69f7b9b1-28dd-41a1-ab3e-73f89ee71485",
+   "order": 1,
+   "title": "Smurf Attack",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "d41bbf2a-b67d-4eb1-8bec-3b36da2f2821",
+   "parent_id": "8ec40cf4-66e1-46b4-b1e4-143b9968e898",
+   "order": 0,
+   "title": "IP 위장 + ICMP 특성을 이용한 공격",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "4005cd74-707d-47d0-a06f-cf6e28ce0378",
+   "parent_id": "8ec40cf4-66e1-46b4-b1e4-143b9968e898",
+   "order": 1,
+   "title": "방법",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "40aa554e-8bb6-4584-8ba3-15f9138b35c5",
+   "parent_id": "4005cd74-707d-47d0-a06f-cf6e28ce0378",
+   "order": 0,
+   "title": "출발지 IP를 공격 대상으로 위장",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "dae0a35f-c85c-4416-947a-92d9bb3cec1c",
+   "parent_id": "4005cd74-707d-47d0-a06f-cf6e28ce0378",
+   "order": 1,
+   "title": "목적지를 Directed Broadcast 주소(외부 네트워크의 모든 호스트 대상)로 설정해 ICMP Echo Request 전송",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "b7dfb6af-e532-4219-82d2-21bd12275cff",
+   "parent_id": "4005cd74-707d-47d0-a06f-cf6e28ce0378",
+   "order": 2,
+   "title": "브로드캐스트를 받은 다수 시스템이 ICMP Echo Reply를 공격 대상에게 전송",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "dd4b933a-8790-40f3-b2ae-d2fecbaae7df",
+   "parent_id": "8ec40cf4-66e1-46b4-b1e4-143b9968e898",
+   "order": 2,
+   "title": "대책",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "41b488df-ea72-4082-8bd1-cef480690e77",
+   "parent_id": "dd4b933a-8790-40f3-b2ae-d2fecbaae7df",
+   "order": 0,
+   "title": "외부 네트워크에서 들어오는 Directed Broadcast 차단 (no ip directed-broadcast)",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "f2e83e12-56e9-4d23-87d4-5d7d0dc7da3a",
+   "parent_id": "dd4b933a-8790-40f3-b2ae-d2fecbaae7df",
+   "order": 1,
+   "title": "동일한 ICMP Echo Reply가 대량 유입되면 모두 Drop",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "5762df11-534c-4775-ba39-174f6e22c482",
+   "parent_id": "69f7b9b1-28dd-41a1-ab3e-73f89ee71485",
+   "order": 2,
+   "title": "LAND Attack",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "390fe4ea-f365-47fc-a7b1-a1fad05ae064",
+   "parent_id": "5762df11-534c-4775-ba39-174f6e22c482",
+   "order": 0,
+   "title": "출발지 IP와 목적지 IP를 모두 공격 대상 IP로 설정",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "bf89409c-91b7-4335-be5e-87c00f42eaa1",
+   "parent_id": "5762df11-534c-4775-ba39-174f6e22c482",
+   "order": 1,
+   "title": "대상이 자기 자신에게 응답하며 루프·자원 소진",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "79a0befa-6e4a-4024-80bd-11cf93a44749",
+   "parent_id": "5762df11-534c-4775-ba39-174f6e22c482",
+   "order": 2,
+   "title": "대책: 출발지와 목적지가 같은 패킷 차단",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "8ff35851-158d-43ba-be95-cbe31aeff7be",
+   "parent_id": "69f7b9b1-28dd-41a1-ab3e-73f89ee71485",
+   "order": 3,
+   "title": "Ping of Death",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "bbb68856-76f5-47d7-bc77-21db830d1ae5",
+   "parent_id": "8ff35851-158d-43ba-be95-cbe31aeff7be",
+   "order": 0,
+   "title": "ICMP 패킷을 최대 크기(65,535바이트) 이상으로 크게 만들어 전송",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "92346df7-ba83-4813-8571-aa3035025762",
+   "parent_id": "8ff35851-158d-43ba-be95-cbe31aeff7be",
+   "order": 1,
+   "title": "전송 중 단편화(Fragmentation)되고 대상은 재조합 과정에서 과부하·오류",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "79c84d92-0988-4fad-a4d1-483f3ee09bd6",
+   "parent_id": "8ff35851-158d-43ba-be95-cbe31aeff7be",
+   "order": 2,
+   "title": "대책: 일정 크기 이상 ICMP 차단",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "23b9694a-c88a-4189-a7cb-4fbd654aa94f",
+   "parent_id": "69f7b9b1-28dd-41a1-ab3e-73f89ee71485",
+   "order": 4,
+   "title": "Teardrop Attack",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "3624f878-62aa-4087-a200-40326c08ad02",
+   "parent_id": "23b9694a-c88a-4189-a7cb-4fbd654aa94f",
+   "order": 0,
+   "title": "단편화된 패킷의 Fragment Offset을 고의로 조작해 재조합 오류 유발",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "038104b1-02b9-48e8-92e6-f619aebf487b",
+   "parent_id": "23b9694a-c88a-4189-a7cb-4fbd654aa94f",
+   "order": 1,
+   "title": "변종: Bonk",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "6f3a60cd-391b-458a-aaa0-22b70e514c81",
+   "parent_id": "038104b1-02b9-48e8-92e6-f619aebf487b",
+   "order": 0,
+   "title": "순서번호(Offset)를 모두 1번으로 설정",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "67648327-5b18-484e-bbf1-4a2730f611d8",
+   "parent_id": "23b9694a-c88a-4189-a7cb-4fbd654aa94f",
+   "order": 2,
+   "title": "변종: Boink",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "99afe06e-b366-4a8f-99e1-16d097b4a546",
+   "parent_id": "67648327-5b18-484e-bbf1-4a2730f611d8",
+   "order": 0,
+   "title": "정상 순서로 보내다가 중간부터 순서번호를 조작",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "e8c931ad-c564-4c5b-a5c6-48026dd5af41",
+   "parent_id": "69f7b9b1-28dd-41a1-ab3e-73f89ee71485",
+   "order": 5,
+   "title": "DNS 싱크홀",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "c8dbcc23-57fc-43ed-9e0b-1624e9520f9c",
+   "parent_id": "e8c931ad-c564-4c5b-a5c6-48026dd5af41",
+   "order": 0,
+   "title": "악성 봇과 C&C(조종자) 서버 간 접속을 차단하는 시스템",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "3a42fd5f-4096-4269-88c1-95e0d37d3d30",
+   "parent_id": "e8c931ad-c564-4c5b-a5c6-48026dd5af41",
+   "order": 1,
+   "title": "PC가 C&C 주소로 접속하려 하면 싱크홀 서버가 대신 응답",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "bb484bba-3185-4d5e-a0be-f868bcef50b8",
+   "parent_id": "e8c931ad-c564-4c5b-a5c6-48026dd5af41",
+   "order": 2,
+   "title": "KISA가 ISP와 협력해 운영, C&C 주소를 주기적으로 갱신",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "6ab0a989-5e4f-4cda-a6ea-03181c78c13a",
+   "parent_id": "afb460ab-006c-4738-bfa7-889c6630a45e",
+   "order": 1,
+   "title": "전통적인 DDoS 공격 도구",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "e9e5dbac-4cca-4b48-b86f-358fec926435",
+   "parent_id": "6ab0a989-5e4f-4cda-a6ea-03181c78c13a",
+   "order": 0,
+   "title": "Trinoo",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "9616612f-906f-4d22-88ae-10cc1756cb56",
+   "parent_id": "e9e5dbac-4cca-4b48-b86f-358fec926435",
+   "order": 0,
+   "title": "UDP Flood 서비스 거부 공격 유발",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "259c3733-4c98-43bd-a217-fc95821081f3",
+   "parent_id": "6ab0a989-5e4f-4cda-a6ea-03181c78c13a",
+   "order": 1,
+   "title": "TFN (Tribe Flood Network)",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "4d902a2c-20c4-4449-8eb3-0a9911b93d3e",
+   "parent_id": "259c3733-4c98-43bd-a217-fc95821081f3",
+   "order": 0,
+   "title": "Trinoo의 발전된 형태",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "c71acef9-fae4-4197-ad2a-0ea62921ceb2",
+   "parent_id": "259c3733-4c98-43bd-a217-fc95821081f3",
+   "order": 1,
+   "title": "UDP Flood, TCP SYN Flood, ICMP Echo Flood, Smurf 공격 가능",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "8783ac80-adbc-4d3c-b495-8d3ce57724fa",
+   "parent_id": "6ab0a989-5e4f-4cda-a6ea-03181c78c13a",
+   "order": 2,
+   "title": "TFN2K",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "e5b2b6e7-ef80-42ce-9092-61550b3655e8",
+   "parent_id": "8783ac80-adbc-4d3c-b495-8d3ce57724fa",
+   "order": 0,
+   "title": "TFN의 발전된 형태",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "14569642-8172-45f9-bacb-d876e0646eb9",
+   "parent_id": "8783ac80-adbc-4d3c-b495-8d3ce57724fa",
+   "order": 1,
+   "title": "통신 포트를 임의로 결정, 암호화 사용",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "624bb132-056b-47c5-89f2-852195f3b5ee",
+   "parent_id": "6ab0a989-5e4f-4cda-a6ea-03181c78c13a",
+   "order": 3,
+   "title": "Stacheldraht",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "80814abf-801b-46c7-91e1-a866bf221237",
+   "parent_id": "624bb132-056b-47c5-89f2-852195f3b5ee",
+   "order": 0,
+   "title": "Trinoo와 TFN의 발전된 형태",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "e3cf6da8-c965-4f51-9711-dafd8c96030e",
+   "parent_id": "624bb132-056b-47c5-89f2-852195f3b5ee",
+   "order": 1,
+   "title": "마스터와 에이전트 데몬 간 통신을 암호화",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "38f245dc-ec53-46de-8e1f-df58b44f5028",
+   "parent_id": "afb460ab-006c-4738-bfa7-889c6630a45e",
+   "order": 2,
+   "title": "DDoS 공격 유형별 분류",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "93ece1d1-438c-4d2e-a979-d4b5208509ba",
+   "parent_id": "38f245dc-ec53-46de-8e1f-df58b44f5028",
+   "order": 0,
+   "title": "대역폭 공격",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "300df2f7-589a-490a-923c-fa1ae54f551c",
+   "parent_id": "93ece1d1-438c-4d2e-a979-d4b5208509ba",
+   "order": 0,
+   "title": "높은 bps",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "8c5b03c1-0a93-4b66-b382-fa873cb25855",
+   "parent_id": "93ece1d1-438c-4d2e-a979-d4b5208509ba",
+   "order": 1,
+   "title": "UDP, ICMP 프로토콜 악용",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "02b44c06-4d91-4813-9d93-4ce95c31aa0c",
+   "parent_id": "38f245dc-ec53-46de-8e1f-df58b44f5028",
+   "order": 1,
+   "title": "자원 소진 공격",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "8a6bf8ee-2b70-4301-a877-72ffc3e035b5",
+   "parent_id": "02b44c06-4d91-4813-9d93-4ce95c31aa0c",
+   "order": 0,
+   "title": "높은 pps",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "c7e24a10-027f-4cbd-8efc-ca0d80b587a3",
+   "parent_id": "02b44c06-4d91-4813-9d93-4ce95c31aa0c",
+   "order": 1,
+   "title": "TCP 프로토콜 악용",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "723087d9-40a5-4a0a-80e8-5ca034439f1c",
+   "parent_id": "38f245dc-ec53-46de-8e1f-df58b44f5028",
+   "order": 2,
+   "title": "웹/DB 부하 공격",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "5a1efb56-f174-44c1-9cb5-7b938262ab6f",
+   "parent_id": "723087d9-40a5-4a0a-80e8-5ca034439f1c",
+   "order": 0,
+   "title": "HTTP 요청으로 웹서버·DB 자원 소진",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "0841413d-465c-461b-9007-157296d13db7",
+   "parent_id": "afb460ab-006c-4738-bfa7-889c6630a45e",
+   "order": 3,
+   "title": "대역폭 공격",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "5c483541-a492-4a9d-ba0c-05e7cf582ef4",
+   "parent_id": "0841413d-465c-461b-9007-157296d13db7",
+   "order": 0,
+   "title": "UDP Flooding",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "9888f176-7c02-4856-96e0-ed218ab55026",
+   "parent_id": "5c483541-a492-4a9d-ba0c-05e7cf582ef4",
+   "order": 0,
+   "title": "출발지 IP를 위조한 뒤 대량의 UDP 데이터를 대상에 전송",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "feb98067-48a0-44f5-b355-01acda7d6415",
+   "parent_id": "5c483541-a492-4a9d-ba0c-05e7cf582ef4",
+   "order": 1,
+   "title": "대상 시스템이 해당 UDP 포트를 사용하지 않아도 공격 가능",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "42b3ef1c-711a-433c-b01f-8d04ad402af8",
+   "parent_id": "0841413d-465c-461b-9007-157296d13db7",
+   "order": 1,
+   "title": "ICMP Flooding",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "36381d4e-77d3-4de6-86c9-cac5dd573087",
+   "parent_id": "42b3ef1c-711a-433c-b01f-8d04ad402af8",
+   "order": 0,
+   "title": "대량의 ICMP Echo Request 패킷을 대상에 전송",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "379a2d65-4eb1-4b61-a015-b88af0eb5736",
+   "parent_id": "42b3ef1c-711a-433c-b01f-8d04ad402af8",
+   "order": 1,
+   "title": "증폭이 발생하지 않음",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "f89d2e28-12ca-474d-b7f5-cbfb3cb7cc71",
+   "parent_id": "0841413d-465c-461b-9007-157296d13db7",
+   "order": 2,
+   "title": "DRDoS (Distributed Reflection DoS)",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "ca2c72b2-ceb6-47b6-af77-4586ba7453c5",
+   "parent_id": "f89d2e28-12ca-474d-b7f5-cbfb3cb7cc71",
+   "order": 0,
+   "title": "TCP, UDP, ICMP 프로토콜 이용",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "00bbf6ba-6b15-496f-a644-955dcbdf12d1",
+   "parent_id": "f89d2e28-12ca-474d-b7f5-cbfb3cb7cc71",
+   "order": 1,
+   "title": "출발지 IP를 대상으로 위조해 반사 서버의 응답이 대상에게 몰림",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "3bf377bb-8d28-41c5-b25f-50f6e82e794c",
+   "parent_id": "f89d2e28-12ca-474d-b7f5-cbfb3cb7cc71",
+   "order": 2,
+   "title": "경로가 다양하고 계속 변경 가능해 추적·차단이 어려움 (가장 위험)",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "ad8f9785-2517-43f8-afc0-e32a0ac8c740",
+   "parent_id": "f89d2e28-12ca-474d-b7f5-cbfb3cb7cc71",
+   "order": 3,
+   "title": "반사 공격 종류",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "6f64c3da-b6d5-4c26-8a5e-f93b53d96f7a",
+   "parent_id": "ad8f9785-2517-43f8-afc0-e32a0ac8c740",
+   "order": 0,
+   "title": "DNS Reflection Attack",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "e5887c9b-0ad2-43d4-bbce-259a1c50ffee",
+   "parent_id": "6f64c3da-b6d5-4c26-8a5e-f93b53d96f7a",
+   "order": 0,
+   "title": "DNS 서버의 큰 응답을 이용",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "2a029b23-a00f-4580-81d5-5f918dacc586",
+   "parent_id": "ad8f9785-2517-43f8-afc0-e32a0ac8c740",
+   "order": 1,
+   "title": "NTP Reflection Attack",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "f17938a4-0d0b-4c2c-9e04-e1fde816ff0d",
+   "parent_id": "2a029b23-a00f-4580-81d5-5f918dacc586",
+   "order": 0,
+   "title": "Network Time Protocol 서버 이용",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "756f3c2d-a0b3-4e83-ac1e-0149de0c4756",
+   "parent_id": "ad8f9785-2517-43f8-afc0-e32a0ac8c740",
+   "order": 2,
+   "title": "CLDAP Reflection Attack",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "b65f3080-4814-4ae0-865b-05444e0ef286",
+   "parent_id": "756f3c2d-a0b3-4e83-ac1e-0149de0c4756",
+   "order": 0,
+   "title": "디렉터리 연결·검색·수정 프로토콜(LDAP)의 UDP 버전 이용",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "b4c88678-83cd-4508-b6bf-f1549eae5bc5",
+   "parent_id": "ad8f9785-2517-43f8-afc0-e32a0ac8c740",
+   "order": 3,
+   "title": "SSDP Reflection Attack",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "29d0ff7f-1571-4026-83ae-6a7134289465",
+   "parent_id": "b4c88678-83cd-4508-b6bf-f1549eae5bc5",
+   "order": 0,
+   "title": "UPnP 장치(주로 IoT)를 찾고 알리는 Simple Service Discovery Protocol 이용",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "6fb2eb28-0157-4d8b-804c-2b4553d6064d",
+   "parent_id": "ad8f9785-2517-43f8-afc0-e32a0ac8c740",
+   "order": 4,
+   "title": "Memcached Reflection Attack",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "a0143841-c31a-4449-9179-ccc5a3f639ee",
+   "parent_id": "6fb2eb28-0157-4d8b-804c-2b4553d6064d",
+   "order": 0,
+   "title": "분산 메모리에 데이터를 캐싱하는 서비스 이용",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "75f656e7-fadd-40b6-bccc-e2c0dfc0d790",
+   "parent_id": "ad8f9785-2517-43f8-afc0-e32a0ac8c740",
+   "order": 5,
+   "title": "CoAP Reflection Attack",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "b9886261-ac40-4357-983b-c70dd7527216",
+   "parent_id": "75f656e7-fadd-40b6-bccc-e2c0dfc0d790",
+   "order": 0,
+   "title": "저전력 IoT용 UDP 기반 프로토콜 이용",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "1e9af5ec-e1e0-4b3a-b40d-9741b394b437",
+   "parent_id": "afb460ab-006c-4738-bfa7-889c6630a45e",
+   "order": 4,
+   "title": "자원 소진 공격",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "522b2a00-d11c-479a-a462-4f57c3f6c3be",
+   "parent_id": "1e9af5ec-e1e0-4b3a-b40d-9741b394b437",
+   "order": 0,
+   "title": "ACK Flooding",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "702ffdec-db38-42d5-bcee-f134fd60ecb9",
+   "parent_id": "522b2a00-d11c-479a-a462-4f57c3f6c3be",
+   "order": 0,
+   "title": "3-Way Handshake를 악용해 대량의 ACK 패킷을 대상에 전송",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "627c6e15-de71-4544-9ecc-846652e9d217",
+   "parent_id": "522b2a00-d11c-479a-a462-4f57c3f6c3be",
+   "order": 1,
+   "title": "대상은 세션 테이블 확인에 자원 소모",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "9ae24667-9b80-4b91-8683-084a31a3973b",
+   "parent_id": "1e9af5ec-e1e0-4b3a-b40d-9741b394b437",
+   "order": 1,
+   "title": "DNS Query Flooding",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "395e78e6-9410-4454-8f39-100d360febdb",
+   "parent_id": "9ae24667-9b80-4b91-8683-084a31a3973b",
+   "order": 0,
+   "title": "DNS 서버에 대량의 질의를 보내 DNS 서버 자원 소진",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "32d97acd-cbf0-4513-bf05-707ff7fe7d46",
+   "parent_id": "9ae24667-9b80-4b91-8683-084a31a3973b",
+   "order": 1,
+   "title": "송신 IP를 위조하면 응답이 목표 시스템으로 향함",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "f9876769-c16c-402f-94e7-0b9bb6900408",
+   "parent_id": "afb460ab-006c-4738-bfa7-889c6630a45e",
+   "order": 5,
+   "title": "웹/DB 부하 공격",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "5bfb9c82-d1e3-4324-98aa-19ce640d2182",
+   "parent_id": "f9876769-c16c-402f-94e7-0b9bb6900408",
+   "order": 0,
+   "title": "GET Flooding",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "25546d37-7afd-4122-9e07-76a8ec38cda7",
+   "parent_id": "5bfb9c82-d1e3-4324-98aa-19ce640d2182",
+   "order": 0,
+   "title": "3-Way Handshake로 정상 세션을 맺은 뒤 대량의 HTTP GET 요청",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "41981e4a-dcda-4337-9c1a-524875e923fc",
+   "parent_id": "5bfb9c82-d1e3-4324-98aa-19ce640d2182",
+   "order": 1,
+   "title": "웹서버·DB서버 자원 소진",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "06fc6d95-5011-45f3-82f1-3c25109aa4d4",
+   "parent_id": "f9876769-c16c-402f-94e7-0b9bb6900408",
+   "order": 1,
+   "title": "GET Flooding with Cache-Control (CC Attack)",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "d38da3c9-661a-4d90-a7c5-5c4279bb5036",
+   "parent_id": "06fc6d95-5011-45f3-82f1-3c25109aa4d4",
+   "order": 0,
+   "title": "보통 웹서버 부하 감소를 위해 캐싱 서버 운영",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "b4d7eb8b-25a2-4176-ac71-6c2d97a026f5",
+   "parent_id": "06fc6d95-5011-45f3-82f1-3c25109aa4d4",
+   "order": 1,
+   "title": "HTTP 헤더의 Cache-Control 옵션(no-cache 등)을 조작",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "2816a61f-adaf-4c65-82ca-029f3747340e",
+   "parent_id": "06fc6d95-5011-45f3-82f1-3c25109aa4d4",
+   "order": 2,
+   "title": "캐싱 서버가 아닌 웹서버가 직접 처리하도록 유도",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "44f28765-a975-4afb-81cc-4993afa2b4a5",
+   "parent_id": "f9876769-c16c-402f-94e7-0b9bb6900408",
+   "order": 2,
+   "title": "동적 HTTP Request Flooding",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "a1619ee8-fbd7-4413-8f68-9fa20c5ac425",
+   "parent_id": "44f28765-a975-4afb-81cc-4993afa2b4a5",
+   "order": 0,
+   "title": "차단을 피하려고 요청 페이지(URL)를 계속 변경",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "8770a88b-b368-415b-a635-1951cf2fad79",
+   "parent_id": "f9876769-c16c-402f-94e7-0b9bb6900408",
+   "order": 3,
+   "title": "HULK DoS",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "3eca9889-cff6-417e-aa31-8debdde55605",
+   "parent_id": "8770a88b-b368-415b-a635-1951cf2fad79",
+   "order": 0,
+   "title": "GET Flooding의 일종",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "234d8dc2-bcea-402e-be6b-1a911b8cd064",
+   "parent_id": "8770a88b-b368-415b-a635-1951cf2fad79",
+   "order": 1,
+   "title": "공격 대상 URL을 계속 바꿔 DDoS 차단 정책 우회",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "7136adc4-fbfa-4307-95be-0e4d1e47bbf2",
+   "parent_id": "f9876769-c16c-402f-94e7-0b9bb6900408",
+   "order": 4,
+   "title": "Hash DoS",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "a5ad7a6e-34f9-42ad-aec3-8598987496fb",
+   "parent_id": "7136adc4-fbfa-4307-95be-0e4d1e47bbf2",
+   "order": 0,
+   "title": "해시 충돌을 대량 유발",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "f9927101-b3a2-4380-ad45-b75305c17426",
+   "parent_id": "7136adc4-fbfa-4307-95be-0e4d1e47bbf2",
+   "order": 1,
+   "title": "해시 테이블 조회가 선형 탐색이 되어 CPU 자원 소진",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "17818c67-7317-49a3-835e-d4bee190b513",
+   "parent_id": "f9876769-c16c-402f-94e7-0b9bb6900408",
+   "order": 5,
+   "title": "Slowloris",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "43998fb8-5dcc-4ba0-921a-e43028ae22a7",
+   "parent_id": "17818c67-7317-49a3-835e-d4bee190b513",
+   "order": 0,
+   "title": "GET Flooding과 비슷하지만 소량의 트래픽으로 공격",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "2a10de3b-16df-4cd1-84b0-1ada02e734bc",
+   "parent_id": "17818c67-7317-49a3-835e-d4bee190b513",
+   "order": 1,
+   "title": "HTTP 헤더 끝의 개행(CRLF 2회) 중 하나를 빼고 전송",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "7faac9d5-ddae-468b-90a2-99ae6e5c50f4",
+   "parent_id": "17818c67-7317-49a3-835e-d4bee190b513",
+   "order": 2,
+   "title": "서버는 헤더가 끝나지 않았다고 보고 연결을 계속 대기",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "f2164ae8-57a0-436c-8fce-3f65b401047a",
+   "parent_id": "f9876769-c16c-402f-94e7-0b9bb6900408",
+   "order": 6,
+   "title": "RUDY (R-U-Dead-Yet)",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "988d8cc0-02a6-4926-af84-da543b3f6c2f",
+   "parent_id": "f2164ae8-57a0-436c-8fce-3f65b401047a",
+   "order": 0,
+   "title": "POST 메소드를 이용한 Slow 공격",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "584c5ec9-cce8-44c7-b00b-70c3d749d6de",
+   "parent_id": "f2164ae8-57a0-436c-8fce-3f65b401047a",
+   "order": 1,
+   "title": "Content-Length를 매우 크게 설정 후 데이터를 아주 조금씩 전송",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "b5faff97-ed67-4bf6-a4f5-b0f0ee4dddab",
+   "parent_id": "f9876769-c16c-402f-94e7-0b9bb6900408",
+   "order": 7,
+   "title": "Slow Read Attack",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "54dc30fa-8c0a-462c-a1a1-122f254f066e",
+   "parent_id": "b5faff97-ed67-4bf6-a4f5-b0f0ee4dddab",
+   "order": 0,
+   "title": "TCP Window Size를 악용",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "a5c61c08-539a-4d80-9082-27a6b9d0afb6",
+   "parent_id": "b5faff97-ed67-4bf6-a4f5-b0f0ee4dddab",
+   "order": 1,
+   "title": "클라이언트는 수신 가능 크기를 Window Size 필드로 알림",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "46c0b9c6-512b-44d6-b322-29800af8f7aa",
+   "parent_id": "b5faff97-ed67-4bf6-a4f5-b0f0ee4dddab",
+   "order": 2,
+   "title": "Window Size를 매우 작게 설정해 응답을 느리게 받으며 연결을 장시간 유지",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "ded4021d-3249-4b4f-8b42-0c69828ea911",
+   "parent_id": "f9876769-c16c-402f-94e7-0b9bb6900408",
+   "order": 8,
+   "title": "SIP Flood",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "428e8a69-1d93-4c04-aaa2-3fde20354998",
+   "parent_id": "ded4021d-3249-4b4f-8b42-0c69828ea911",
+   "order": 0,
+   "title": "VoIP 연결용 프로토콜(SIP)의 프록시 서버에 대량 요청",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "c2d0ba99-f286-46a5-b6a9-b1d7014d0d10",
+   "parent_id": "ded4021d-3249-4b4f-8b42-0c69828ea911",
+   "order": 1,
+   "title": "SIP 프록시 서버에 과부하",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "20afcd70-9386-4520-82c6-75ec37e6fd38",
+   "parent_id": "afb460ab-006c-4738-bfa7-889c6630a45e",
+   "order": 6,
+   "title": "스캐닝",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "0d4bb7f6-e591-44bf-b040-b5aac1a8a05b",
+   "parent_id": "20afcd70-9386-4520-82c6-75ec37e6fd38",
+   "order": 0,
+   "title": "Sweep 스캔",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "f07716a0-b911-415d-a336-f5f1cc8bd3f1",
+   "parent_id": "0d4bb7f6-e591-44bf-b040-b5aac1a8a05b",
+   "order": 0,
+   "title": "네트워크 내 시스템의 작동 여부를 확인",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "9d6a17c4-f4eb-4786-8cea-d901508c9c1d",
+   "parent_id": "0d4bb7f6-e591-44bf-b040-b5aac1a8a05b",
+   "order": 1,
+   "title": "사용 중인 IP 주소와 네트워크 범위를 파악",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "c7b81e28-76f7-495f-a187-997d7be0c64f",
+   "parent_id": "0d4bb7f6-e591-44bf-b040-b5aac1a8a05b",
+   "order": 2,
+   "title": "요청에 대한 응답 여부로 판단",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "705c3d12-dfe3-49a8-b98e-633dd669a0bf",
+   "parent_id": "0d4bb7f6-e591-44bf-b040-b5aac1a8a05b",
+   "order": 3,
+   "title": "종류: ICMP Sweep, TCP Sweep, UDP Sweep",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "bab16800-a800-46ca-96cc-1bd0d48f109f",
+   "parent_id": "20afcd70-9386-4520-82c6-75ec37e6fd38",
+   "order": 1,
+   "title": "Open 스캔",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "65a1cf5a-a303-4d19-b055-a1901a19a414",
+   "parent_id": "bab16800-a800-46ca-96cc-1bd0d48f109f",
+   "order": 0,
+   "title": "포트 활성화 여부와 제공 서비스를 파악",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "21fa49d8-b965-437d-a36a-49db50a25e6d",
+   "parent_id": "bab16800-a800-46ca-96cc-1bd0d48f109f",
+   "order": 1,
+   "title": "TCP Full Open 스캔",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "0aed8630-149b-41ed-9f50-d871fb5163d4",
+   "parent_id": "21fa49d8-b965-437d-a36a-49db50a25e6d",
+   "order": 0,
+   "title": "3-Way Handshake를 완전히 수행",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "b2dca896-2b1e-4915-906c-cd41f9dc4703",
+   "parent_id": "21fa49d8-b965-437d-a36a-49db50a25e6d",
+   "order": 1,
+   "title": "열림: SYN/ACK 수신 후 ACK 전송",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "2a7da4a9-b51f-4d1b-8cff-5748389a20e4",
+   "parent_id": "21fa49d8-b965-437d-a36a-49db50a25e6d",
+   "order": 2,
+   "title": "닫힘: RST/ACK 수신",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "ce315674-fd06-4f7b-9604-c181a22ea1c5",
+   "parent_id": "21fa49d8-b965-437d-a36a-49db50a25e6d",
+   "order": 3,
+   "title": "연결 로그가 남아 탐지되기 쉬움",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "a3f5d74e-f5a1-4859-8189-5de4eea52c00",
+   "parent_id": "bab16800-a800-46ca-96cc-1bd0d48f109f",
+   "order": 2,
+   "title": "TCP Half Open 스캔 (SYN 스캔)",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "34b818a2-be1e-48da-90d6-dd9453bd2c63",
+   "parent_id": "a3f5d74e-f5a1-4859-8189-5de4eea52c00",
+   "order": 0,
+   "title": "SYN만 보내고 SYN/ACK를 받으면 즉시 RST로 끊음",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "586c6ef1-acd7-4510-a09d-10bfcd46fcc2",
+   "parent_id": "a3f5d74e-f5a1-4859-8189-5de4eea52c00",
+   "order": 1,
+   "title": "완전한 연결을 맺지 않아 로그가 잘 남지 않음",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "4edb429a-3664-4499-ace4-726f4058b72f",
+   "parent_id": "bab16800-a800-46ca-96cc-1bd0d48f109f",
+   "order": 3,
+   "title": "UDP 스캔",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "ffa8f9d7-dc25-48f8-898f-b8109914fad1",
+   "parent_id": "4edb429a-3664-4499-ace4-726f4058b72f",
+   "order": 0,
+   "title": "닫힌 포트는 ICMP Port Unreachable 응답",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "dcd11084-963e-4dee-b0d1-edbba8202261",
+   "parent_id": "4edb429a-3664-4499-ace4-726f4058b72f",
+   "order": 1,
+   "title": "응답이 없으면 열림 또는 필터링으로 판단",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "327cda2c-8c0e-4744-975f-6590512519b2",
+   "parent_id": "4edb429a-3664-4499-ace4-726f4058b72f",
+   "order": 2,
+   "title": "라우터·방화벽에서 손실될 수 있어 신뢰도 낮음",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "f5b54127-71b7-4485-9210-2dfcd8b32d57",
+   "parent_id": "20afcd70-9386-4520-82c6-75ec37e6fd38",
+   "order": 2,
+   "title": "Stealth 스캔",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "bb5c9fed-46d4-4428-a4f5-34b9c9c94811",
+   "parent_id": "f5b54127-71b7-4485-9210-2dfcd8b32d57",
+   "order": 0,
+   "title": "TCP 헤더 플래그를 조작한 패킷으로 포트 상태 파악",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "b22f883c-051c-44d7-b3eb-fa56e14e2d4b",
+   "parent_id": "f5b54127-71b7-4485-9210-2dfcd8b32d57",
+   "order": 1,
+   "title": "FIN 스캔",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "98830dfc-d19d-47a5-a91b-4f7e003a9896",
+   "parent_id": "b22f883c-051c-44d7-b3eb-fa56e14e2d4b",
+   "order": 0,
+   "title": "FIN 플래그만 설정",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "c6d0dfca-e1bc-4e66-b6fb-ae27da6b06a2",
+   "parent_id": "f5b54127-71b7-4485-9210-2dfcd8b32d57",
+   "order": 2,
+   "title": "NULL 스캔",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "696ec9be-ac51-49cf-85a7-7b95a48a3f1d",
+   "parent_id": "c6d0dfca-e1bc-4e66-b6fb-ae27da6b06a2",
+   "order": 0,
+   "title": "플래그를 하나도 설정하지 않음",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "55d48f14-6cb4-4659-8994-69071bd808c1",
+   "parent_id": "f5b54127-71b7-4485-9210-2dfcd8b32d57",
+   "order": 3,
+   "title": "XMAS 스캔",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "701acbfb-02b2-480e-b46e-9c3386312ddb",
+   "parent_id": "55d48f14-6cb4-4659-8994-69071bd808c1",
+   "order": 0,
+   "title": "FIN, PSH, URG 등 여러 플래그를 모두 설정",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "01fa1390-b747-42b1-96ba-6c60f4fc49fe",
+   "parent_id": "f5b54127-71b7-4485-9210-2dfcd8b32d57",
+   "order": 4,
+   "title": "FIN/NULL/XMAS 응답 판단",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "64af6fda-c2a9-4471-85cb-6fdb121ccb0e",
+   "parent_id": "01fa1390-b747-42b1-96ba-6c60f4fc49fe",
+   "order": 0,
+   "title": "열림: 응답 없음",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "b500afd0-5ab7-4af1-b6b9-da1c6b80e319",
+   "parent_id": "01fa1390-b747-42b1-96ba-6c60f4fc49fe",
+   "order": 1,
+   "title": "닫힘: RST 응답",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "88dd6516-8360-42c5-b3a1-d38398110eae",
+   "parent_id": "f5b54127-71b7-4485-9210-2dfcd8b32d57",
+   "order": 5,
+   "title": "TCP ACK 스캔",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "6f67d1ed-7116-47b9-8d0b-7894f620038b",
+   "parent_id": "88dd6516-8360-42c5-b3a1-d38398110eae",
+   "order": 0,
+   "title": "방화벽 필터링 정책 확인용",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "bc16078b-2696-42e7-a241-0719fc7e62f0",
+   "parent_id": "88dd6516-8360-42c5-b3a1-d38398110eae",
+   "order": 1,
+   "title": "ACK 플래그만 설정해 전송",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "70569fd6-7985-4ad4-934e-62790f9a7426",
+   "parent_id": "88dd6516-8360-42c5-b3a1-d38398110eae",
+   "order": 2,
+   "title": "상태 기반 방화벽 여부와 포트 필터링 여부 파악",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "4fb335f3-bd9c-4fc4-81a5-397332442ba2",
+   "parent_id": "f5b54127-71b7-4485-9210-2dfcd8b32d57",
+   "order": 6,
+   "title": "Decoy 스캔",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "16a63dd2-c8f2-4734-abd9-8c1228cf0245",
+   "parent_id": "4fb335f3-bd9c-4fc4-81a5-397332442ba2",
+   "order": 0,
+   "title": "여러 위조 주소와 함께 스캔해 실제 스캐너 주소 식별을 어렵게 함",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "5702634e-dca3-4f60-9b9d-c9b4aa50cf69",
+   "parent_id": "20afcd70-9386-4520-82c6-75ec37e6fd38",
+   "order": 3,
+   "title": "OS Fingerprinting",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "5ff702a0-5641-431f-95aa-1f72bff21e92",
+   "parent_id": "5702634e-dca3-4f60-9b9d-c9b4aa50cf69",
+   "order": 0,
+   "title": "대상 시스템의 OS를 알아내는 기법",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "d1518101-377d-4bb6-9f61-8407544b4a89",
+   "parent_id": "5702634e-dca3-4f60-9b9d-c9b4aa50cf69",
+   "order": 1,
+   "title": "TCP 초기 순서번호, TTL, ToS, Window Size 확인",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "08252910-bbff-4d48-8de2-6f3367665db9",
+   "parent_id": "5702634e-dca3-4f60-9b9d-c9b4aa50cf69",
+   "order": 2,
+   "title": "배너 그래빙",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "442c0051-47c1-414c-a94e-f5bd862b35b6",
+   "parent_id": "afb460ab-006c-4738-bfa7-889c6630a45e",
+   "order": 7,
+   "title": "스니핑",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "2b88e6c7-180c-4e89-a4ff-3b14d9845022",
+   "parent_id": "442c0051-47c1-414c-a94e-f5bd862b35b6",
+   "order": 0,
+   "title": "허브 환경",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "a9183546-06ca-4d5c-9ff9-383ad2f1dedf",
+   "parent_id": "2b88e6c7-180c-4e89-a4ff-3b14d9845022",
+   "order": 0,
+   "title": "허브는 들어온 패킷을 나머지 모든 포트로 전달",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "006c7af7-e1e5-4b9c-8a4b-8e20706b606c",
+   "parent_id": "2b88e6c7-180c-4e89-a4ff-3b14d9845022",
+   "order": 1,
+   "title": "NIC를 Promiscuous 모드로 설정하면 모든 패킷 수신 가능",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "c8a216e4-ee4c-440a-9763-44f9e1571c4f",
+   "parent_id": "2b88e6c7-180c-4e89-a4ff-3b14d9845022",
+   "order": 2,
+   "title": "스니핑 도구로 패킷 분석",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "6be528a2-a242-4a6e-81b2-f7b40b6efcc5",
+   "parent_id": "442c0051-47c1-414c-a94e-f5bd862b35b6",
+   "order": 1,
+   "title": "스위치 재밍 (MAC Flooding)",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "5ab2ab8d-302d-4590-bcbf-eb31aa454c59",
+   "parent_id": "6be528a2-a242-4a6e-81b2-f7b40b6efcc5",
+   "order": 0,
+   "title": "위조 MAC으로 스위치 MAC 주소 테이블을 오버플로우",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "3bd3313d-9a98-42d4-8c40-beb8520b58d1",
+   "parent_id": "6be528a2-a242-4a6e-81b2-f7b40b6efcc5",
+   "order": 1,
+   "title": "스위치는 Fail Open 정책이라 허브처럼 동작",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "97c371dc-b321-4882-bc75-8ae6a5ae0d7b",
+   "parent_id": "442c0051-47c1-414c-a94e-f5bd862b35b6",
+   "order": 2,
+   "title": "ARP 스푸핑 기반 스니핑",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "9c35ee77-9673-4be6-924f-ad23ab272f54",
+   "parent_id": "97c371dc-b321-4882-bc75-8ae6a5ae0d7b",
+   "order": 0,
+   "title": "특정 호스트의 MAC을 공격자 MAC으로 위조한 ARP Reply를 희생자에게 지속 전송",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "50eecbaf-f325-49de-9217-e2dfa86f579d",
+   "parent_id": "97c371dc-b321-4882-bc75-8ae6a5ae0d7b",
+   "order": 1,
+   "title": "희생자 ARP 캐시가 공격자 MAC으로 변경",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "dbbe6d5e-59f9-4f66-a753-64954bb3230c",
+   "parent_id": "97c371dc-b321-4882-bc75-8ae6a5ae0d7b",
+   "order": 2,
+   "title": "희생자가 해당 호스트로 보내는 패킷을 스니핑",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "ba7545d2-159c-44f4-b9ef-603fc4ae3b25",
+   "parent_id": "442c0051-47c1-414c-a94e-f5bd862b35b6",
+   "order": 3,
+   "title": "ARP 리다이렉트",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "259a752d-f22f-4665-91cf-ab3fbb8dcf85",
+   "parent_id": "ba7545d2-159c-44f4-b9ef-603fc4ae3b25",
+   "order": 0,
+   "title": "공격자가 라우터의 MAC으로 위조한 ARP Reply를 브로드캐스트",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "30d81406-120d-49d6-ab91-5bc9ed4e740c",
+   "parent_id": "ba7545d2-159c-44f4-b9ef-603fc4ae3b25",
+   "order": 1,
+   "title": "로컬 네트워크 모든 호스트와 라우터 간 트래픽 스니핑",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "353dbabd-31f4-4a22-a384-91a34469f15f",
+   "parent_id": "ba7545d2-159c-44f4-b9ef-603fc4ae3b25",
+   "order": 2,
+   "title": "IP Forwarding으로 패킷을 원래 목적지로 넘겨 사용자가 눈치채지 못하게 함",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "3ac332ef-6841-4501-b40c-1ad8c69d7b6f",
+   "parent_id": "442c0051-47c1-414c-a94e-f5bd862b35b6",
+   "order": 4,
+   "title": "ICMP 리다이렉트",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "c264310c-020a-41ae-ac71-7252e3906f88",
+   "parent_id": "3ac332ef-6841-4501-b40c-1ad8c69d7b6f",
+   "order": 0,
+   "title": "3계층에서 공격자 시스템을 다른 라우터라고 알림",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "4d8aee20-69c1-4046-ad96-f6a75526963d",
+   "parent_id": "3ac332ef-6841-4501-b40c-1ad8c69d7b6f",
+   "order": 1,
+   "title": "패킷 흐름을 공격자 쪽으로 변경",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "d3d7fb2c-1efe-419a-833d-92dc08c90baf",
+   "parent_id": "442c0051-47c1-414c-a94e-f5bd862b35b6",
+   "order": 5,
+   "title": "SPAN / Port Mirroring",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "c441a202-b820-4b3f-b156-ada2ac48703a",
+   "parent_id": "d3d7fb2c-1efe-419a-833d-92dc08c90baf",
+   "order": 0,
+   "title": "스위치를 지나는 트래픽을 특정 포트로 복사하는 기능",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "b534029b-c15d-427b-aa54-751d36dd5a5c",
+   "parent_id": "d3d7fb2c-1efe-419a-833d-92dc08c90baf",
+   "order": 1,
+   "title": "해당 포트에 접근해 스니핑",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "7ccc596f-2ba5-4db4-88a5-ffef2f3eb78e",
+   "parent_id": "afb460ab-006c-4738-bfa7-889c6630a45e",
+   "order": 8,
+   "title": "스푸핑",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "072f9833-80bb-45b6-b05f-e199d66c31d9",
+   "parent_id": "7ccc596f-2ba5-4db4-88a5-ffef2f3eb78e",
+   "order": 0,
+   "title": "중간자 공격, DoS 등에 활용",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "ce6799b7-dfd3-4f46-9b74-c39c012f7041",
+   "parent_id": "7ccc596f-2ba5-4db4-88a5-ffef2f3eb78e",
+   "order": 1,
+   "title": "ARP 스푸핑",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "2399389c-217d-4ef3-9c17-55eabce27c2c",
+   "parent_id": "ce6799b7-dfd3-4f46-9b74-c39c012f7041",
+   "order": 0,
+   "title": "ARP는 IP 주소를 MAC 주소로 변환하는 프로토콜",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "081f5bb7-1abc-49b4-870b-2829fd26f9ed",
+   "parent_id": "ce6799b7-dfd3-4f46-9b74-c39c012f7041",
+   "order": 1,
+   "title": "호스트의 ARP 테이블에 위조된 MAC 주소가 등록되게 함",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "c0b33766-f656-4cd8-bcaa-205374134d4f",
+   "parent_id": "ce6799b7-dfd3-4f46-9b74-c39c012f7041",
+   "order": 2,
+   "title": "캐시를 유지하려면 주기적으로 위조 패킷을 보내야 함",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "88fd2663-2223-41c2-bdc7-4154cc7ab667",
+   "parent_id": "ce6799b7-dfd3-4f46-9b74-c39c012f7041",
+   "order": 3,
+   "title": "대책: 관리자가 ARP 테이블을 정적(static)으로 설정",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "a8e4f426-b246-4863-b284-069b119ad344",
+   "parent_id": "7ccc596f-2ba5-4db4-88a5-ffef2f3eb78e",
+   "order": 2,
+   "title": "IP 스푸핑",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "1c565b0e-7e9b-4f1d-928f-b521ea931bc9",
+   "parent_id": "a8e4f426-b246-4863-b284-069b119ad344",
+   "order": 0,
+   "title": "신뢰 관계에 있는 IP로 위장",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "98149530-edf8-4b0a-ba52-0ab3025c8e4c",
+   "parent_id": "a8e4f426-b246-4863-b284-069b119ad344",
+   "order": 1,
+   "title": "원래 신뢰 시스템을 SYN Flooding으로 무력화한 뒤 위장",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "2f1f3537-be7f-4079-b68a-8e2eb56a24bf",
+   "parent_id": "7ccc596f-2ba5-4db4-88a5-ffef2f3eb78e",
+   "order": 3,
+   "title": "DNS 스푸핑",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "f41a024b-0f26-4cb3-8513-e4a34bf59b1f",
+   "parent_id": "2f1f3537-be7f-4079-b68a-8e2eb56a24bf",
+   "order": 0,
+   "title": "DNS는 UDP 기반이라 세션이 없음",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "f1975075-c28f-44ee-96b3-c82200e4c532",
+   "parent_id": "2f1f3537-be7f-4079-b68a-8e2eb56a24bf",
+   "order": 1,
+   "title": "실제 DNS 서버보다 먼저 위조 Response를 보냄",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "46c17fd2-4b3e-455f-9b9e-c448a234370f",
+   "parent_id": "2f1f3537-be7f-4079-b68a-8e2eb56a24bf",
+   "order": 2,
+   "title": "대상이 잘못된 IP의 웹사이트로 접속",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "b257dab4-8354-47f1-8449-e142f1a29410",
+   "parent_id": "7ccc596f-2ba5-4db4-88a5-ffef2f3eb78e",
+   "order": 4,
+   "title": "이메일 스푸핑",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "d18f41a3-8ca9-44e5-8223-1401840fc263",
+   "parent_id": "b257dab4-8354-47f1-8449-e142f1a29410",
+   "order": 0,
+   "title": "발신자를 위조, 사회공학 기법에 속함",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "6bd8cade-0188-4927-a59c-cb5c83021dab",
+   "parent_id": "afb460ab-006c-4738-bfa7-889c6630a45e",
+   "order": 9,
+   "title": "세션 하이재킹",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "4ef11b04-cd64-4282-bfe6-5a22c90a2a92",
+   "parent_id": "6bd8cade-0188-4927-a59c-cb5c83021dab",
+   "order": 0,
+   "title": "정상 통신 중인 사용자의 세션을 가로채 인증 없이 통신을 이어감",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "1fd29518-0f0d-40a8-9861-5c288323f56a",
+   "parent_id": "6bd8cade-0188-4927-a59c-cb5c83021dab",
+   "order": 1,
+   "title": "OTP, 챌린지/응답 인증도 무력화 가능",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "82666ad6-74c3-4747-b4e7-94a714c9c6dd",
+   "parent_id": "6bd8cade-0188-4927-a59c-cb5c83021dab",
+   "order": 2,
+   "title": "순서번호 추론 기반 TCP 하이재킹",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "0f95f162-a59c-4b67-b96c-85963876effd",
+   "parent_id": "82666ad6-74c3-4747-b4e7-94a714c9c6dd",
+   "order": 0,
+   "title": "클라이언트를 DoS로 무력화하고 IP 스푸핑",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "94a219d4-41e1-4126-8a23-17d3ee6ce819",
+   "parent_id": "82666ad6-74c3-4747-b4e7-94a714c9c6dd",
+   "order": 1,
+   "title": "서버에 SYN 전송",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "76f3c15e-4a15-4625-9c2b-f1f35f2b8147",
+   "parent_id": "82666ad6-74c3-4747-b4e7-94a714c9c6dd",
+   "order": 2,
+   "title": "서버의 순서번호를 추론해 ACK 응답",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "8334daa9-8c7c-4228-af39-cbdd0714d822",
+   "parent_id": "82666ad6-74c3-4747-b4e7-94a714c9c6dd",
+   "order": 3,
+   "title": "서버 응답은 원래 클라이언트로 가므로 일방향 전송만 가능",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "57365e79-cc67-4d02-9109-fae66e49cf1c",
+   "parent_id": "6bd8cade-0188-4927-a59c-cb5c83021dab",
+   "order": 3,
+   "title": "스니핑 기반 TCP 하이재킹",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "bca5ddca-d0ac-4ae3-828f-01c69ae49e85",
+   "parent_id": "57365e79-cc67-4d02-9109-fae66e49cf1c",
+   "order": 0,
+   "title": "스니핑으로 세션과 시퀀스 넘버 획득",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "389055b5-3278-4050-b39f-4787212a9e70",
+   "parent_id": "57365e79-cc67-4d02-9109-fae66e49cf1c",
+   "order": 1,
+   "title": "RST 패킷으로 서버 쪽 연결만 끊음",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "76c27e99-0b81-41e6-940a-a5e8db337027",
+   "parent_id": "57365e79-cc67-4d02-9109-fae66e49cf1c",
+   "order": 2,
+   "title": "새 시퀀스 넘버로 서버와 세션 재생성",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "8319cb1a-57cf-4ee9-9a2c-60a34a10435c",
+   "parent_id": "6bd8cade-0188-4927-a59c-cb5c83021dab",
+   "order": 4,
+   "title": "HTTP 세션 하이재킹",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "25ec5c30-7c67-4404-add3-506a9afacae2",
+   "parent_id": "8319cb1a-57cf-4ee9-9a2c-60a34a10435c",
+   "order": 0,
+   "title": "유효기간이 남은 세션 식별자(쿠키 등)를 가로채 사용",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "0029dc69-7e97-4213-9e6a-2e6c3e6a7754",
+   "parent_id": "afb460ab-006c-4738-bfa7-889c6630a45e",
+   "order": 10,
+   "title": "원격 공격 (Remote Attack)",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "084f9934-49e0-4867-be2d-9288c7338b9c",
+   "parent_id": "0029dc69-7e97-4213-9e6a-2e6c3e6a7754",
+   "order": 0,
+   "title": "트로이 목마 (Trojan)",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "77b217ff-75b0-4279-bdb6-4ee120666382",
+   "parent_id": "084f9934-49e0-4867-be2d-9288c7338b9c",
+   "order": 0,
+   "title": "악성 프로그램을 정상 프로그램처럼 위장",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "87987c3b-26d0-4112-990b-f0c8ee1dc706",
+   "parent_id": "084f9934-49e0-4867-be2d-9288c7338b9c",
+   "order": 1,
+   "title": "실행 시 특정 포트를 열어 공격자 침입을 도움",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "ac389f3c-a1e0-4377-a513-08b819302b63",
+   "parent_id": "0029dc69-7e97-4213-9e6a-2e6c3e6a7754",
+   "order": 1,
+   "title": "익스플로잇 (Exploit)",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  },
+  {
+   "id": "ddd08fa0-5613-46c2-8eb5-a7df753418d9",
+   "parent_id": "ac389f3c-a1e0-4377-a513-08b819302b63",
+   "order": 0,
+   "title": "OS·소프트웨어의 버그를 이용해 루트 권한 획득 등을 수행하는 공격 코드",
+   "note": null,
+   "aliases": "[]",
+   "collapsed": null
+  }
+ ]
+}

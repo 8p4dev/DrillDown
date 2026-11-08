@@ -1,0 +1,222 @@
+네트워크 기반 공격의 이해
+  네트워크 기반 공격
+    네트워크 기반 공격의 이해
+      TCP SYN Flooding
+        3-Way Handshake의 Half-Open 연결을 악용
+        방법
+          공격자가 다수의 SYN을 대상에 전송
+          대상은 SYN/ACK를 보내지만 공격자는 ACK로 응답하지 않음
+          TCP 연결 테이블(Backlog Queue)이 가득 차 이후 연결 요청 거부
+        대책
+          방화벽·DDoS 대응 장비에서 동일 출발지의 연결 요청 임계치 설정
+          SYN Cookie 사용
+          First SYN Drop 설정
+          TCP 연결 테이블 엔트리 선택적 삭제 (권장되지 않음)
+      Smurf Attack
+        IP 위장 + ICMP 특성을 이용한 공격
+        방법
+          출발지 IP를 공격 대상으로 위장
+          목적지를 Directed Broadcast 주소(외부 네트워크의 모든 호스트 대상)로 설정해 ICMP Echo Request 전송
+          브로드캐스트를 받은 다수 시스템이 ICMP Echo Reply를 공격 대상에게 전송
+        대책
+          외부 네트워크에서 들어오는 Directed Broadcast 차단 (no ip directed-broadcast)
+          동일한 ICMP Echo Reply가 대량 유입되면 모두 Drop
+      LAND Attack
+        출발지 IP와 목적지 IP를 모두 공격 대상 IP로 설정
+        대상이 자기 자신에게 응답하며 루프·자원 소진
+        대책: 출발지와 목적지가 같은 패킷 차단
+      Ping of Death
+        ICMP 패킷을 최대 크기(65,535바이트) 이상으로 크게 만들어 전송
+        전송 중 단편화(Fragmentation)되고 대상은 재조합 과정에서 과부하·오류
+        대책: 일정 크기 이상 ICMP 차단
+      Teardrop Attack
+        단편화된 패킷의 Fragment Offset을 고의로 조작해 재조합 오류 유발
+        변종: Bonk
+          순서번호(Offset)를 모두 1번으로 설정
+        변종: Boink
+          정상 순서로 보내다가 중간부터 순서번호를 조작
+      DNS 싱크홀
+        악성 봇과 C&C(조종자) 서버 간 접속을 차단하는 시스템
+        PC가 C&C 주소로 접속하려 하면 싱크홀 서버가 대신 응답
+        KISA가 ISP와 협력해 운영, C&C 주소를 주기적으로 갱신
+    전통적인 DDoS 공격 도구
+      Trinoo
+        UDP Flood 서비스 거부 공격 유발
+      TFN (Tribe Flood Network)
+        Trinoo의 발전된 형태
+        UDP Flood, TCP SYN Flood, ICMP Echo Flood, Smurf 공격 가능
+      TFN2K
+        TFN의 발전된 형태
+        통신 포트를 임의로 결정, 암호화 사용
+      Stacheldraht
+        Trinoo와 TFN의 발전된 형태
+        마스터와 에이전트 데몬 간 통신을 암호화
+    DDoS 공격 유형별 분류
+      대역폭 공격
+        높은 bps
+        UDP, ICMP 프로토콜 악용
+      자원 소진 공격
+        높은 pps
+        TCP 프로토콜 악용
+      웹/DB 부하 공격
+        HTTP 요청으로 웹서버·DB 자원 소진
+    대역폭 공격
+      UDP Flooding
+        출발지 IP를 위조한 뒤 대량의 UDP 데이터를 대상에 전송
+        대상 시스템이 해당 UDP 포트를 사용하지 않아도 공격 가능
+      ICMP Flooding
+        대량의 ICMP Echo Request 패킷을 대상에 전송
+        증폭이 발생하지 않음
+      DRDoS (Distributed Reflection DoS)
+        TCP, UDP, ICMP 프로토콜 이용
+        출발지 IP를 대상으로 위조해 반사 서버의 응답이 대상에게 몰림
+        경로가 다양하고 계속 변경 가능해 추적·차단이 어려움 (가장 위험)
+        반사 공격 종류
+          DNS Reflection Attack
+            DNS 서버의 큰 응답을 이용
+          NTP Reflection Attack
+            Network Time Protocol 서버 이용
+          CLDAP Reflection Attack
+            디렉터리 연결·검색·수정 프로토콜(LDAP)의 UDP 버전 이용
+          SSDP Reflection Attack
+            UPnP 장치(주로 IoT)를 찾고 알리는 Simple Service Discovery Protocol 이용
+          Memcached Reflection Attack
+            분산 메모리에 데이터를 캐싱하는 서비스 이용
+          CoAP Reflection Attack
+            저전력 IoT용 UDP 기반 프로토콜 이용
+    자원 소진 공격
+      ACK Flooding
+        3-Way Handshake를 악용해 대량의 ACK 패킷을 대상에 전송
+        대상은 세션 테이블 확인에 자원 소모
+      DNS Query Flooding
+        DNS 서버에 대량의 질의를 보내 DNS 서버 자원 소진
+        송신 IP를 위조하면 응답이 목표 시스템으로 향함
+    웹/DB 부하 공격
+      GET Flooding
+        3-Way Handshake로 정상 세션을 맺은 뒤 대량의 HTTP GET 요청
+        웹서버·DB서버 자원 소진
+      GET Flooding with Cache-Control (CC Attack)
+        보통 웹서버 부하 감소를 위해 캐싱 서버 운영
+        HTTP 헤더의 Cache-Control 옵션(no-cache 등)을 조작
+        캐싱 서버가 아닌 웹서버가 직접 처리하도록 유도
+      동적 HTTP Request Flooding
+        차단을 피하려고 요청 페이지(URL)를 계속 변경
+      HULK DoS
+        GET Flooding의 일종
+        공격 대상 URL을 계속 바꿔 DDoS 차단 정책 우회
+      Hash DoS
+        해시 충돌을 대량 유발
+        해시 테이블 조회가 선형 탐색이 되어 CPU 자원 소진
+      Slowloris
+        GET Flooding과 비슷하지만 소량의 트래픽으로 공격
+        HTTP 헤더 끝의 개행(CRLF 2회) 중 하나를 빼고 전송
+        서버는 헤더가 끝나지 않았다고 보고 연결을 계속 대기
+      RUDY (R-U-Dead-Yet)
+        POST 메소드를 이용한 Slow 공격
+        Content-Length를 매우 크게 설정 후 데이터를 아주 조금씩 전송
+      Slow Read Attack
+        TCP Window Size를 악용
+        클라이언트는 수신 가능 크기를 Window Size 필드로 알림
+        Window Size를 매우 작게 설정해 응답을 느리게 받으며 연결을 장시간 유지
+      SIP Flood
+        VoIP 연결용 프로토콜(SIP)의 프록시 서버에 대량 요청
+        SIP 프록시 서버에 과부하
+    스캐닝
+      Sweep 스캔
+        네트워크 내 시스템의 작동 여부를 확인
+        사용 중인 IP 주소와 네트워크 범위를 파악
+        요청에 대한 응답 여부로 판단
+        종류: ICMP Sweep, TCP Sweep, UDP Sweep
+      Open 스캔
+        포트 활성화 여부와 제공 서비스를 파악
+        TCP Full Open 스캔
+          3-Way Handshake를 완전히 수행
+          열림: SYN/ACK 수신 후 ACK 전송
+          닫힘: RST/ACK 수신
+          연결 로그가 남아 탐지되기 쉬움
+        TCP Half Open 스캔 (SYN 스캔)
+          SYN만 보내고 SYN/ACK를 받으면 즉시 RST로 끊음
+          완전한 연결을 맺지 않아 로그가 잘 남지 않음
+        UDP 스캔
+          닫힌 포트는 ICMP Port Unreachable 응답
+          응답이 없으면 열림 또는 필터링으로 판단
+          라우터·방화벽에서 손실될 수 있어 신뢰도 낮음
+      Stealth 스캔
+        TCP 헤더 플래그를 조작한 패킷으로 포트 상태 파악
+        FIN 스캔
+          FIN 플래그만 설정
+        NULL 스캔
+          플래그를 하나도 설정하지 않음
+        XMAS 스캔
+          FIN, PSH, URG 등 여러 플래그를 모두 설정
+        FIN/NULL/XMAS 응답 판단
+          열림: 응답 없음
+          닫힘: RST 응답
+        TCP ACK 스캔
+          방화벽 필터링 정책 확인용
+          ACK 플래그만 설정해 전송
+          상태 기반 방화벽 여부와 포트 필터링 여부 파악
+        Decoy 스캔
+          여러 위조 주소와 함께 스캔해 실제 스캐너 주소 식별을 어렵게 함
+      OS Fingerprinting
+        대상 시스템의 OS를 알아내는 기법
+        TCP 초기 순서번호, TTL, ToS, Window Size 확인
+        배너 그래빙
+    스니핑
+      허브 환경
+        허브는 들어온 패킷을 나머지 모든 포트로 전달
+        NIC를 Promiscuous 모드로 설정하면 모든 패킷 수신 가능
+        스니핑 도구로 패킷 분석
+      스위치 재밍 (MAC Flooding)
+        위조 MAC으로 스위치 MAC 주소 테이블을 오버플로우
+        스위치는 Fail Open 정책이라 허브처럼 동작
+      ARP 스푸핑 기반 스니핑
+        특정 호스트의 MAC을 공격자 MAC으로 위조한 ARP Reply를 희생자에게 지속 전송
+        희생자 ARP 캐시가 공격자 MAC으로 변경
+        희생자가 해당 호스트로 보내는 패킷을 스니핑
+      ARP 리다이렉트
+        공격자가 라우터의 MAC으로 위조한 ARP Reply를 브로드캐스트
+        로컬 네트워크 모든 호스트와 라우터 간 트래픽 스니핑
+        IP Forwarding으로 패킷을 원래 목적지로 넘겨 사용자가 눈치채지 못하게 함
+      ICMP 리다이렉트
+        3계층에서 공격자 시스템을 다른 라우터라고 알림
+        패킷 흐름을 공격자 쪽으로 변경
+      SPAN / Port Mirroring
+        스위치를 지나는 트래픽을 특정 포트로 복사하는 기능
+        해당 포트에 접근해 스니핑
+    스푸핑
+      중간자 공격, DoS 등에 활용
+      ARP 스푸핑
+        ARP는 IP 주소를 MAC 주소로 변환하는 프로토콜
+        호스트의 ARP 테이블에 위조된 MAC 주소가 등록되게 함
+        캐시를 유지하려면 주기적으로 위조 패킷을 보내야 함
+        대책: 관리자가 ARP 테이블을 정적(static)으로 설정
+      IP 스푸핑
+        신뢰 관계에 있는 IP로 위장
+        원래 신뢰 시스템을 SYN Flooding으로 무력화한 뒤 위장
+      DNS 스푸핑
+        DNS는 UDP 기반이라 세션이 없음
+        실제 DNS 서버보다 먼저 위조 Response를 보냄
+        대상이 잘못된 IP의 웹사이트로 접속
+      이메일 스푸핑
+        발신자를 위조, 사회공학 기법에 속함
+    세션 하이재킹
+      정상 통신 중인 사용자의 세션을 가로채 인증 없이 통신을 이어감
+      OTP, 챌린지/응답 인증도 무력화 가능
+      순서번호 추론 기반 TCP 하이재킹
+        클라이언트를 DoS로 무력화하고 IP 스푸핑
+        서버에 SYN 전송
+        서버의 순서번호를 추론해 ACK 응답
+        서버 응답은 원래 클라이언트로 가므로 일방향 전송만 가능
+      스니핑 기반 TCP 하이재킹
+        스니핑으로 세션과 시퀀스 넘버 획득
+        RST 패킷으로 서버 쪽 연결만 끊음
+        새 시퀀스 넘버로 서버와 세션 재생성
+      HTTP 세션 하이재킹
+        유효기간이 남은 세션 식별자(쿠키 등)를 가로채 사용
+    원격 공격 (Remote Attack)
+      트로이 목마 (Trojan)
+        악성 프로그램을 정상 프로그램처럼 위장
+        실행 시 특정 포트를 열어 공격자 침입을 도움
+      익스플로잇 (Exploit)
+        OS·소프트웨어의 버그를 이용해 루트 권한 획득 등을 수행하는 공격 코드
