@@ -89,3 +89,5 @@
 - 오케스트레이터: `public/og.png`(1200×630, Pretendard OFL, 중앙 안전 영역) 추가 — SS 의 `og:image` 경로.
 - 결정(CS 질문): `GET /api/t/:slug` = api.ts `SharedTree` 평평한 모양 + `id` 추가(SS 응답·CA 타입·CS sourceTreeId). 원격 반영 이벤트 `dd:remote{treeIds}` → EditorPage·TreeListPage 구독은 머지 후 오케스트레이터. 401 → `refreshMe()` 동적 호출. M4(커서 만료 뒤 이 기기에만 있는 트리)는 '올리기' 자동 + 토스트.
 - CA 에게 mock/sync.ts·mock/shared.ts 1줄 임시 수정 허용(CS 가 삭제 → 머지 때 삭제 쪽 채택).
+- **SS 완료 → 머지 bd948d5**(sync/trees/share/gallery/OG, owner.ts 11함수, sync.check C1~3·C6~11·C13~15·C17·C18·전이표 11행). 변경: 커서 만료 = `since < user_seq.purged_seq`(정확 판정), og:image 절대 URL, 소유자·관리자는 /api/t hidden 통과. CS 에 push.seq 로 커서를 올리지 말 것 전달.
+- UI QA 3차: LM(#16 + `dd:remote` 구독) → 머지 88b495b, DS(#5 #6 #7 #11 #12 #15 #24 + 테마 칸) → 머지 b645e2a. typecheck·lint·check 통과.
