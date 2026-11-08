@@ -78,9 +78,14 @@
 2. 오케스트레이터 E2E(`playwright.config.ts` 가 `node server/index.ts` 를 `AUTH_FAKE=1`·새 DB 로 띄움): 기존 13 + 신규 — ① 가짜 로그인 → 트리 생성 → 두 번째 컨텍스트 같은 사용자 로그인 → pull 로 트리 보임 ② 비로그인 로컬 트리 2개 → 로그인 → 병합 대화 → 저장 → 다른 컨텍스트에 보임 ③ 공유 시트 링크 → 비로그인 컨텍스트 `/t/<slug>` 보기·플래시 → 복제 → 목록에 생김 ④ 관리자 로그인 → 공개 트리 숨김 → `/t/<slug>` 403 화면 ⑤ 탈퇴 2단계 → 재로그인 복구.
 3. UI-First QA(진행 중, `06_ui_qa.md`) 결과는 이 단계 머지 뒤 소유자에게 수정 지시.
 
-## 6. 결과
+## 6. 결과 (2026-11-08)
 
-(통합 후 기록)
+- 상태: **완료**(CS 후속 1건 진행 중 — 잘못된 행 1개가 outbox 를 막는 문제).
+- 머지: SS bd948d5 → CA 4d37d56 → SA(2e6281b) → SA 후속 622cb5f → CS b453d79 → E2E·예산 a630676. 순서는 plan(SA→SS→CA→CS)과 달리 보고 순으로 했다 — 파일 배타라 충돌 0.
+- 검증: typecheck(클라+서버) 0, lint 0, check(클라 6 + account·sync·server), build, **E2E 18/18 연속 3회**(기존 13 + 서버 흐름 5). 실서버 스모크(curl) 통과.
+- 계획 대비 변경: `SharedTree` 에 `id` 추가(평평한 모양 유지), 커서 만료 = `purged_seq` 정확 판정, push 뒤 커서 미전진, M4 는 자동 올리기 + 토스트, 공유 보기 "보기" 탭은 목록 유지, CSS 예산은 첫 화면 기준, **첫 화면 gzip 예산 120 → 130KB 재설정**(라이브러리 100.6KB 고정).
+- 범위 밖·사용자 작업: Google·Kakao 앱 등록과 키, 도메인(`PUBLIC_ORIGIN`), 보호책임자(`PRIVACY_CONTACT`), Pi 설치·Tunnel·Access 정책, 백업 age 키·rclone 원격 — 절차는 `docs/ops/runbook.md`, `deploy/`. 실제 OAuth 왕복·실기기(iOS·Android·카카오톡 인앱)·ARM 메모리는 미검증.
+- 남은 알려진 버그(00 §8): 접힌 가지 빈칸 미표시(`scopeOf`), `attempts` 미기록.
 
 ## 진행 기록
 
