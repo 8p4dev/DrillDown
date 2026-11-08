@@ -79,7 +79,7 @@ function expand(slug: string, outline: string): TreeNode[] {
 
 const demo = (slug: string, outline: string, owner: string, copies: number, daysAgo: number): SharedTree => {
   const nodes = expand(slug, outline)
-  return { slug, title: nodes[0].title, visibility: 'public', owner: { nickname: owner, avatar_url: null }, node_count: nodes.length, copy_count: copies, updated_at: Date.now() - daysAgo * 86400_000, nodes }
+  return { id: slug, slug, title: nodes[0].title, visibility: 'public', owner: { nickname: owner, avatar_url: null }, node_count: nodes.length, copy_count: copies, updated_at: Date.now() - daysAgo * 86400_000, nodes }
 }
 
 const trees = new Map<string, SharedTree>()
