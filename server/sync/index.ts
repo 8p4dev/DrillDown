@@ -24,11 +24,11 @@ const treeId = (c: Context<AppEnv>) => {
 
 /** /api/sync /api/trees* /api/t/:slug(GET·copy) /api/gallery */
 export function registerSync(app: Hono<AppEnv>) {
-  app.post('/api/sync', requireUser, limit('sync_push', 60, MIN), async (c) => {
+  app.post('/api/sync', requireUser, limit('sync_push', 300, MIN), async (c) => {
     const p = parsePush(await body(c, LIMITS.bytes))
     return c.json(applyPush(c.get('db'), uid(c), p, now()))
   })
-  app.get('/api/sync', requireUser, limit('sync_pull', 60, MIN), (c) => {
+  app.get('/api/sync', requireUser, limit('sync_pull', 300, MIN), (c) => {
     const s = c.req.query('since') ?? '0'
     if (!/^\d{1,15}$/.test(s)) fail(400, 'invalid', 'since 가 올바르지 않습니다', 'since')
     return c.json(pullSince(c.get('db'), uid(c), Number(s)))
