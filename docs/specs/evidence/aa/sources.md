@@ -82,9 +82,12 @@ WebFetch로 원문을 읽고 요지를 옮겼다. 인용은 원문 표현, 그 �
 
 - **[S31] OWASP Session Management Cheat Sheet** https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html — 세션 ID 엔트로피 최소 64비트, CSPRNG 128비트 이상 권장. 로그인 시 세션 ID 교체(고정 공격 방지).
 - **[S32] OWASP SameSite** https://community.owasp.org/SameSite — Lax는 외부 링크 top-level 내비게이션에는 쿠키 전송, "CSRF-prone request methods (e.g. POST)"에는 차단. 보호는 부분적 → 브라우저별 기본값이 달라 명시 설정 권장.
-- **[S33] 개인정보 보호법 제30조(처리방침)** https://itwiki.kr/w/개인정보_보호법_제30조 (법제처 원문 페이지는 본문 fetch 실패) — 1항 각 호: 처리 목적 / 처리 및 보유 기간 / 제3자 제공(해당 시) / 파기절차 및 파기방법 / 민감정보 공개 가능성(해당 시) / 처리위탁(해당 시) / 가명정보(해당 시) / 정보주체·법정대리인 권리·의무·행사방법 / 보호책임자 성명 또는 부서·연락처 / 자동수집장치 설치·운영·거부(해당 시) / 그 밖에 대통령령.
-- **[S34] 개인정보처리자 정의·판례** 대법원 2026-04-16 선고(검색 요지) https://www.scourt.go.kr/sjudge/1776736872554_110112.pdf — "업무를 목적으로 개인정보파일을 운용하기 위하여 … 개인정보를 처리하는 자는 특별한 사정이 없는 한 … '개인정보처리자'에 해당". 영리 여부와 무관하게 개인도 포함 [추론].
-- **[S35] 처리방침 작성지침 2025·2026 개정 보도** https://newsseoul.co.kr/news/view/1065585619471455 , https://mobile.newsis.com/view/NISX20260424_0003604909 — 2025-04-21 개정본: 필수·권장 구분, 공개 위치(로그인·회원가입 영역 등) 확대. 2026-04 개정: 이용자 입력 데이터의 AI 학습 활용 여부·거부 절차 안내(우리는 "학습에 쓰지 않음" 한 줄로 해당).
-- **[S36] 안전성 확보조치 기준 제8조(접속기록)** https://itwiki.kr/w/개인정보의_안전성_확보조치_기준_제8조 — 접속기록 1년 이상 보관(5만 명 이상·고유식별·민감정보는 2년). 1만 명 미만 소상공인·개인은 내부 관리계획 생략 가능. → `audit_log`·관리자 접속기록 보관 1년의 근거.
+> 3차(RV L11) 표시: S33~S36은 2차 자료(위키·언론·검색 요약)다. 조문·판결 요지는 **[가정]** 등급이며 구현 전 법제처·대법원·개인정보위 원문과 대조한다.
+
+- **[S33] 개인정보 보호법 제30조(처리방침)** [2차·요약 출처] https://itwiki.kr/w/개인정보_보호법_제30조 (법제처 원문 페이지는 본문 fetch 실패) — 1항 각 호: 처리 목적 / 처리 및 보유 기간 / 제3자 제공(해당 시) / 파기절차 및 파기방법 / 민감정보 공개 가능성(해당 시) / 처리위탁(해당 시) / 가명정보(해당 시) / 정보주체·법정대리인 권리·의무·행사방법 / 보호책임자 성명 또는 부서·연락처 / 자동수집장치 설치·운영·거부(해당 시) / 그 밖에 대통령령.
+- **[S34] 개인정보처리자 정의·판례** [2차·요약 출처, 판결문 본문 미확인 → 가정] 대법원 2026-04-16 선고 https://www.scourt.go.kr/sjudge/1776736872554_110112.pdf (PDF 존재, 본문 추출 불가) — 검색 요약: "업무를 목적으로 개인정보파일을 운용하기 위하여 … 개인정보를 처리하는 자는 특별한 사정이 없는 한 … '개인정보처리자'에 해당". 영리 여부와 무관하게 개인도 포함 [추론].
+- **[S35] 처리방침 작성지침 2025·2026 개정** [언론 보도·요약 출처 → 가정] https://newsseoul.co.kr/news/view/1065585619471455 , https://mobile.newsis.com/view/NISX20260424_0003604909 — 2025-04-21 개정본: 필수·권장 구분, 공개 위치(로그인·회원가입 영역 등) 확대. 2026-04 개정: 이용자 입력 데이터의 AI 학습 활용 여부·거부 절차 안내(우리는 "학습에 쓰지 않음" 한 줄로 해당). 지침 원문 PDF(pipc.go.kr)는 미열람.
+- **[S36] 안전성 확보조치 기준 제8조(접속기록)** [2차·요약 출처 → 가정] https://itwiki.kr/w/개인정보의_안전성_확보조치_기준_제8조 — 접속기록 1년 이상 보관(5만 명 이상·고유식별·민감정보는 2년). 1만 명 미만 소상공인·개인은 내부 관리계획 생략 가능. → `audit_log`·관리자 접속기록 보관 1년의 근거.
+- **[S39] Google OAuth 2.0 Policies(임베디드 UA)** https://developers.google.com/identity/protocols/oauth2/policies — "A developer must not direct a Google OAuth 2.0 authorization request to an embedded user-agent" / "All browsing environments must allow the user to verify the current connection to the Google OAuth server". `disallowed_useragent` 오류명·Custom Tabs 권고는 이 페이지에 없음 → [가정]. (3차 M8)
 - **[S37] 유출 신고 72시간** — 11_cost_recovery [S17] 재인용(개인정보보호위원회 https://pipc.go.kr/np/default/page.do?mCode=D030040000 , KISA https://www.kisa.or.kr/1030402).
 - **[S38] Cloudflare 영상·대용량 약관** https://blog.cloudflare.com/updated-tos/ , https://developers.cloudflare.com/fundamentals/reference/policies-compliances/delivering-videos-with-cloudflare/ — Tunnel 공개 호스트 트래픽도 Free·Pro·Business 플랜에서 영상 전송 약관 적용. 이 서비스는 JSON·정적 HTML/JS만 → 해당 없음 [추론].

@@ -36,3 +36,10 @@
 - 5: 산식·단가·출처를 표로. 11 §3과 차이를 명시.
 - 7~8: §5 (a) R5(서버)·R8·R9 완료 기준 열의 항목이 모두 어느 절에서 충족되는지 표로 채움. (b) `App.tsx` `router.ts` `db.ts` `types.ts` 변경점 파일 단위. 권한 매트릭스 빈칸 0.
 - 9: 세 명령 종료 코드 0, `git status`에 src 변경 없음.
+
+## 변경 사항 — 3차 (2026-11-08, RV `05_review.md` → plan §3.5)
+- [x] `git merge main`(45645c4) → 타 문서·RV·plan §3.5 수신
+- [x] RV 발견 중 AA 담당 행 반영: H1 M1 M2 M5 M7 M8 M11 M15 L2 L11 L12 L13 L15 L18 L19 → `03_account_admin.md` §8 표에 기록
+- [x] `evidence/aa/flows.md` §4(7일·410·restore·웹훅)·§5(SH M1~M4) 재작성, `sources.md` S33~S36 [가정] 표시·S39 추가
+- [x] typecheck·lint·build, 커밋, 보고
+반영하지 않은 번호: M3·M4·M6·L5·L14·L17·L20 — 담당이 SH·DS·LM(AA 문서는 참조만 갱신).
