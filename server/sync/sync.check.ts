@@ -265,6 +265,11 @@ assert.equal(gallery(db, 'recent', 1, T0 + 61_000).items.length, 1)
 setVisibility(db, S, ts, 'unlisted'); clearGalleryCache()
 assert.equal(gallery(db, 'copies', 1, T0).items.length, 0) // unlisted 제외
 setVisibility(db, S, ts, 'public')
+// U58 제목 검색: 부분 일치, %·_ 는 글자 그대로(이스케이프), 공백 q 무시, 긴 q 는 잘림
+db.prepare('UPDATE trees SET title = ? WHERE id = ?').run('공유 100%', ts); clearGalleryCache()
+const gq = (q: string) => gallery(db, 'recent', 1, T0, q).items.length
+assert.deepEqual([gq('유 1'), gq('0%'), gq('  '), gq('없음'), gq('%%'), gq('1_0'), gq('!'), gq('x'.repeat(500))], [1, 1, 1, 0, 0, 0, 0, 0])
+db.prepare('UPDATE trees SET title = ? WHERE id = ?').run('공유', ts); clearGalleryCache()
 
 // ---- 탈퇴 유예: softDelete → 410, restoreTreesOfUser 는 탈퇴 전 삭제 트리를 되살리지 않음 ----
 const W = id(); addUser(W)
