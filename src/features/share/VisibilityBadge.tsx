@@ -7,6 +7,8 @@ import './share-list.css'
 
 export default function VisibilityBadge({ tree }: { tree: Tree }) {
   const v = tree.visibility
+  // U60·R7-S12: 운영 숨김은 공개 범위와 무관하게 경고 배지(pull 로 받은 서버 값)
+  if ((tree as Tree & { hiddenByAdmin?: boolean }).hiddenByAdmin) return <span className="vis-badge vis-hidden">운영 숨김</span>
   if (!v || v === 'private') return null
   const label = v === 'public' ? '공개' : '링크'
   return (

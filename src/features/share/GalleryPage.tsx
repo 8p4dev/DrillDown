@@ -17,8 +17,10 @@ export default function GalleryPage() {
   const [failed, setFailed] = useState(false)
   const [input, setInput] = useState('')
   const [q, setQ] = useState('')
+  // 같은 쪽 다시 시도: 실패해도 page 는 그대로 두고 이 값만 올린다('더 보기' 실패 쪽 건너뜀 방지)
+  const [retry, setRetry] = useState(0)
   // 응답이 온 요청 키. 현재 키와 다르면 요청 중 → '더 보기' 비활성(U61 연타 방지)
-  const key = `${sort}:${q}:${page}`
+  const key = `${sort}:${q}:${page}:${retry}`
   const [done, setDone] = useState('')
   // GET /api/gallery?sort=&page=&q= → { items, page, hasMore } 20건 (04 §3.6). 정렬·검색이 바뀌면 1쪽부터
   useEffect(() => {
@@ -33,7 +35,7 @@ export default function GalleryPage() {
       () => { if (!ac.signal.aborted) { setFailed(true); setDone(key) } },
     )
     return () => ac.abort()
-  }, [sort, page, q, key])
+  }, [sort, page, q, retry, key])
   const pick = (s: Sort) => {
     if (s === sort) return
     setFailed(false)
@@ -83,7 +85,10 @@ export default function GalleryPage() {
         </ul>
       )}
       {more && items && (
-        <div className="actions"><button type="button" disabled={done !== key} onClick={() => (setFailed(false), setPage((p) => p + 1))}>더 보기</button></div>
+        <div className="actions">
+          {failed && done === key && <span className="muted" role="status">불러오지 못했습니다</span>}
+          <button type="button" disabled={done !== key} onClick={() => (failed ? setRetry((n) => n + 1) : setPage((p) => p + 1), setFailed(false))}>{failed ? '더 보기 다시 시도' : '더 보기'}</button>
+        </div>
       )}
     </section>
   )

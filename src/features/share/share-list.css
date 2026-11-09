@@ -14,6 +14,7 @@
 
 /* ── 공개 배지: 16px muted ── */
 .vis-badge { display: inline-flex; align-items: center; color: var(--muted); }
+.vis-hidden { font-size: var(--fs-sm); color: var(--danger); white-space: nowrap; }
 
 .share-sheet { display: grid; gap: .75rem; }
 .share-sheet p { margin: 0; }

@@ -368,6 +368,14 @@ assert.equal(gr.status, 200)
 g = (await gr.json()) as typeof g
 assert.deepEqual([g.page, g.hasMore, g.items[0].copyCount], [1, false, 1])
 assert.equal((await app.request('/api/gallery?sort=bogus')).status, 400)
+// U60: /api/trees 는 본인 트리만 + copyCount (남의 트리 안 보임)
+const ownApp = new Hono<AppEnv>()
+ownApp.use(async (c, next) => { c.set('db', db); c.set('user', { id: S, role: 'user', nickname: 's', sessionId: 'x' }); await next() })
+registerSync(ownApp)
+const own = (await (await ownApp.request('/api/trees')).json()) as { trees: { id: string; copyCount: number; hiddenByAdmin: boolean }[] }
+assert.ok(own.trees.length > 0 && own.trees.every((t) => get('SELECT owner_id FROM trees WHERE id = ?', t.id)!.owner_id === S))
+assert.ok(!own.trees.some((t) => zt.includes(t.id)))
+assert.deepEqual([own.trees.find((t) => t.id === ts)?.copyCount, own.trees.find((t) => t.id === ts)?.hiddenByAdmin], [1, false])
 // 응답 시간 동일화: 404·200 모두 하한 이상
 const t404 = performance.now(); await app.request(`/api/t/${newSlug()}`)
 assert.ok(performance.now() - t404 >= 35)
