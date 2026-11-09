@@ -150,3 +150,4 @@
 
 ## 7. 진행 기록
 - 2026-11-10 감사 4건 완료(F18·E22·S19·H22 = 81건). 선행 작업(S1·C1·S6) 커밋 → WE·WS·WY·WH 디스패치
+- 선행 커밋 1a0519d. Run run_1fcc74119dbf. 디스패치: WY ctx_ff1831d76ad6 · WS ctx_ac14ca2a6691 · WE ctx_89a86ae088e2 · WH ctx_9fe23836e92a (새 워크트리 agent-W*-improve, base main)
