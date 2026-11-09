@@ -25,7 +25,7 @@ test('D1: 새 기기 첫 pull 이 여러 페이지여도 고아 복구로 구조
   const T = crypto.randomUUID(), R = crypto.randomUUID()
   const mids = Array.from({ length: 300 }, (_, i) => ({ id: crypto.randomUUID(), treeId: T, parentId: R, order: i, title: 'mid' + i, aliases: [], updatedAt: t0 }))
   const leaves = mids.map((m, i) => ({ id: crypto.randomUUID(), treeId: T, parentId: m.id, order: 0, title: 'leaf' + i, aliases: [], updatedAt: t0 }))
-  expect(await push(pa, { trees: [{ id: T, title: 'D1', createdAt: t0, updatedAt: t0 }], nodes: [{ id: R, treeId: T, parentId: null, order: 0, title: 'root', aliases: [], updatedAt: t0 }, ...mids] })).toBe(200)
+  expect(await push(pa, { trees: [{ id: T, title: 'D1', createdAt: t0, updatedAt: t0 }], nodes: [{ id: R, treeId: T, parentId: null, order: 0, title: 'D1', aliases: [], updatedAt: t0 }, ...mids] })).toBe(200)
   expect(await push(pa, { nodes: leaves })).toBe(200)
   // 부모만 나중에 고침 → 부모 seq 가 자식보다 뒤 = pull 뒤 페이지
   expect(await push(pa, { nodes: mids.map((m) => ({ ...m, title: m.title + '*', updatedAt: t0 + 1000 })) })).toBe(200)
