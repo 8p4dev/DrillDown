@@ -7,6 +7,13 @@ import type { GradeSource, ID, NodeSrs, Structure, TreeNode } from '../types'
 const scheduler = await DefaultScheduler({ enableFuzz: true }) // U33: 같은 날 평가한 항목의 기한을 흩는다
 type Card = ReturnType<typeof scheduler.newCard>
 
+/** 서버에서 받은 행은 card 의 날짜가 JSON 문자열이다 → ts-fsrs 에 넘기기 전에 Date 로 되돌린다 */
+export function asCard(c: unknown): Card {
+  const o = { ...(c as Record<string, unknown>) }
+  for (const k in o) if (/At$|^due$|^last_review$/.test(k) && typeof o[k] === 'string') o[k] = new Date(o[k] as string)
+  return o as unknown as Card
+}
+
 /** 색 바램 임계값(예상 기억률 R). lightgreen 0.8 은 가정값(FSRS-7 곡선이 완만해 0.7 이면 첫 복습 카드가 ~250일간 연두) */
 export const FADE = { green: 0.9, lightgreen: 0.8 }
 
@@ -34,7 +41,7 @@ export function applyGrade(
   structure: Structure,
   now: Date,
 ): { next: NodeSrs; recheckResolved: boolean } {
-  const card = (prev?.card as Card | undefined) ?? scheduler.newCard({ now })
+  const card = prev?.card ? asCard(prev.card) : scheduler.newCard({ now })
   const { card: nextCard } = scheduler.review({ card, grade: gradeToRating(src, structure) as Grade, now })
   const auto = isAutoCorrect(src, structure)
   const days = prev?.autoCorrectDays ?? []
@@ -58,7 +65,7 @@ export function applyGrade(
 }
 
 export function retrievability(s: NodeSrs, now: Date): number {
-  const card = s.card as Card
+  const card = asCard(s.card)
   if (!card.lastReviewAt) return 0
   return scheduler.model.forgettingCurve(card, scheduler.chrono.difference(card.lastReviewAt, now))
 }

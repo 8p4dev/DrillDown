@@ -2,7 +2,10 @@
 import { api, type SharedTree } from './api'
 import { db, newId, track, type OutboxRow } from './db'
 import { flush } from './sync'
+import { byOrder, childIndex } from './path'
 import type { ID, NodeSrs, Tree, TreeNode, Visibility } from './types'
+
+export { byOrder, childIndex }
 
 /** 쓰기 훅 트랜잭션에 들어가는 테이블 */
 const W = () => [db.trees, db.nodes, db.outbox, db.meta]
@@ -115,15 +118,15 @@ export function getRoot(nodes: TreeNode[]): TreeNode {
 }
 
 export function childrenOf(nodes: TreeNode[], parentId: ID): TreeNode[] {
-  // (order, id) 안정 정렬 — 기기 간 동기화 뒤에도 같은 순서 (04 §5(b))
-  return nodes.filter((n) => n.parentId === parentId).sort((a, b) => a.order - b.order || a.id.localeCompare(b.id))
+  return nodes.filter((n) => n.parentId === parentId).sort(byOrder)
 }
 
 /** rootId 제외, 전위 순회 */
 export function descendantsOf(nodes: TreeNode[], rootId: ID): TreeNode[] {
   const out: TreeNode[] = []
+  const kids = childIndex(nodes)
   const walk = (id: ID) => {
-    for (const c of childrenOf(nodes, id)) {
+    for (const c of kids.get(id) ?? []) {
       out.push(c)
       walk(c.id)
     }

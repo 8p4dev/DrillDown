@@ -1,6 +1,6 @@
 // 퀴즈 화면 공용 조각: 범위 선택, 트리 캔버스(layout 재사용), 드래그 고스트, 진행 막대, 점수, 결과 마크
 import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
-import { withParent } from '../../core/path'
+import { byOrder, withParent } from '../../core/path'
 import type { ID, TreeNode } from '../../core/types'
 import { Icon } from '../../ui/Icon'
 import { I } from '../../ui/icons'
@@ -22,7 +22,7 @@ function branches(nodes: TreeNode[]): [TreeNode, number, number][] {
   for (const n of nodes) kids.set(n.parentId, [...(kids.get(n.parentId) ?? []), n])
   const out: [TreeNode, number, number][] = []
   const walk = (n: TreeNode, d: number): number => {
-    const ks = (kids.get(n.id) ?? []).sort((a, b) => a.order - b.order)
+    const ks = (kids.get(n.id) ?? []).sort(byOrder)
     if (!ks.length) return 1
     const row: [TreeNode, number, number] = [n, d, 0]
     out.push(row)

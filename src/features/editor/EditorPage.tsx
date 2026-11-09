@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { logEvent } from '../../core/events'
 import { cloneBranch, nodesToOutline, outlineToNodes, parseOutline, serializeOutline, splitTitle } from '../../core/outline'
-import { childrenOf, deleteNodes, descendantsOf, getTreeNodes, putNodes } from '../../core/repo'
+import { byOrder, childrenOf, deleteNodes, descendantsOf, getTreeNodes, putNodes } from '../../core/repo'
 import { getSrsMap, missHeat } from '../../core/srs'
 import { ancestorsOf } from '../../core/path'
 import { CAP, type ID, type NodeSrs, type TreeNode } from '../../core/types'
@@ -70,7 +70,7 @@ function countTree(ns: TreeNode[]) {
     else kids.set(n.parentId, [n])
   }
   const pos = new Map<ID, [number, number]>()
-  for (const k of kids.values()) k.sort((a, b) => a.order - b.order).forEach((n, i) => pos.set(n.id, [i + 1, k.length]))
+  for (const k of kids.values()) k.sort(byOrder).forEach((n, i) => pos.set(n.id, [i + 1, k.length]))
   const desc = new Map<ID, number>()
   const walk = (id: ID): number => {
     const total = (kids.get(id) ?? []).reduce((sum, k) => sum + 1 + walk(k.id), 0)

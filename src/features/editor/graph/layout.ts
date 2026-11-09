@@ -1,5 +1,6 @@
 // 트리 그래프 배치 — 순수 함수 (DOM 없음). 크기 측정은 주입받는다.
 // dir 'down' = 위→아래(깊이 = 행), 'right' = 왼→오른(깊이 = 열, 형제는 세로로 쌓임 — 세로 보기). right 는 down 을 축만 바꿔 계산한다
+import { byOrder } from '../../../core/path'
 import type { ID, TreeNode } from '../../../core/types'
 
 export interface Size { w: number; h: number }
@@ -44,7 +45,7 @@ function core(nodes: TreeNode[], rootId: ID, measure: (n: TreeNode) => Size, ope
     if (k) k.push(n)
     else kidsOf.set(n.parentId, [n])
   }
-  for (const k of kidsOf.values()) k.sort((a, b) => a.order - b.order)
+  for (const k of kidsOf.values()) k.sort(byOrder)
   const visibleKids = (n: TreeNode, depth: number) => (open(n, depth) ? (kidsOf.get(n.id) ?? []) : [])
 
   // 1패스(후위): 서브트리 폭, 서브트리 왼쪽 기준 노드 중심, 자식 서브트리의 상대 x

@@ -1,5 +1,5 @@
 // D&D 퀴즈 순수 로직 — 셔플·배치 상태 변경·채점 (DOM·Dexie 없음, dnd.check.ts 로 검증)
-import { ancestorsOf } from '../../core/path'
+import { ancestorsOf, byOrder } from '../../core/path'
 import type { ID, TreeNode } from '../../core/types'
 import { layout, MARGIN, type Box, type Graph } from '../editor/graph/layout'
 
@@ -35,7 +35,7 @@ export function scopeOf(nodes: TreeNode[], rootId: ID): TreeNode[] {
   for (const n of nodes) if (n.parentId !== null) kids.set(n.parentId, [...(kids.get(n.parentId) ?? []), n])
   const out: TreeNode[] = [{ ...root, parentId: null }]
   const walk = (id: ID) => {
-    for (const c of (kids.get(id) ?? []).sort((a, b) => a.order - b.order)) {
+    for (const c of (kids.get(id) ?? []).sort(byOrder)) {
       out.push(c)
       walk(c.id)
     }

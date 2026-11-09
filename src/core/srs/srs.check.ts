@@ -139,3 +139,13 @@ assert.equal(cm.size, nodes.length)
 }
 
 console.log('srs.check: ok')
+
+// 서버에서 받은 행(JSON 직렬화된 card)도 채점·색 판정이 된다
+{
+  const t0 = new Date('2026-01-01T00:00:00Z')
+  const first = applyGrade(undefined, 'n', 't', 'exact', 'ok', t0).next
+  const wire = JSON.parse(JSON.stringify(first)) as typeof first
+  const later = new Date(+t0 + 3 * 864e5)
+  assert.ok(retrievability(wire, later) > 0, 'wire card retrievability')
+  assert.ok(applyGrade(wire, 'n', 't', 'exact', 'ok', later).next.due > +later, 'wire card regrade')
+}
