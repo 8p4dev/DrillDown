@@ -96,7 +96,7 @@ function Dashboard() {
         <Card icon={I.check} label="가동" value={dur(s.uptime_s)} sub={`RSS ${bytes(s.rss)}`} />
         <Card icon={ban} label="정지 · 탈퇴 대기" value={`${s.users.suspended} · ${s.users.pending_delete}`} />
       </div>
-      <figure className="signups" role="img" aria-label={`최근 14일 가입: ${s.users.signups_14d.join(', ')}`}>
+      <figure className="signups">
         <figcaption>14일 가입</figcaption>
         <div className="bars">
           {s.users.signups_14d.map((n, i) => {
@@ -174,7 +174,7 @@ function UserRow({ u, self, update }: { u: AdminUser; self: boolean; update: Upd
 
 // ---- 공개 트리 ----
 function Trees() {
-  const { items: trees, next, more, patch } = usePaged<AdminTree>('/api/admin/trees?visibility=public')
+  const { items: trees, next, more, patch } = usePaged<AdminTree>('/api/admin/trees')
   const [reports, setReports] = useGet<{ items: Report[] }>('/api/admin/reports?status=open')
   const live = trees.filter((t) => !t.deleted_at)
   const open = (reports?.items ?? []).filter((r) => !r.resolved_at)
@@ -201,8 +201,8 @@ function Trees() {
           {open.map((r) => (
             <li key={r.id}>
               <span className="grow"><strong>{r.tree.title}</strong> · {REASON[r.reason]}{r.note && <><br /><span className="muted">{r.note}</span></>}</span>
-              <button type="button" onClick={() => resolve(r, 'hidden')}><Icon d={eyeOff} /> 숨김</button>
-              <button type="button" onClick={() => resolve(r, 'dismissed')}>기각</button>
+              <button type="button" aria-label={`${r.tree.title} 숨김`} onClick={() => resolve(r, 'hidden')}><Icon d={eyeOff} /> 숨김</button>
+              <button type="button" aria-label={`${r.tree.title} 신고 기각`} onClick={() => resolve(r, 'dismissed')}>기각</button>
             </li>
           ))}
         </ul>
@@ -213,7 +213,7 @@ function Trees() {
           {deleted.map((t) => (
             <li key={t.id}>
               <span className="grow"><strong>{t.title}</strong> · {t.owner.nickname}<br /><span className="muted">{when(t.deleted_at!)} 삭제</span></span>
-              <button type="button" onClick={() => restore(t)}><Icon d={undo2} /> 복구</button>
+              <button type="button" aria-label={`${t.title} 복구`} onClick={() => restore(t)}><Icon d={undo2} /> 복구</button>
             </li>
           ))}
         </ul>

@@ -32,7 +32,7 @@
 .admin .toggle { display: inline-flex; align-items: center; gap: .4rem; min-height: var(--tap); font-size: var(--fs-sm); color: var(--text-2); cursor: pointer; }
 
 /* 표: PC sticky 헤더(861+), 셀 숫자 tnum, 동작 열 오른쪽 */
-.admin table { border-radius: var(--radius); box-shadow: none; overflow: visible; } /* index.css 의 overflow:hidden 은 sticky 헤더를 막는다(스크롤 컨테이너가 표 자신이 됨) */
+.admin table { border-radius: var(--radius); box-shadow: none; overflow: visible; } /* overflow 는 visible 유지: hidden 이면 표가 스크롤 컨테이너가 되어 sticky 헤더가 막힌다 */
 .admin th { white-space: nowrap; }
 .admin td.name { font-weight: 600; }
 .admin td.name svg { vertical-align: -2px; margin-right: .2rem; }
