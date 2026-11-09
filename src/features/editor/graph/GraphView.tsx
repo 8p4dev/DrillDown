@@ -175,9 +175,9 @@ export default function GraphView(p: {
   function onPointerMove(e: React.PointerEvent) {
     const s = start.current
     if (!s) return
+    if (!s.moved && Math.hypot(e.clientX - s.x, e.clientY - s.y) < DRAG_MIN) return // 임계는 화면 px(배율 무관, E8)
     const dx = (e.clientX - s.x) / z // 화면 px → 배치 px
     const dy = (e.clientY - s.y) / z
-    if (!s.moved && Math.hypot(dx, dy) < DRAG_MIN) return
     // 실제로 끌기 시작할 때만 캡처: 미리 캡처하면 카드 안 요소(내용 영역)의 클릭·더블클릭 대상이 카드로 바뀐다
     if (!s.moved) s.el.setPointerCapture(s.pointer)
     s.moved = true

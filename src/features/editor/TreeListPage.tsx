@@ -14,6 +14,7 @@ import VisibilityBadge from '../share/VisibilityBadge'
 import { haptic } from '../feel'
 import { toast } from '../Toast'
 import { startViewport } from '../viewport'
+import { isComposing } from './edit'
 import './treelist.css'
 
 const UNDO_MS = 10_000
@@ -154,7 +155,7 @@ export default function TreeListPage() {
         </button>
       </header>
       <form onSubmit={create} className="trees-form card">
-        <input ref={input} aria-label="새 트리 제목" placeholder="새 트리 제목 (예: 노동법)" value={title} onChange={(e) => setTitle(e.target.value)} />
+        <input ref={input} aria-label="새 트리 제목" placeholder="새 트리 제목 (예: 노동법)" maxLength={CAP.title} value={title} onChange={(e) => setTitle(e.target.value)} />
         <button type="submit" className="primary" disabled={full}><Icon d={I.plus} />만들기</button>
       </form>
       {full ? <p className="trees-full" role="status">트리는 200개까지 저장할 수 있습니다</p>
@@ -204,10 +205,10 @@ function TreeCard({ t, meta, copies, isNew, gone, editing, onEdit, onRename, onC
       <div className="tree-top">
         <span className="avatar" data-tone={toneOf(t.title)} aria-hidden>{initialOf(t.title)}</span>
         {editing ? (
-          <input className="tree-rename" aria-label="트리 이름" defaultValue={t.title} autoFocus
+          <input className="tree-rename" aria-label="트리 이름" defaultValue={t.title} autoFocus maxLength={CAP.title}
             onFocus={(e) => { done.current = false; e.target.select() }}
             onKeyDown={(e) => {
-              if (e.nativeEvent.isComposing) return
+              if (isComposing(e)) return
               if (e.key === 'Enter') { done.current = true; onRename(e.currentTarget.value) }
               if (e.key === 'Escape') { done.current = true; onCancel() }
             }}

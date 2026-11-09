@@ -64,10 +64,13 @@ export function restoreTree(treeId: ID): Promise<number> {
 }
 /** 휴지통 보존 기간(C2). 이보다 오래 전에 지운 트리만 하드 삭제된다 */
 export const TRASH_MS = 7 * 86_400_000
-/** 앱 시작 때 호출: deletedAt 이 7일보다 오래된 트리만 하드 삭제 */
+/** 로컬 events 보존 기간(F11). 서버로 가지 않고 쌓이기만 하는 테이블 */
+export const EVENTS_MS = 180 * 86_400_000
+/** 트리 목록이 열릴 때 호출: deletedAt 이 7일보다 오래된 트리만 하드 삭제 + 180일 지난 events 정리 */
 export async function purgeDeletedTrees(now = Date.now()): Promise<void> {
   const victims = (await db.trees.toArray()).filter((t) => t.deletedAt && t.deletedAt < now - TRASH_MS)
   for (const t of victims) await deleteTree(t.id)
+  await db.events.where('ts').below(now - EVENTS_MS).delete()
 }
 
 /** 목록 카드 한 줄 메타(U44). studiedAt 은 그 트리 srs 의 마지막 학습 시각(없으면 학습 안 함) */
@@ -135,27 +138,46 @@ export function descendantsOf(nodes: TreeNode[], rootId: ID): TreeNode[] {
   return out
 }
 
-/** upsert + tree.updatedAt 갱신. 루트 title 이 들어오면 tree.title 도 맞춘다 */
+/** 지운 노드의 학습 기록(E3, 계약 C6): 실행 취소로 같은 id 가 다시 putNodes 되면 돌려준다. 세션 메모리 — 새로 고치면 사라진다 */
+// ponytail: 상한 없음. 한 세션에서 학습한 노드를 수천 개 지우는 일은 없다고 본다 — 문제가 되면 LRU 로
+const heldSrs = new Map<ID, NodeSrs>()
+/** 보관분 중 nodes 에 해당하는 srs 를 꺼내(보관에서 제거) 새 updatedAt 으로 — 서버 톰스톤(삭제 시각)보다 나중 쓰기가 되게 */
+export function takeHeldSrs(held: Map<ID, NodeSrs>, nodes: Pick<TreeNode, 'id'>[], now: number): NodeSrs[] {
+  const out: NodeSrs[] = []
+  for (const n of nodes) {
+    const s = held.get(n.id)
+    if (!s) continue
+    held.delete(n.id)
+    out.push({ ...s, updatedAt: now })
+  }
+  return out
+}
+
+/** upsert + tree.updatedAt 갱신. 루트 title 이 들어오면 tree.title 도 맞춘다. 지웠던 노드가 돌아오면 학습 기록도 함께(E3) */
 export async function putNodes(nodes: TreeNode[]): Promise<void> {
   if (!nodes.length) return
   const now = Date.now()
-  await db.transaction('rw', W(), async () => {
+  await db.transaction('rw', [...W(), db.srs], async () => {
+    const srs = takeHeldSrs(heldSrs, nodes, now)
     await db.nodes.bulkPut(nodes)
+    if (srs.length) await db.srs.bulkPut(srs)
     const treeIds = [...new Set(nodes.map((n) => n.treeId))]
     for (const treeId of treeIds) {
       const root = nodes.find((n) => n.treeId === treeId && n.parentId === null)
       await db.trees.update(treeId, root ? { updatedAt: now, title: root.title } : { updatedAt: now })
     }
-    await track([...nodes.map((n) => nodeRow(n)), ...treeIds.map((id) => treeRow(id))])
+    // 서버 push 는 node put 을 srs 보다 먼저 처리한다 → 되살린 노드의 srs 가 버려지지 않는다
+    await track([...nodes.map((n) => nodeRow(n)), ...treeIds.map((id) => treeRow(id)), ...srs.map((s) => ({ kind: 'srs' as const, id: s.nodeId, treeId: s.treeId, op: 'put' as const }))])
   })
 }
 
-/** 노드와 해당 srs 를 함께 지운다 (하위 노드는 호출자가 ids 에 포함) */
+/** 노드와 해당 srs 를 함께 지운다 (하위 노드는 호출자가 ids 에 포함). srs 는 되돌리기용으로 보관(E3) */
 export async function deleteNodes(ids: ID[]): Promise<void> {
   if (!ids.length) return
   const now = Date.now()
   await db.transaction('rw', [...W(), db.srs], async () => {
     const found = (await db.nodes.bulkGet(ids)).filter((n) => !!n)
+    for (const s of await db.srs.bulkGet(ids)) if (s) heldSrs.set(s.nodeId, s)
     await db.nodes.bulkDelete(ids)
     await db.srs.bulkDelete(ids)
     const treeIds = [...new Set(found.map((n) => n.treeId))]
@@ -163,14 +185,6 @@ export async function deleteNodes(ids: ID[]): Promise<void> {
     // node del × n (srs 는 서버 cascade), tree put
     await track([...found.map((n) => nodeRow(n, 'del')), ...treeIds.map((id) => treeRow(id))])
   })
-}
-
-export async function addAlias(nodeId: ID, alias: string): Promise<void> {
-  const a = alias.trim()
-  if (!a) return
-  const n = await db.nodes.get(nodeId)
-  if (!n || n.aliases.includes(a)) return
-  await putNodes([{ ...n, aliases: [...n.aliases, a], updatedAt: Date.now() }])
 }
 
 // ── 공유·복제 (04 §3.3·§3.4.3) ─────────────────────────────

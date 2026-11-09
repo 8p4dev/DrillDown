@@ -1,5 +1,5 @@
 // 개요 텍스트 ↔ 트리 — 공유 계약 §4.2 (에이전트 A 소유). 순수 함수
-import { childrenOf } from './repo'
+import { childIndex } from './path'
 import { CAP, type ID, type TreeNode } from './types'
 
 export interface OutlineItem {
@@ -74,7 +74,7 @@ export function outlineToNodes(items: OutlineItem[], treeId: ID, parentId: ID | 
     xs.forEach((x, i) => {
       const id = crypto.randomUUID()
       const { title, note } = splitTitle(x.text)
-      const memo = [note, x.note?.slice(0, CAP.note)].filter(Boolean).join('\n')
+      const memo = [note, x.note].filter(Boolean).join('\n').slice(0, CAP.note) // CAP.note 초과는 서버가 거부(E4)
       out.push({ id, treeId, parentId: pid, order: base + i, title, ...(memo ? { note: memo } : {}), aliases: [], updatedAt: now })
       walk(x.children, id, 0)
     })
@@ -87,7 +87,8 @@ const toItem = (n: TreeNode, children: OutlineItem[]): OutlineItem =>
   n.note?.trim() && !n.note.includes('\n') ? { text: n.title, note: n.note.trim(), children } : { text: n.title, children }
 
 export function nodesToOutline(nodes: TreeNode[], rootId: ID, includeRoot = false): OutlineItem[] {
-  const build = (id: ID): OutlineItem[] => childrenOf(nodes, id).map((c) => toItem(c, build(c.id)))
+  const kids = childIndex(nodes)
+  const build = (id: ID): OutlineItem[] => (kids.get(id) ?? []).map((c) => toItem(c, build(c.id)))
   if (!includeRoot) return build(rootId)
   const root = nodes.find((n) => n.id === rootId)
   return root ? [toItem(root, build(rootId))] : []
@@ -99,10 +100,11 @@ export function cloneBranch(nodes: TreeNode[], id: ID, order: number): TreeNode[
   if (!src) return []
   const now = Date.now()
   const out: TreeNode[] = []
+  const kids = childIndex(nodes)
   const walk = (n: TreeNode, parentId: ID | null, o: number) => {
     const nid = crypto.randomUUID()
     out.push({ ...n, id: nid, parentId, order: o, updatedAt: now })
-    for (const c of childrenOf(nodes, n.id)) walk(c, nid, c.order)
+    for (const c of kids.get(n.id) ?? []) walk(c, nid, c.order)
   }
   walk(src, src.parentId, order)
   return out

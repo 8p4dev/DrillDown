@@ -1,4 +1,7 @@
 import { useEffect, useImperativeHandle, useLayoutEffect, useRef } from 'react'
+import { CAP } from '../../../core/types'
+import { toast } from '../../Toast'
+import { isComposing } from '../edit'
 import { fromDom, getSel, setSel } from './dom'
 import { autoBullet, highlight, lineText, parse, serialize, toggleBullet, toHtml, type Color, type Line, type Pos } from './format'
 
@@ -36,6 +39,14 @@ export default function NoteEditor({ ref: api, ...p }: {
   }
   function emit(lines: Line[]) {
     const v = serialize(lines)
+    if (v.length > CAP.note) {
+      // E4: 서버 한도를 넘는 내용은 저장하지 않고 직전 값으로 되돌린다(커서는 끝)
+      toast(`내용은 ${CAP.note.toLocaleString('en')}자까지입니다`)
+      const el = ref.current!
+      render(parse(emitted.current ?? p.value))
+      setSel(el, { line: el.childNodes.length - 1, col: Infinity })
+      return
+    }
     emitted.current = v
     if (v !== p.value) p.onChange(v)
   }
@@ -79,7 +90,7 @@ export default function NoteEditor({ ref: api, ...p }: {
   useImperativeHandle(api, () => ({ apply }))
 
   function onKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
-    if (e.nativeEvent.isComposing || e.keyCode === 229) return
+    if (isComposing(e)) return
     const el = ref.current!
     if (e.key === 'Escape') {
       e.preventDefault()
