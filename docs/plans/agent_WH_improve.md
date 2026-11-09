@@ -24,7 +24,7 @@ plan: `orchestration_improve.md` §1.5. 포트 5364/4364. 선행 커밋 1a0519d 
 - [x] 6 H4 아이콘 PNG 생성(스크래치 Playwright) + manifest + apple-touch-icon 링크
 - [x] 7 H16 tsconfig.server.json include / H18·H19·H20 삭제 / H22 주석·문서 / H17 README
 - [x] 8 typecheck·lint·check·build 통과. 첫 화면 gzip 85.98 → **85.68 KB**(icons.all −1.28, viewport +0.83, Toast −0.07, icons +0.13), precache 70개 629.4 → **630.0 KiB**(아이콘 PNG 는 `includeManifestIcons: false` 로 밖). dist/index.html 에 icons.all modulepreload 0건. 스크래치 Playwright(msedge, preview 4364): aria-current='내 트리', 공유 시트 Tab 순환(닫기→로그인→닫기, Shift+Tab 역방향)·Esc 닫힘, GalleryPage 청크 404 → '새로 고침' 경계, 갤러리 첫 페이지 실패 → '다시 시도', manifest·PNG 4개 200
-- [ ] 9 커밋, worker_done
+- [x] 9 커밋 bc72770·73f5d12·eb231e4, worker_done
 
 ## 검증 방법
 - 1~5·7: `npm run typecheck`·`npm run lint`·`npm run check`·`npm run build`.
