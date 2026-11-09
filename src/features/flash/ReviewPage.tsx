@@ -11,10 +11,11 @@ import { I } from '../../ui/icons'
 import { NodePath } from '../../ui/NodePath'
 import { arrowRight } from '../../ui/icons.all'
 import FlashCard from './FlashCard'
-import { byOverdue, parentQueue } from './flash'
+import { byOverdue, missedConcepts, parentQueue, requeueMissed } from './flash'
 import './flash.css'
 
-interface Session { tree: Tree; nodes: TreeNode[]; queue: ID[]; i: number }
+// base = 재출제(U40) 붙기 전 길이, due = 오늘 기한 노드(이것만 평가 버튼, R3-P15), missed = 이번 세션에 모름으로 평가한 노드
+interface Session { tree: Tree; nodes: TreeNode[]; queue: ID[]; base: number; i: number; due: Set<ID>; missed: Map<ID, boolean> }
 
 /** '오늘의' 복습 = 오늘 안에 기한이 오는 노드 (Again 은 수 분 뒤 기한이라 now 기준이면 방금 틀린 항목이 안 보임) */
 const endOfToday = () => {
@@ -40,28 +41,35 @@ export default function ReviewPage() {
   const start = async (tree: Tree, due: NodeSrs[]) => {
     const [nodes, s] = await Promise.all([getTreeNodes(tree.id), loadSrs(tree.id)])
     setSrs(s)
-    setSession({ tree, nodes, queue: parentQueue(nodes, due), i: 0 })
+    const queue = parentQueue(nodes, due)
+    setSession({ tree, nodes, queue, base: queue.length, i: 0, due: new Set(due.map((s) => s.nodeId)), missed: new Map() })
   }
 
   if (session) {
     const id = session.queue[session.i]
-    const last = session.i >= session.queue.length - 1
-    const step = () => setSession({ ...session, i: session.i + 1 })
+    const byId = new Map(session.nodes.map((n) => [n.id, n]))
+    const ext = requeueMissed(session.queue, session.base, session.i, missedConcepts(byId, session.missed)) // U40: 끝에 모름 카드 한 번 더
+    const last = session.i >= ext.length - 1
+    const step = () => setSession({ ...session, queue: ext, i: session.i + 1 })
     const treeId = session.tree.id
     return (
       <section className="review flash">
         <header className="review-head">
           <h1>{session.tree.title} 복습</h1>
-          <span className="muted" aria-label="복습 진행">{session.i + 1} / {session.queue.length}</span>
-          <div className="review-bar" role="progressbar" aria-valuemin={0} aria-valuemax={session.queue.length} aria-valuenow={session.i + 1}>
-            <span style={{ width: `${((session.i + 1) / session.queue.length) * 100}%` }} />
+          <span className="muted" aria-label="복습 진행">{session.i + 1} / {ext.length}</span>
+          <div className="review-bar" role="progressbar" aria-valuemin={0} aria-valuemax={ext.length} aria-valuenow={session.i + 1}>
+            <span style={{ width: `${((session.i + 1) / ext.length) * 100}%` }} />
           </div>
         </header>
         {id ? (<>
-          <NodePath path={ancestorsOf(new Map(session.nodes.map((n) => [n.id, n])), id)} label="복습 위치" className="flash-path" />
-          <FlashCard key={id} treeId={treeId} nodes={session.nodes} conceptId={id} colors={colors}
-            source={dexieSource(treeId)}
-            onRated={(s) => setSrs(({ map }) => ({ map: new Map(map).set(s.nodeId, s), at: new Date() }))} onNext={last ? undefined : step} />
+          <NodePath path={ancestorsOf(byId, id)} label="복습 위치" className="flash-path" />
+          <FlashCard key={`${session.i}:${id}`} treeId={treeId} nodes={session.nodes} conceptId={id} colors={colors}
+            source={dexieSource(treeId)} rateable={session.due}
+            onRated={(s, known) => {
+              setSrs(({ map }) => ({ map: new Map(map).set(s.nodeId, s), at: new Date() }))
+              setSession((ss) => ss && { ...ss, missed: new Map(ss.missed).set(s.nodeId, known) })
+            }} onNext={last ? undefined : step} />
+          {session.i >= session.base && <p className="muted flash-retry">모름이었던 카드 다시 보기</p>}
         </>) : (
           <p className="muted">복습할 항목이 없습니다.</p>
         )}

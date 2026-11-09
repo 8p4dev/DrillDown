@@ -42,15 +42,18 @@ interface Props {
   initialRated?: Map<ID, boolean>
   /** →/Enter 키: 다음 카드로 */
   onNext?: () => void
+  /** U41(R3-P15): 평가 버튼을 줄 하위. 없으면 전부. 나머지는 회색 '참고'(복습에서 기한 아닌 형제) */
+  rateable?: Set<ID>
 }
 
 /** 입력 중이거나 수정키가 눌렸으면 단축키 무시 */
 const typing = (e: KeyboardEvent) =>
   e.ctrlKey || e.metaKey || e.altKey || e.isComposing || (e.target as HTMLElement).closest?.('input, textarea, select, [contenteditable]')
 
-export default function FlashCard({ treeId, nodes, conceptId, colors, source, onRated, onDive, initialRated, onNext }: Props) {
+export default function FlashCard({ treeId, nodes, conceptId, colors, source, onRated, onDive, initialRated, onNext, rateable }: Props) {
   const concept = nodes.find((n) => n.id === conceptId)
   const kids = useMemo(() => childrenOf(nodes, conceptId), [nodes, conceptId])
+  const canRate = (id: ID) => !rateable || rateable.has(id)
   const [open, setOpen] = useState(false)
   const [mounted, setMounted] = useState(false) // 처음 펼칠 때 마운트. 이후 닫힘은 CSS(.closed)가 맡는다
   const [rated, setRated] = useState(() => new Map<ID, boolean>(initialRated))
@@ -75,7 +78,7 @@ export default function FlashCard({ treeId, nodes, conceptId, colors, source, on
       if (!open || typing(e)) return
       const t = e.target as HTMLElement
       if (e.key === '1' || e.key === '2') {
-        const k = kids.find((c) => !rated.has(c.id))
+        const k = kids.find((c) => canRate(c.id) && !rated.has(c.id))
         if (k) { e.preventDefault(); rate(k, e.key === '1') }
       } else if (onNext && (e.key === 'ArrowRight' || (e.key === 'Enter' && (t === document.body || t === cardRef.current)))) {
         e.preventDefault()
@@ -121,7 +124,7 @@ export default function FlashCard({ treeId, nodes, conceptId, colors, source, on
             return (
               <li
                 key={k.id}
-                className={`flash-kid ${colorClass(color(k.id))}${shook === k.id ? ' shake' : ''}`}
+                className={`flash-kid ${colorClass(color(k.id))}${shook === k.id ? ' shake' : ''}${canRate(k.id) ? '' : ' ref'}`}
                 data-node-id={k.id}
                 data-color={color(k.id).color}
                 data-rated={r === undefined ? undefined : r ? 'known' : 'unknown'}
@@ -138,7 +141,9 @@ export default function FlashCard({ treeId, nodes, conceptId, colors, source, on
                   )}
                 </div>
                 <div className="flash-rate">
-                  {r === undefined ? (
+                  {!canRate(k.id) ? (
+                    <span className="flash-ref muted" data-tip="오늘 기한이 아니라 평가하지 않아요">참고</span>
+                  ) : r === undefined ? (
                     <>
                       <button type="button" className="known" data-tip="알음 (1)" onClick={() => rate(k, true)}><Icon d={I.check} /> 알음</button>
                       <button type="button" className="unknown" data-tip="모름 (2)" onClick={() => rate(k, false)}><Icon d={x} /> 모름</button>

@@ -1,6 +1,7 @@
 /* 플래시카드·미니맵·오늘의 복습 — index.css 토큰만(01 §3.1 4색 규칙). 연두 = ok 45% + 점선, 채움 위 글자 = --on-fill */
 
 .flash-layout { display: grid; grid-template-columns: minmax(0, 1fr) 220px; gap: 1.5rem; align-items: start; }
+.flash-layout.solo { grid-template-columns: minmax(0, 1fr); } /* 미니맵 숨김(100노드 초과) */
 .flash-aside { position: sticky; top: calc(var(--nav-h) + 1rem); }
 .flash-tally { display: inline-flex; align-items: center; gap: .15rem; font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
 .flash-tally b { font-weight: 650; color: var(--text); margin-right: .5rem; }
@@ -76,6 +77,9 @@
 /* 평가 버튼(01 §3.3 버튼 ok/danger 행): surface 면 + 색 글자·테두리, 호버·눌림은 채움 + --on-fill */
 .flash-rate { display: flex; gap: .4rem; }
 .flash-rate button { flex: 1; }
+.flash-kid.ref { opacity: .6; } /* R3-P15: 복습에서 기한 아닌 형제 = 맥락만 */
+.flash-ref { padding: .35rem .6rem; font-size: var(--fs-sm); }
+.flash-retry { margin: .5rem 0 0; font-size: var(--fs-sm); text-align: center; }
 .flash-rate button.known { color: var(--ok); border-color: var(--ok); }
 .flash-rate button.unknown { color: var(--danger); border-color: var(--danger); }
 .flash-rate button.known:active:not(:disabled) { color: var(--on-fill); background: var(--ok); }
