@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { descendantsOf } from '../../../core/repo'
+import { flushSync } from 'react-dom'
 import type { ID, TreeNode } from '../../../core/types'
 import { haptic } from '../../feel'
 import { isOpen, layout, type Box, type Size } from './layout'
@@ -44,18 +44,30 @@ export default function GraphView(p: {
   // 위치 정착한 카드 id. 처음엔 FALLBACK 크기로 놓였다가 측정 후 옮겨지므로, 정착 전엔 미끄러지지 않게 still
   const [known, setKnown] = useState<Set<ID>>(new Set())
   const dragId = drag?.id
-  const moving = useMemo(
-    () => (dragId ? new Set([dragId, ...descendantsOf(p.nodes, dragId).map((n) => n.id)]) : null),
-    [p.nodes, dragId],
-  )
+  // 끄는 카드와 그 하위. 자식 Map 한 번 → O(n) (childrenOf 반복은 O(n²), R5-P9)
+  const moving = useMemo(() => {
+    if (!dragId) return null
+    const kids = new Map<ID, ID[]>()
+    for (const n of p.nodes) {
+      if (!n.parentId) continue
+      const k = kids.get(n.parentId)
+      if (k) k.push(n.id)
+      else kids.set(n.parentId, [n.id])
+    }
+    const out = new Set([dragId])
+    for (const id of out) for (const k of kids.get(id) ?? []) out.add(k) // Set 순회는 추가된 것까지 돈다
+    return out
+  }, [p.nodes, dragId])
   const still = (id: ID) => !known.has(id) || !!moving?.has(id)
 
-  // 너비 트랜지션 등 렌더 없이 크기가 바뀌는 동안에도 다시 재서 배치 (transitionend 에 의존하지 않음)
+  // 너비 트랜지션·편집 입력칸 등 렌더 없이 크기가 바뀌는 것은 ResizeObserver 가 잡는다 (transitionend 에 의존하지 않음)
   const ro = useRef<ResizeObserver | null>(null)
-  // 카드 크기를 재서 바뀐 것만 반영. 크기가 같으면 이전 Map 그대로 → 리렌더 없음
-  function measure() {
-    const els = ref.current?.querySelectorAll<HTMLElement>('[data-node-id]') ?? []
+  // 관찰 중인 카드 요소·마지막으로 잰 노드 객체. 둘 다 같으면 다시 재지 않는다(R5-P6: 렌더마다 전체 offsetWidth 제거)
+  const seen = useRef(new Map<ID, { el: HTMLElement; node: TreeNode | undefined }>())
+  // 주어진 카드만 재서 바뀐 것만 반영. 크기가 같으면 이전 Map 그대로 → 리렌더 없음
+  function measure(els: Iterable<HTMLElement>) {
     const now = [...els].map((el) => [el.dataset.nodeId!, { w: el.offsetWidth, h: el.offsetHeight }] as const)
+    if (!now.length) return
     setSizes((prev) => {
       let changed = false
       const next = new Map(prev)
@@ -69,15 +81,27 @@ export default function GraphView(p: {
       return changed ? next : prev
     })
   }
-  // 매 렌더 후 측정 (페인트 전에 재배치되므로 깜빡임 없음). 의존성 없음이 의도: 무엇이 바뀌어도 다시 잰다.
+  // 매 렌더 후 새로 생긴(또는 다시 마운트된) 카드와 노드 내용이 바뀐 카드만 잰다 (페인트 전에 재배치되므로 깜빡임 없음).
+  // 의존성 없음이 의도: 무엇이 바뀌어도 확인한다(확인은 Map 조회뿐, 강제 레이아웃은 잰 카드 수만큼).
   // 크기 변화가 없는 패스에서 새 카드를 정착으로 표시 → 위치가 같은 렌더에서 still 이 풀려 미끄러짐이 없다
   // oxlint-disable-next-line react-hooks/exhaustive-deps
   useLayoutEffect(() => {
-    measure()
     const els = ref.current?.querySelectorAll<HTMLElement>('[data-node-id]') ?? []
-    for (const el of els) ro.current?.observe(el)
+    const next = new Map<ID, { el: HTMLElement; node: TreeNode | undefined }>()
+    const dirty: HTMLElement[] = []
+    for (const el of els) {
+      const id = el.dataset.nodeId!
+      const node = byId.get(id)
+      const old = seen.current.get(id)
+      if (old?.el !== el) ro.current?.observe(el)
+      if (old?.el !== el || old.node !== node || !sizes.has(id)) dirty.push(el)
+      next.set(id, { el, node })
+    }
+    for (const [id, { el }] of seen.current) if (next.get(id)?.el !== el) ro.current?.unobserve(el) // 사라진 카드: 분리된 요소를 붙잡지 않게
+    seen.current = next
+    measure(dirty)
     const ids = [...g.boxes.keys()]
-    if ((known.size !== ids.length || ids.some((id) => !known.has(id))) && [...els].every((el) => sizes.has(el.dataset.nodeId!))) {
+    if ((known.size !== ids.length || ids.some((id) => !known.has(id))) && ids.every((id) => sizes.has(id))) {
       // oxlint-disable-next-line react/set-state-in-effect -- 측정 완료 후 정착 표시
       setKnown(new Set(ids))
       const r = g.boxes.get(p.rootId)
@@ -85,7 +109,8 @@ export default function GraphView(p: {
     }
   })
   useEffect(() => {
-    ro.current = new ResizeObserver(measure)
+    // 페인트 전에 반영(flushSync): 입력칸 전환처럼 렌더와 같은 프레임에 크기가 바뀌어도 한 프레임 겹쳐 보이지 않게
+    ro.current = new ResizeObserver((es) => flushSync(() => measure(es.map((e) => e.target as HTMLElement))))
     return () => ro.current?.disconnect()
   }, []) // oxlint-disable-line react-hooks/exhaustive-deps
 
@@ -96,7 +121,20 @@ export default function GraphView(p: {
     const [a, b] = [...touches.current.values()]
     return { dist: Math.hypot(a.x - b.x, a.y - b.y), cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2 }
   }
+  // 터치로 누른 실제 자리의 요소. 폰 축소 배율에서 작은 카드를 탭하면 브라우저 터치 보정이 이벤트 대상을 옆의 접기 배지로
+  // 옮겨(pointerdown 대상까지) 가지가 접힌다. 좌표는 보정되지 않으므로 그 자리가 배지가 아니었으면 click 을 카드 선택으로 돌린다
+  // (탭 = 선택, 접기 = 배지를 정확히 누르거나 구조 바)
+  const touchAt = useRef<Element | null>(null)
+  function onTapClick(e: React.MouseEvent) {
+    const hit = touchAt.current
+    touchAt.current = null
+    const card = (e.target as HTMLElement).closest('.badge')?.closest<HTMLElement>('[data-node-id]')
+    if (!hit || !card || hit.closest('.badge')) return
+    e.stopPropagation()
+    card.click()
+  }
   function onTouchDown(e: React.PointerEvent) {
+    touchAt.current = e.pointerType === 'touch' ? document.elementFromPoint(e.clientX, e.clientY) : null
     if (e.pointerType !== 'touch') return
     touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
     if (touches.current.size !== 2) return
@@ -171,18 +209,9 @@ export default function GraphView(p: {
   }
   const endPan = () => ((pan.current = null), setPanning(false))
 
-  return (
-    <div className={`graph-pan${panning ? ' panning' : ''}`} onPointerDownCapture={onTouchDown} onPointerMoveCapture={onTouchMove} onPointerUpCapture={onTouchEnd} onPointerCancelCapture={onTouchEnd} onPointerDown={onPanDown} onPointerMove={onPanMove} onPointerUp={endPan} onPointerCancel={endPan}>
-    <div className="graph-zoom" style={{ width: g.width * z, height: g.height * z }}>
-    <div
-      ref={ref}
-      className={`graph${drag ? ' dragging' : ''}`}
-      style={{ width: g.width, height: g.height, transform: z === 1 ? undefined : `scale(${z})` }}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={() => ((start.current = null), setDrag(null))}
-    >
+  // 선 수천 개: 입력처럼 배치가 그대로인 렌더에서는 다시 만들지 않는다
+  const edges = useMemo(
+    () => (
       <svg className="graph-edges" width={g.width} height={g.height} aria-hidden>
         {g.edges.map(([a, b]) => {
           const pa = g.boxes.get(a)!
@@ -192,6 +221,24 @@ export default function GraphView(p: {
           return <path key={b} className={`${a === p.rootId ? 'from-root ' : ''}${still(a) || still(b) ? 'still' : ''}`} d={`M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}`} />
         })}
       </svg>
+    ),
+    [g, known, moving, p.rootId], // oxlint-disable-line react-hooks/exhaustive-deps -- still 은 known·moving 으로 정해진다
+  )
+
+  return (
+    <div className={`graph-pan${panning ? ' panning' : ''}`} onPointerDownCapture={onTouchDown} onPointerMoveCapture={onTouchMove} onPointerUpCapture={onTouchEnd} onPointerCancelCapture={onTouchEnd} onPointerDown={onPanDown} onPointerMove={onPanMove} onPointerUp={endPan} onPointerCancel={endPan}>
+    <div className="graph-zoom" style={{ width: g.width * z, height: g.height * z }}>
+    <div
+      ref={ref}
+      className={`graph${drag ? ' dragging' : ''}`}
+      style={{ width: g.width, height: g.height, transform: z === 1 ? undefined : `scale(${z})` }}
+      onPointerDown={onPointerDown}
+      onClickCapture={onTapClick}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={() => ((start.current = null), setDrag(null))}
+    >
+      {edges}
       {[...g.boxes].map(([id, box]) => p.renderNode(byId.get(id)!, box, { still: still(id), lifted: drag?.id === id, spawn: known.size > 0 && !known.has(id) }))}
     </div>
     </div>
