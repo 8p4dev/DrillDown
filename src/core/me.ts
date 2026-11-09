@@ -4,12 +4,11 @@ import { useEffect, useSyncExternalStore } from 'react'
 import { api, ApiError, setApiErrorHook, type Me, type MeExport, type PatchMeRes, type Provider, type Providers, type Session } from './api'
 import { toast } from '../features/Toast'
 
-/** sync.onLogin 결과 (계약 §3.5, 03 §3.3 M1~M3) */
-export type MergePlan = { local: number; server: number; otherAccount: string | null }
-export type MergeChoice = 'upload' | 'wipe_other' | 'copy_other'
-type SyncApi = { onLogin(userId: string): Promise<MergePlan>; applyMerge(choice: MergeChoice): Promise<void>; onLogout(): void }
-// CS 실구현 전에는 sync.ts 에 이 함수들이 없다 → 있을 때만 부른다
-const loadSync = () => import('./sync') as unknown as Promise<Partial<SyncApi>>
+/** sync.onLogin 결과 (계약 §3.5, 03 §3.3 M1~M3). 화면은 me 경로로 import 한다 */
+export type { MergePlan, MergeChoice } from './sync'
+import type { MergeChoice, MergePlan } from './sync'
+// 동기화 엔진은 첫 청크에 싣지 않는다 — 필요할 때 동적 import
+const loadSync = () => import('./sync')
 
 let me: Me | null = null
 let ready = false
@@ -38,7 +37,7 @@ function setMe(next: Me | null) {
   }
   emit()
   if (id && id !== prevId) {
-    void loadSync().then((s) => s.onLogin?.(id)).then((plan) => {
+    void loadSync().then((s) => s.onLogin(id)).then((plan) => {
       if (plan && me?.user.id === id) { merge = plan; emit() }
     }).catch(() => { /* 동기화 오류는 sync 상태가 보여 준다 */ })
   }
@@ -49,7 +48,7 @@ function signedOut() {
   merge = null
   sessions = []
   setMe(null)
-  if (was) void loadSync().then((s) => s.onLogout?.())
+  if (was) void loadSync().then((s) => s.onLogout())
 }
 
 /** 현재 사용자. null = 비로그인 또는 확인 중 */
@@ -151,7 +150,7 @@ export function useProviders(): Providers | null {
 
 // ---- 병합 (03 §3.3) ----
 export async function applyMerge(choice: MergeChoice): Promise<void> {
-  await (await loadSync()).applyMerge?.(choice)
+  await (await loadSync()).applyMerge(choice)
   merge = null
   emit()
 }
