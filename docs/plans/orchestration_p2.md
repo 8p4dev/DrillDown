@@ -39,3 +39,8 @@
 
 ## 5. 진행 기록
 - 2026-11-09 예산 640 KiB 반영, 계획 커밋 → WE3·WE4·WS2·WG2·WY2 디스패치
+- 디스패치: WE3 ctx_b0fde36db7ca · WE4 ctx_d94dd82fd0ef · WS2 ctx_b024792c860e · WG2 ctx_2c0c8ebe24cd · WY2 ctx_b0e395be15ed (base c808918)
+- WE3 완료 a0696aa: U12(공백 필수·체크박스/인용 제거·# 깊이·탭 단위 추정, 예시 트리 파싱 동일), U27 `::` 왕복, U28 별칭 칩(50×50), U26 가지 복제(226→447, undo 1회)·가지 내보내기, U19 ←→ 같은 깊이 형제·사촌. 남김: 제목 속 ' :: ' 는 메모로 갈림, 1칸 들여쓰기 오타 미처리
+- WY2 완료 059a601: applyRemote outbox 1회(3만 행 11~23s → 0.4s), bumpChildren owner_id 조건(SCAN → SEARCH), U03 확장 실측 결과 안 보였음 → 톰스톤 트리 저장·휴지통 갱신·복구 확인. 남김: 7일 경계 빈 트리 복구, 새 기기 pull 전 잠깐 saved 표시
+- WG2 질문: source.ts copy? 1줄 + study.ts 토스트 1줄 → 승인. WS2 질문: 백지는 D&D라 '이것도 정답' 성립 안 함 → U28 백지 쪽 생략
+- 통합 1차: WE3·WY2 머지 충돌 0, typecheck·lint·check 통과
