@@ -110,4 +110,13 @@ assert.equal(searchNodes(base, '  ').length, 0)
   assert.equal(changedNode(before, before), undefined)
 }
 
+// U21: 형제 수천 개(자식 묶기 O(n)) — 입력 순서와 무관하게 order 순으로 왼쪽부터
+{
+  const r = mk('W', null)
+  const kids = Array.from({ length: 3000 }, (_, i) => ({ ...mk(`w${i}`, 'W'), order: 3000 - i }))
+  const g = layout([r, ...kids], 'W', () => ({ w: 10, h: 10 }))
+  assert.equal(g.boxes.size, 3001)
+  assert(g.boxes.get('w2999')!.x < g.boxes.get('w0')!.x, '형제는 order 순')
+}
+
 console.log('layout.check: ok')

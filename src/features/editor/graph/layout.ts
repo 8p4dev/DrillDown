@@ -23,7 +23,12 @@ export const isOpen = (n: TreeNode) => !n.collapsed
 export function layout(nodes: TreeNode[], rootId: ID, measure: (n: TreeNode) => Size, open: (n: TreeNode, depth: number) => boolean = isOpen): Graph {
   const byId = new Map(nodes.map((n) => [n.id, n]))
   const kidsOf = new Map<ID, TreeNode[]>()
-  for (const n of nodes) if (n.parentId !== null) kidsOf.set(n.parentId, [...(kidsOf.get(n.parentId) ?? []), n])
+  for (const n of nodes) {
+    if (n.parentId === null) continue
+    const k = kidsOf.get(n.parentId)
+    if (k) k.push(n)
+    else kidsOf.set(n.parentId, [n])
+  }
   for (const k of kidsOf.values()) k.sort((a, b) => a.order - b.order)
   const visibleKids = (n: TreeNode, depth: number) => (open(n, depth) ? (kidsOf.get(n.id) ?? []) : [])
 
