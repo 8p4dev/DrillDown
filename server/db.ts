@@ -12,7 +12,8 @@ export type DB = DatabaseSync
 export async function openDb(file = join(env.dataDir, 'app.db')): Promise<DB> {
   if (file !== ':memory:') mkdirSync(env.dataDir, { recursive: true })
   const db = new DatabaseSync(file)
-  db.exec('PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 3000;')
+  // synchronous=FULL (F3): seq 를 발급한 커밋이 전원 차단에도 남아야 한다. NORMAL 이면 마지막 커밋이 사라져 seq 가 되감기고 클라이언트 커서가 미래가 된다
+  db.exec('PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 3000;')
   await migrate(db, file)
   return db
 }

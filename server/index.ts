@@ -3,6 +3,8 @@
 import { serve } from '@hono/node-server'
 import { serveStatic } from '@hono/node-server/serve-static'
 import { Hono } from 'hono'
+import { bodyLimit } from 'hono/body-limit'
+import { secureHeaders } from 'hono/secure-headers'
 import { readFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { openDb, type DB } from './db.ts'
@@ -10,22 +12,27 @@ import { env } from './env.ts'
 import { errorBody, HttpError, type AppEnv } from './http.ts'
 import { registerAccount, sessionMiddleware, maintenanceMiddleware } from './account/index.ts'
 import { registerSync, registerSharePages } from './sync/index.ts'
+import { LIMITS } from './sync/map.ts'
 
 export async function createApp(db: DB) {
   const app = new Hono<AppEnv>()
 
-  // 요청 로그: ts method path status ms 만 (IP·UA·쿼리스트링 금지, 03 §3.7)
+  // F9 보안 헤더. CSP 는 인라인 테마 스크립트·Vite 산출물 해시 관리가 필요해 뺀다(plan §1.6). COEP 는 hono 기본값이 꺼짐(외부 아바타 이미지)
+  app.use(secureHeaders())
+  // 요청 로그: ts method path status ms 만 (IP·UA·쿼리스트링 금지, 03 §3.7). 공유 slug 는 :slug 로 가린다(F10)
   app.use(async (c, next) => {
     const t = performance.now()
     await next()
     if (c.req.path.startsWith('/api/') || c.req.path.startsWith('/t/'))
-      console.log(`${new Date().toISOString()} ${c.req.method} ${c.req.path} ${c.res.status} ${Math.round(performance.now() - t)}`)
+      console.log(`${new Date().toISOString()} ${c.req.method} ${c.req.path.replace(/^(\/api)?\/t\/[^/]+/, '$1/t/:slug')} ${c.res.status} ${Math.round(performance.now() - t)}`)
   })
   app.onError((e, c) => {
     if (e instanceof HttpError) return c.json(errorBody(e.code, e.message, e.field), e.status as 400)
     console.error(e)
     return c.json(errorBody('internal', '서버 오류'), 500)
   })
+  // F1 본문 상한: 다 읽기 전에 끊는다(익명 /api/t/:slug/report 포함). 동기화 상한(C8) + JSON 봉투 여유
+  app.use('/api/*', bodyLimit({ maxSize: LIMITS.bytes + 64 * 1024, onError: (c) => c.json(errorBody('payload_too_large', '요청이 너무 큽니다'), 413) }))
   app.use(async (c, next) => { c.set('db', db); c.set('user', null); await next() })
   app.use('/api/*', sessionMiddleware)
 
