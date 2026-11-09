@@ -25,7 +25,7 @@
 .share-link { display: grid; gap: .5rem; }
 .share-url { display: block; padding: .5rem .65rem; font-size: var(--fs-sm); word-break: break-all; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text-2); }
 .share-link .actions { margin: 0; }
-.share-link .actions button { display: inline-flex; align-items: center; gap: .35rem; min-height: 40px; }
+.share-link .actions button { display: inline-flex; align-items: center; gap: .35rem; }
 
 /* 시트 머리 닫기: 아이콘 전용 44px (QA #7) */
 .sheet-head .sheet-x { min-width: var(--tap); min-height: var(--tap); }

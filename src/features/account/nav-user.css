@@ -15,6 +15,6 @@
 
 /* 배너: 상단 바 아래 한 줄 (03 §4 목록 행). 점검은 danger 테두리 */
 .banner { display: flex; align-items: center; gap: .6rem; padding: .5rem .85rem; margin: -.5rem 0 1rem; font-size: var(--fs-sm); color: var(--text); background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); }
-.banner-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.banner-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .banner[data-kind='maintenance'] { border-color: var(--danger); color: var(--danger); }
-.banner .ghost { min-height: 0; min-width: 0; padding: .25rem; color: inherit; }
+.banner .ghost { min-height: var(--tap); min-width: var(--tap); padding: .25rem; color: inherit; }

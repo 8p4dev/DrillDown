@@ -8,7 +8,6 @@ import type { Tree, Visibility } from '../../core/types'
 import { href } from '../../router'
 import { Icon } from '../../ui/Icon'
 import { I } from '../../ui/icons'
-import { x } from '../../ui/icons.all'
 import { toast } from '../Toast'
 import { Sheet } from '../../ui/Sheet'
 import './share-list.css'
@@ -68,7 +67,12 @@ export default function ShareSheet({ tree: initial, onClose, onChange }: { tree:
     void apply('public')
   }
   const copy = async () => {
-    await navigator.clipboard.writeText(url)
+    try {
+      await navigator.clipboard.writeText(url)
+    } catch {
+      toast('복사하지 못했습니다') // 권한 거부·비보안 컨텍스트 — 링크는 위에 보이니 길게 눌러 복사할 수 있다
+      return
+    }
     setCopied(true)
     toast('링크 복사됨')
     setTimeout(() => setCopied(false), 1500)
@@ -81,7 +85,7 @@ export default function ShareSheet({ tree: initial, onClose, onChange }: { tree:
       <div className="share-sheet">
         <header className="sheet-head">
           <h2>공유</h2>
-          <button type="button" className="ghost sheet-x" aria-label="닫기" data-tip="닫기" onClick={onClose}><Icon d={x} /></button>
+          <button type="button" className="ghost sheet-x" aria-label="닫기" data-tip="닫기" onClick={onClose}><Icon d={I.x} /></button>
         </header>
         {!me ? (
           <p className="muted">로그인하면 링크로 공유할 수 있습니다 <a href={href.login(location.hash)}>로그인</a></p>

@@ -66,7 +66,10 @@ export default function GalleryPage() {
         <input type="search" className="gallery-search" aria-label="제목 검색" placeholder="제목 검색" maxLength={50} value={input} onChange={(e) => setInput(e.target.value)} />
       </header>
       {failed && !items?.length ? (
-        <p className="empty muted">갤러리를 불러오지 못했습니다</p>
+        <div className="empty">
+          <p className="muted">갤러리를 불러오지 못했습니다</p>
+          <button type="button" onClick={() => { setFailed(false); setItems(null); setRetry((n) => n + 1) }}>다시 시도</button>
+        </div>
       ) : !items ? (
         <div className="route-loading" aria-busy="true" />
       ) : items.length === 0 ? (
