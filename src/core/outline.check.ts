@@ -85,4 +85,9 @@ eq(parseOutline('위\n\t탭\n    넷'), [I('위', I('탭'), I('넷'))], 'tab def
   eq(copy.map((n) => [n.title, n.note ?? null]), [['A', '한 줄'], ['B', null]], 'clone titles')
   eq([copy[0].parentId, copy[0].order, copy[1].parentId === copy[0].id, copy.some((c) => ns.some((n) => n.id === c.id))], ['R', 0.5, true, false], 'clone ids/parents')
 }
+// E4: 가져온 메모(긴 제목 나머지 + :: 메모)는 CAP.note(5,000자)에서 잘린다
+{
+  const [n] = outlineToNodes([{ text: 'a'.repeat(300), note: '나'.repeat(6000), children: [] }], 't', null)
+  eq([n.title.length, n.note?.length, n.note?.startsWith('a'.repeat(100) + '\n나')], [200, 5000, true], 'note capped at CAP.note')
+}
 console.log('outline U12/U26/U27 ok')

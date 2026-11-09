@@ -1,5 +1,8 @@
 import type { ID, TreeNode } from '../../core/types'
 
+/** 한글 IME 조합 중인 키 입력 — Enter 등을 가로채면 글자가 중복·유실된다. keyCode 229 = 일부 브라우저가 isComposing 을 안 주는 경우 */
+export const isComposing = (e: React.KeyboardEvent) => e.nativeEvent.isComposing || e.keyCode === 229
+
 /** 접기(collapsed)·시각만 다르면 같은 노드 — 접기는 실행 취소 대상이 아니라 '바뀐 곳'이 아니다 */
 const key = (n: TreeNode) => JSON.stringify({ ...n, collapsed: undefined, updatedAt: undefined })
 

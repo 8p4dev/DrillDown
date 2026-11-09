@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { logEvent } from '../../core/events'
 import { cloneBranch, nodesToOutline, outlineToNodes, parseOutline, serializeOutline, splitTitle } from '../../core/outline'
-import { byOrder, childrenOf, deleteNodes, descendantsOf, getTreeNodes, putNodes } from '../../core/repo'
+import { byOrder, childIndex, childrenOf, deleteNodes, descendantsOf, getTreeNodes, putNodes } from '../../core/repo'
 import { getSrsMap, missHeat } from '../../core/srs'
 import { ancestorsOf } from '../../core/path'
 import { CAP, type ID, type NodeSrs, type TreeNode } from '../../core/types'
@@ -16,7 +16,7 @@ import NoteEditor, { type NoteApi, type NoteOp } from './content/NoteEditor'
 import GraphView from './graph/GraphView'
 import { isOpen, type Dir } from './graph/layout'
 import { searchNodes, SEARCH_LIMIT } from './search'
-import { changedNode } from './edit'
+import { changedNode, isComposing } from './edit'
 import TreeHeader from '../TreeHeader'
 import { hint, toast } from '../Toast'
 import { haptic } from '../feel'
@@ -36,19 +36,31 @@ const nextOrder = (ns: TreeNode[], parentId: ID) => {
   const k = childrenOf(ns, parentId)
   return k.length ? k[k.length - 1].order + 1 : 0
 }
-/** node 바로 뒤 형제 자리의 order (types.ts 규약: 중간값) */
-const orderAfter = (ns: TreeNode[], node: TreeNode) => {
+/** 형제를 sib 순서대로 0..n 재번호(E6: 중간값이 안 나오거나 order 가 같을 때). 바뀐 노드만 새 객체 */
+const renumber = (ns: TreeNode[], sib: TreeNode[]) => {
+  const at = new Map(sib.map((s, k) => [s.id, k]))
+  return ns.map((n) => {
+    const k = at.get(n.id)
+    return k === undefined || n.order === k ? n : { ...n, order: k, updatedAt: Date.now() }
+  })
+}
+/** node 바로 뒤 형제 자리의 order (types.ts 규약: 중간값). 중간값이 이웃 사이에 엄밀히 안 들어가면(부동소수 한계·동률) 형제를 재번호한 배열과 i+0.5 */
+const orderAfter = (ns: TreeNode[], node: TreeNode): [TreeNode[], number] => {
   const sib = childrenOf(ns, node.parentId!)
-  const next = sib[sib.indexOf(node) + 1]
-  return next ? (node.order + next.order) / 2 : node.order + 1
+  const i = sib.indexOf(node)
+  const next = sib[i + 1]
+  if (!next) return [ns, node.order + 1]
+  const mid = (node.order + next.order) / 2
+  return mid > node.order && mid < next.order ? [ns, mid] : [renumber(ns, sib), i + 0.5]
 }
 type Open = (n: TreeNode, depth: number) => boolean
-/** 화면에 그려지는 노드(전위 순서). open = 접기 + 보기 깊이(C3), depth 는 root(포커스 루트) 기준 */
+/** 화면에 그려지는 노드(전위 순서). open = 접기 + 보기 깊이(C3), depth 는 root(포커스 루트) 기준. O(n) */
 const visibleRows = (ns: TreeNode[], root: TreeNode, open: Open = isOpen) => {
   const out: { node: TreeNode; depth: number }[] = []
+  const kids = childIndex(ns)
   const walk = (n: TreeNode, depth: number) => {
     out.push({ node: n, depth })
-    if (open(n, depth)) for (const k of childrenOf(ns, n.id)) walk(k, depth + 1)
+    if (open(n, depth)) for (const k of kids.get(n.id) ?? []) walk(k, depth + 1)
   }
   walk(root, 0)
   return out
@@ -59,7 +71,15 @@ const newNode = (treeId: ID, parentId: ID, order: number): TreeNode => ({
 const FULL_MSG = '트리 하나에 노드는 5,000개까지입니다' // 계약 C5
 /** 실행 취소 1단계: 되돌아갈 노드 배열 + 무엇이었는지(U09 토스트 "가져오기 222개 되돌림") */
 type Step = { ns: TreeNode[]; label: string }
-const isComposing = (e: React.KeyboardEvent) => e.nativeEvent.isComposing || e.keyCode === 229
+/** E14: 가져오기 칸에 그대로 붙일 수 있는 개요를 AI 에게 요청하는 고정 문구 */
+const AI_PROMPT = `다음 주제를 공부용 트리(개요)로 정리해 주세요.
+형식 규칙:
+- 들여쓰기 개요만 출력합니다(설명·머리말 없이). 한 단계 = 공백 2칸.
+- 첫 줄은 주제(루트), 그 아래로 큰 갈래 → 세부 개념 순서로 3~4단계.
+- 각 줄은 짧은 제목 하나. 필요하면 " :: " 뒤에 한 줄 메모를 붙입니다. 예) 근로계약 :: 근로자와 사용자의 합의
+- 번호·기호·마크다운은 쓰지 않습니다.
+
+주제: `
 /** 노드별 자식 유무·하위 수·형제 위치를 한 번에 계산 (O(n log n)). 노드마다 childrenOf/descendantsOf 를 부르면 O(n²) */
 function countTree(ns: TreeNode[]) {
   const kids = new Map<ID, TreeNode[]>()
@@ -156,15 +176,19 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
   useEffect(() => {
     if (loaded) outlineRef.current?.focus() // 진입 즉시 키보드로 편집 가능
   }, [loaded])
-  // 동기화 엔진이 pull 뒤 쏘는 dd:remote{treeIds}: 내 트리면 노드를 다시 읽어 교체한다.
-  // undo 스택은 그대로 두고, 편집 중인 노드(카드 제목·카드 내용·패널 live)는 로컬 값을 유지해 입력칸을 덮지 않는다.
+  // 동기화 엔진이 pull 뒤 쏘는 dd:remote{treeIds}: 내 트리면 노드·학습 기록을 다시 읽어 교체한다(E16).
+  // undo/redo 스택은 비운다(E2: 옛 스냅샷으로 되돌리면 다른 기기가 추가한 노드가 지워진다).
+  // 편집 중인 노드(카드 제목·카드 내용·패널 live)는 로컬 값을 유지해 입력칸을 덮지 않는다.
   useEffect(() => {
     const onRemote = (e: Event) => {
       if (!(e as CustomEvent<{ treeIds: string[] }>).detail?.treeIds?.includes(treeId)) return
       const keep = new Set([editId, noteEditId, liveBase.current ? selId : null])
+      getSrsMap(treeId).then(setSrs)
       getTreeNodes(treeId).then((remote) => {
         const local = new Map(nodesRef.current.map((n) => [n.id, n]))
         const next = remote.map((n) => (keep.has(n.id) && local.get(n.id)) || n)
+        undoRef.current = []
+        redoRef.current = []
         nodesRef.current = next
         setNodes(next)
         setSelId((id) => (next.some((n) => n.id === id) ? id : (next.find((n) => n.parentId === null)?.id ?? '')))
@@ -182,10 +206,12 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
       if (v.open) document.getElementById(KEYS_ID)?.hidePopover()
     })
   }, [])
-  // '/' = 검색 (입력 중이 아닐 때). Ctrl+F 는 브라우저 찾기 그대로
+  // '/' 또는 Ctrl/⌘+K = 검색 (입력 중이 아닐 때, E13). Ctrl+F 는 브라우저 찾기 그대로
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return
+      const slash = e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey
+      const k = e.code === 'KeyK' && (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey
+      if ((!slash && !k) || e.isComposing) return
       const t = e.target as HTMLElement | null
       if (t?.isContentEditable || t?.closest?.('input, textarea, select')) return
       e.preventDefault()
@@ -396,13 +422,16 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
     if (!step) return toast(`${redo ? '다시 실행' : '실행 취소'}할 것이 없음`)
     const prev = nodesRef.current
     to.current.push({ ns: prev, label: step.label })
-    persist(prev, step.ns)
-    nodesRef.current = step.ns
-    setNodes(step.ns)
-    if (cutId && !step.ns.some((n) => n.id === cutId)) setCutId(null)
-    const id = changedNode(prev, step.ns)
+    // E1: 되살리거나 되돌린 노드는 새 updatedAt 으로 — 서버 LWW(at > updated_at)에서 톰스톤·이전 쓰기를 이긴다. 스냅샷 자체는 그대로(undoIf 동일성)
+    const before = new Map(prev.map((n) => [n.id, n]))
+    const next = step.ns.map((n) => (before.get(n.id) === n ? n : { ...n, updatedAt: Date.now() }))
+    persist(prev, next)
+    nodesRef.current = next
+    setNodes(next)
+    if (cutId && !next.some((n) => n.id === cutId)) setCutId(null)
+    const id = changedNode(prev, next)
     if (id) jump(id)
-    else if (!step.ns.some((n) => n.id === selId)) setSelId(topNode().id)
+    else if (!next.some((n) => n.id === selId)) setSelId(topNode().id)
     toast(`${step.label} ${redo ? '다시 실행' : '되돌림'}`, undefined, 4000, true) // 떠 있는 [되돌리기] 토스트는 이제 무의미 → 대체
   }
   /** 토스트 [되돌리기]: 그 사이 다른 변경이 있으면 엉뚱한 단계를 되돌리지 않는다 */
@@ -537,8 +566,9 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
     const n = get(id)!
     const ns = nodesRef.current
     const first = isTop(n)
-    const nn = first ? newNode(treeId, n.id, (childrenOf(ns, n.id)[0]?.order ?? 1) - 1) : newNode(treeId, n.parentId!, orderAfter(ns, n))
-    commit([...(first ? patch(ns, n.id, { collapsed: false }) : ns), nn], '추가')
+    const [base, order] = first ? [patch(ns, n.id, { collapsed: false }), (childrenOf(ns, n.id)[0]?.order ?? 1) - 1] : orderAfter(ns, n)
+    const nn = newNode(treeId, first ? n.id : n.parentId!, order)
+    commit([...base, nn], '추가')
     if (first) showKids(n.id)
     return nn.id
   }
@@ -559,16 +589,23 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
     const parent = n.parentId ? get(n.parentId) : undefined
     if (!parent || parent.parentId === null || isTop(n)) return toast('더 내어쓸 수 없음')
     if (parent.id === viewRef.current.top) return toast('포커스 밖으로는 내어쓸 수 없음 · 전체 보기에서')
-    const ns = nodesRef.current
-    commit(patch(ns, n.id, { parentId: parent.parentId, order: orderAfter(ns, parent) }), '내어쓰기')
+    const [base, order] = orderAfter(nodesRef.current, parent)
+    commit(patch(base, n.id, { parentId: parent.parentId, order }), '내어쓰기')
   }
   function moveSibling(id: ID, dir: -1 | 1) {
     const n = get(id)!
     if (isTop(n) || n.parentId === null) return
     const ns = nodesRef.current
     const sib = childrenOf(ns, n.parentId)
-    const other = sib[sib.indexOf(n) + dir]
+    const i = sib.indexOf(n)
+    const other = sib[i + dir]
     if (!other) return
+    if (n.order === other.order) {
+      // E6: 동률이면 교환이 무효 → 바꾼 순서로 형제 재번호
+      const sw = [...sib]
+      ;[sw[i], sw[i + dir]] = [other, n]
+      return commit(renumber(ns, sw), '순서 바꾸기')
+    }
     commit(patch(patch(ns, n.id, { order: other.order }), other.id, { order: n.order }), '순서 바꾸기')
   }
   function removeSubtree(id: ID) {
@@ -579,12 +616,13 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
     const gone = new Set([id, ...sub.map((x) => x.id)])
     const rows = visibleRows(ns, topNode(), viewRef.current.open)
     const i = rows.findIndex((r) => r.node.id === id)
-    commit(ns.filter((x) => !gone.has(x.id)), `"${n.title}" 삭제`)
+    const name = n.title || '제목 없음'
+    commit(ns.filter((x) => !gone.has(x.id)), `"${name}" 삭제`)
     haptic('warn')
     setSelId(rows[i - 1]?.node.id ?? topNode().id)
     if (cutId && gone.has(cutId)) setCutId(null)
     // 확인창 대신 되돌리기
-    toast(`"${n.title}" 삭제${sub.length ? ` (하위 ${sub.length}개)` : ''}`, { label: '실행 취소', run: () => undoIf(ns) }, UNDO_MS)
+    toast(`"${name}" 삭제${sub.length ? ` (하위 ${sub.length}개)` : ''}`, { label: '실행 취소', run: () => undoIf(ns) }, UNDO_MS)
   }
   /** 잘라낸 서브트리를 선택 노드의 마지막 자식으로 이동 (id 유지 → 학습 기록 보존) */
   function paste(targetId: ID) {
@@ -610,10 +648,12 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
     if (isTop(n)) return toast(n.parentId === null ? '루트는 복제할 수 없음' : '포커스 루트는 복제할 수 없음')
     const ns = nodesRef.current
     if (isFull(1 + descendantsOf(ns, id).length)) return
-    const copy = cloneBranch(ns, id, orderAfter(ns, n))
-    commit([...ns, ...copy], `"${n.title}" 복제`)
+    const [base, order] = orderAfter(ns, n)
+    const copy = cloneBranch(ns, id, order)
+    const name = n.title || '제목 없음'
+    commit([...base, ...copy], `"${name}" 복제`)
     setSelId(copy[0].id)
-    toast(`"${n.title}" 복제${copy.length > 1 ? ` (하위 ${copy.length - 1}개)` : ''}`, { label: '되돌리기', run: () => undoIf(ns) }, UNDO_MS)
+    toast(`"${name}" 복제${copy.length > 1 ? ` (하위 ${copy.length - 1}개)` : ''}`, { label: '되돌리기', run: () => undoIf(ns) }, UNDO_MS)
   }
   /** 마지막 자식으로 새 노드를 만들고 제목 편집 (구조 바 +자식 — 키보드의 Enter 후 Tab) */
   function addChild(id: ID) {
@@ -641,8 +681,8 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
     else if (ctrl && e.code === 'KeyZ') restore(e.shiftKey)
     else if (ctrl && e.code === 'KeyY') restore(true)
     else if (ctrl && e.code === 'KeyX') cut(sel)
-    else if (ctrl && e.code === 'KeyV') paste(sel.id)
-    else if (ctrl) handled = false
+    else if (ctrl && e.code === 'KeyV' && cutId) paste(sel.id)
+    else if (ctrl) handled = false // Ctrl+V(잘라낸 것 없음)는 기본 동작 → 캔버스 onPaste 가 클립보드 개요를 받는다(E21)
     // 그래프 방향: ↑ 부모 · ↓ 첫 자식 · ←→ 형제 (plan G4)
     else if (e.altKey && key === 'ArrowLeft') moveSibling(sel.id, -1)
     else if (e.altKey && key === 'ArrowRight') moveSibling(sel.id, 1)
@@ -671,7 +711,7 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
     else if (e.code === 'KeyH' && !e.altKey && !e.shiftKey) {
       if (hasKids) toggle(sel)
     }
-    else if (e.key === 'Delete') removeSubtree(sel.id)
+    else if (e.key === 'Delete' || e.key === 'Backspace') removeSubtree(sel.id) // Backspace: 맥 키보드(E10)
     else if (e.key === 'Escape') {
       setCutId(null)
       document.getElementById(KEYS_ID)?.hidePopover()
@@ -682,8 +722,9 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
   }
 
   // ---- 가져오기 / 내보내기 ----
-  function importOutline(asRoot: boolean) {
-    const items = parseOutline(importText)
+  /** text 기본값은 가져오기 칸. 캔버스 Ctrl+V(E21)는 클립보드 텍스트를 넘긴다 */
+  function importOutline(asRoot: boolean, text = importText) {
+    const items = parseOutline(text)
     if (!items.length) return toast('가져올 항목 없음')
     const ns = nodesRef.current
     const target = asRoot ? root! : sel!
@@ -694,7 +735,7 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
     const rootTitle = asRoot ? splitTitle(items[0].text) : null
     // 긴 루트 제목의 나머지·`:: 메모`(C6)는 기존 메모 앞에 붙인다(C5)
     const rootMemo = [rootTitle?.note, asRoot ? items[0].note : undefined].filter(Boolean)
-    const rootNote = rootMemo.length ? { note: [...rootMemo, target.note].filter(Boolean).join('\n') } : {}
+    const rootNote = rootMemo.length ? { note: [...rootMemo, target.note].filter(Boolean).join('\n').slice(0, CAP.note) } : {}
     const base = patch(ns, target.id, rootTitle ? { title: rootTitle.title, collapsed: false, ...rootNote } : { collapsed: false })
     const long = added.filter((n) => n.title.length === CAP.title && n.note !== undefined).length + (rootTitle?.note !== undefined ? 1 : 0)
     if (added.length) fitPending.current = true // 통째로 들어온 트리는 진입과 같게 맞춘다
@@ -711,17 +752,21 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
       UNDO_MS,
     )
   }
-  function copyText(text: string) {
+  function copyText(text: string, done = '개요 복사됨') {
     navigator.clipboard?.writeText(text).then(
-      () => toast('개요 복사됨'),
+      () => toast(done),
       () => toast('직접 복사하세요'),
     )
   }
-  function exportOutline() {
-    const text = serializeOutline(nodesToOutline(nodesRef.current, root!.id, true))
-    setExportText(text)
-    copyText(text)
+  /** rootId 가지의 개요 복사. 여러 줄 내용은 개요에 못 실리므로 빠진 수를 알린다(E11) */
+  function copyOutline(rootId: ID): string {
+    const ns = nodesRef.current
+    const text = serializeOutline(nodesToOutline(ns, rootId, true))
+    const skipped = [get(rootId)!, ...descendantsOf(ns, rootId)].filter((n) => n.note?.trim() && n.note.includes('\n')).length
+    copyText(text, `개요 복사됨${skipped ? ` · 여러 줄 내용 ${skipped}개 제외` : ''}`)
+    return text
   }
+  const exportOutline = () => setExportText(copyOutline(root!.id))
 
   /** 드래그로 옮긴 위치를 모두 지운다 (실행취소 가능) */
   function autoArrange() {
@@ -811,6 +856,14 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
         tabIndex={0}
         ref={outlineRef}
         onKeyDown={onNavKey}
+        onPaste={(e) => {
+          // E21: 캔버스 자체에 포커스가 있을 때만(제목 입력·내용 편집 중 붙여넣기는 각자 처리). 잘라낸 것이 있으면 keydown 이 먼저 가로챘다
+          if (e.target !== e.currentTarget) return
+          const text = e.clipboardData.getData('text/plain')
+          if (!text.trim()) return
+          e.preventDefault()
+          importOutline(false, text)
+        }}
         onScroll={() => (clearTimeout(scrollTimer.current), (scrollTimer.current = window.setTimeout(() => saveRef.current(), 300)))}
       >
         <GraphView
@@ -888,7 +941,7 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
         </span>
         <span className="zoom-group" role="group" aria-label="확대·축소">
           <button type="button" className="zoom-step" aria-label="축소" data-tip="축소 (-)" onClick={() => zoomBy(1 / 1.2)}><Icon d={zoomOut} size={20} /></button>
-          <button type="button" className="zoom-reset" data-tip="100%로 (0)" onClick={() => zoomTo(1)}>
+          <button type="button" className="zoom-reset" aria-label={`100%로 (현재 ${Math.round(zoom * 100)}%)`} data-tip="100%로 (0)" onClick={() => zoomTo(1)}>
             <output className="tnum" aria-label="배율">{Math.round(zoom * 100)}%</output>
           </button>
           <button type="button" className="zoom-step" aria-label="확대" data-tip="확대 (=)" onClick={() => zoomBy(1.2)}><Icon d={zoomIn} size={20} /></button>
@@ -919,7 +972,7 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
           onImport={openImport}
           onAliases={(aliases) => commit(patch(nodesRef.current, cur.id, { aliases }), '별칭')}
           onDuplicate={cur.id !== top!.id ? () => duplicate(cur.id) : undefined}
-          onExport={() => copyText(serializeOutline(nodesToOutline(nodesRef.current, cur.id, true)))}
+          onExport={() => copyOutline(cur.id)}
         />
         <details className="io" open={ioOpen} onToggle={(e) => setIoOpen(e.currentTarget.open)}>
           <summary><Icon d={clipboardPaste} />개요 붙여넣기 · 내보내기</summary>
@@ -934,6 +987,7 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
             <button type="button" onClick={() => importOutline(false)}>선택 노드의 자식으로 추가</button>
             {asRootOk && <button type="button" onClick={() => importOutline(true)}>첫 줄을 루트로</button>}
             <button type="button" onClick={exportOutline}>개요 내보내기</button>
+            <button type="button" onClick={() => copyText(AI_PROMPT, 'AI 프롬프트 복사됨 · 답을 이 칸에 붙여넣으세요')}>AI 프롬프트 복사</button>
           </div>
           {exportText && (
             // I7: readonly textarea 는 접고, 복사 버튼으로 대신한다
@@ -984,16 +1038,18 @@ const KEYS: [string, string][] = [
   ['Enter Tab', '자식 추가 (차례로)'],
   ['Tab Shift+Tab', '편집 중 들여·내어쓰기'],
   ['H', '접기 · 펼치기'],
-  ['Delete', '삭제'],
+  ['Delete Backspace', '삭제'],
   ['Ctrl+X Ctrl+V', '잘라내기 · 붙여넣기'],
+  ['Ctrl+V', '클립보드 개요를 선택 아래에'],
   ['Ctrl+Z', '실행 취소'],
-  ['Ctrl+Shift+Z', '다시 실행'],
+  ['Ctrl+Shift+Z Ctrl+Y', '다시 실행'],
   ['- = 0', '축소 · 확대 · 100%'],
   ['Shift+H', '형광펜'],
   ['Home End', '처음 · 마지막'],
-  ['/', '검색'],
+  ['/ Ctrl+K', '검색'],
   ['.', '선택으로 이동'],
   ['Esc', '편집 끝내기'],
+  ['?', '이 단축키 표'],
 ]
 
 const TOOLS: { op: NoteOp; label: string; icon: string }[] = [
@@ -1051,7 +1107,7 @@ function DetailPanel({ api, ...p }: {
         }}
         onBlur={() => (setTitle(null), p.onEnd())}
         onKeyDown={(e) => {
-          if (e.nativeEvent.isComposing || e.keyCode === 229) return
+          if (isComposing(e)) return
           if (e.key === 'Enter') e.currentTarget.blur()
           else if (e.key === 'Escape') p.onEscape()
         }}
@@ -1095,7 +1151,7 @@ function DetailPanel({ api, ...p }: {
 
 /** 서버 map.ts LIMITS 와 같은 값: 별칭 50개, 각 50자 — 넘기 전에 막는다 */
 const ALIAS_MAX = 50
-/** U28 별칭 칩(C5 aliases): Enter·쉼표로 추가, × 로 삭제. 채점은 기존 별칭 비교가 쓴다 */
+/** U28 별칭 칩(C5 aliases): Enter·쉼표로 추가, × 로 삭제. 표시·공유 보기·검색(E13)용 — 지금은 어떤 채점도 별칭을 보지 않는다 */
 function Aliases({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
   const [text, setText] = useState('')
   function add(raw: string) {
@@ -1123,7 +1179,7 @@ function Aliases({ value, onChange }: { value: string[]; onChange: (v: string[])
         onChange={(e) => (e.target.value.includes(',') ? add(e.target.value) : setText(e.target.value))}
         onBlur={() => text.trim() && add(text)}
         onKeyDown={(e) => {
-          if (e.nativeEvent.isComposing || e.keyCode === 229) return
+          if (isComposing(e)) return
           if (e.key === 'Enter') { e.preventDefault(); add(text) }
         }}
       />
@@ -1131,7 +1187,7 @@ function Aliases({ value, onChange }: { value: string[]; onChange: (v: string[])
   )
 }
 
-/** '/' 검색(U16): 제목 부분 일치, 각 줄에 경로. ↑↓ 고르기 · Enter 이동 · Esc 닫기 */
+/** '/'·Ctrl+K 검색(U16·E13): 제목(위)·내용·별칭 부분 일치, 각 줄에 경로. ↑↓ 고르기 · Enter 이동 · Esc 닫기 */
 function SearchBox({ nodes, byId, onPick, onClose }: { nodes: TreeNode[]; byId: ReadonlyMap<ID, TreeNode>; onPick: (id: ID) => void; onClose: () => void }) {
   const [q, setQ] = useState('')
   const [i, setI] = useState(0)
@@ -1146,12 +1202,12 @@ function SearchBox({ nodes, byId, onPick, onClose }: { nodes: TreeNode[]; byId: 
         aria-expanded={res.length > 0}
         aria-controls="editor-search-results"
         aria-activedescendant={res[at] ? `sr-${res[at].id}` : undefined}
-        placeholder="제목 검색"
+        placeholder="제목 · 내용 · 별칭 검색"
         value={q}
         onChange={(e) => (setQ(e.target.value), setI(0))}
         onBlur={onClose}
         onKeyDown={(e) => {
-          if (e.nativeEvent.isComposing || e.keyCode === 229) return
+          if (isComposing(e)) return
           if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
             e.preventDefault()
             if (res.length) setI((at + (e.key === 'ArrowDown' ? 1 : -1) + res.length) % res.length)
@@ -1179,7 +1235,7 @@ function SearchBox({ nodes, byId, onPick, onClose }: { nodes: TreeNode[]; byId: 
               <NodePath path={ancestorsOf(byId, n.id).slice(0, -1)} skipRoot label="경로" />
             </li>
           ))}
-          {!res.length && <li className="search-none">찾는 제목이 없습니다</li>}
+          {!res.length && <li className="search-none">찾는 노드가 없습니다</li>}
           {res.length >= SEARCH_LIMIT && <li className="search-none">처음 {SEARCH_LIMIT}개만 보입니다</li>}
         </ul>
       )}
