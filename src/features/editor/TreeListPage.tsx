@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { initialOf, toneOf } from '../../core/avatar'
+import { api } from '../../core/api'
 import { exportEvents, logEvent } from '../../core/events'
 import { useMe } from '../../core/me'
 import { createTree, listTreeMeta, markTreeDeleted, matchTitle, purgeDeletedTrees, renameTree, restoreTree, type TreeMeta } from '../../core/repo'
@@ -50,6 +51,16 @@ export default function TreeListPage() {
   const [goneId, setGoneId] = useState<string>()
   const input = useRef<HTMLInputElement>(null)
   const me = useMe()
+  // U60: 공유 트리 복제 수는 서버에만 있다 → 로그인 시 목록 진입 때 /api/trees 1회(본인 트리만). 실패 무시
+  const meId = me?.user.id
+  const [copies, setCopies] = useState<Record<string, number>>({})
+  useEffect(() => {
+    if (!meId) return
+    const ac = new AbortController()
+    api<{ trees: { id: string; copyCount: number }[] }>('/api/trees', { signal: ac.signal })
+      .then((r) => setCopies(Object.fromEntries(r.trees.map((t) => [t.id, t.copyCount]))), () => {})
+    return () => ac.abort()
+  }, [meId])
   const reload = useCallback(() => listTreeMeta(endOfToday()).then((ts) => {
     setTrees(ts)
     // U05: 트리가 생기면 저장소 영구 보존 요청(비로그인 데이터 보호). 실패·미지원 무시
@@ -163,7 +174,7 @@ export default function TreeListPage() {
       ) : (
         <ul className="tree-cards">
           {shown.map(({ tree: t, ...meta }) => (
-            <TreeCard key={t.id} t={t} meta={meta} isNew={t.id === newId} gone={t.id === goneId} editing={t.id === editing}
+            <TreeCard key={t.id} t={t} meta={meta} copies={copies[t.id]} isNew={t.id === newId} gone={t.id === goneId} editing={t.id === editing}
               onEdit={() => setEditing(t.id)} onRename={(v) => rename(t, v)} onCancel={() => setEditing(undefined)}
               onShare={() => setSharing(t)} onRemove={() => remove(t)} />
           ))}
@@ -175,11 +186,11 @@ export default function TreeListPage() {
 }
 
 type CardProps = {
-  t: Tree; meta: Omit<TreeMeta, 'tree'>; isNew: boolean; gone: boolean; editing: boolean
+  t: Tree; meta: Omit<TreeMeta, 'tree'>; copies?: number; isNew: boolean; gone: boolean; editing: boolean
   onEdit: () => void; onRename: (v: string) => void; onCancel: () => void; onShare: () => void; onRemove: () => void
 }
 
-function TreeCard({ t, meta, isNew, gone, editing, onEdit, onRename, onCancel, onShare, onRemove }: CardProps) {
+function TreeCard({ t, meta, copies, isNew, gone, editing, onEdit, onRename, onCancel, onShare, onRemove }: CardProps) {
   const timer = useRef(0)
   const menu = useRef<HTMLDetailsElement>(null)
   const done = useRef(false) // Esc/Enter 처리 뒤 blur 로 한 번 더 확정되지 않게
@@ -220,7 +231,7 @@ function TreeCard({ t, meta, isNew, gone, editing, onEdit, onRename, onCancel, o
       {/* stretched link: 제목과 모드 사이 빈칸이 링크 본체, ::after 가 카드 전체를 덮는다. 제목·메뉴·모드 링크는 z-index 로 위에 */}
       {/* U44: 노드 수 · 오늘 복습(학습한 트리만) · 최근 사용 */}
       <p className="tree-meta">
-        노드 {meta.nodes}{meta.studiedAt !== undefined && ` · 복습 ${meta.due}`} · {ago(meta.usedAt)}
+        노드 {meta.nodes}{meta.studiedAt !== undefined && ` · 복습 ${meta.due}`} · {ago(meta.usedAt)}{copies !== undefined && t.visibility && t.visibility !== 'private' && ` · 복제 ${copies}`}
       </p>
       <a className="tree-open" href={href.edit(t.id)} aria-label={`${t.title} 편집`} onClick={() => haptic('tap')} />
       <nav className="tree-modes" aria-label={`${t.title} 학습 모드`}>

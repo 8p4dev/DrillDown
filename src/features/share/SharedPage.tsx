@@ -38,11 +38,12 @@ const REASONS: { v: ReportReason; label: string }[] = [
 
 // 체험 학습 기록: 탭을 오가도 세션 동안 유지, 저장 안 함 (04 §3.4.2)
 const sessions = new Map<string, Map<ID, NodeSrs>>()
-function memorySource(t: SharedTree): StudySource {
+function memorySource(t: SharedTree, copy: () => void): StudySource {
   const srs = sessions.get(t.slug) ?? new Map<ID, NodeSrs>()
   sessions.set(t.slug, srs)
   return {
     ephemeral: true,
+    copy,
     nodes: async () => t.nodes,
     srs: async () => srs,
     record: async (nodeId, ok) => {
@@ -103,7 +104,22 @@ export default function SharedPage({ slug, mode, rootId }: { slug: string; mode:
   }, [slug])
   const load = loaded?.slug === slug ? loaded : null
   const t = load && 't' in load ? load.t : null
-  const source = useMemo(() => (t ? memorySource(t) : null), [t])
+  const doCopy = async (again = false) => {
+    if (!t) return
+    setDup(null)
+    const mine = await listTrees()
+    // U57: 이미 복제한 트리가 있으면 먼저 묻는다(삭제된 것은 listTrees 가 뺀다)
+    const prev = !again && mine.find((x) => x.sourceTreeId === t.id)
+    if (prev) { setDup(prev); return }
+    // C5: 로그인 사용자는 서버 한도에 닿으면 복제를 막는다(비로그인은 막지 않음)
+    if (me && mine.length >= CAP.treesPerUser) { toast('트리는 200개까지 저장할 수 있습니다'); return }
+    const tree = await copyTree(t)
+    void api(`/api/t/${slug}/copy`, { method: 'POST' }).catch(() => {}) // copy_count 용, 실패 무시
+    toast('복제됨 · 원본이 바뀌어도 이 트리는 바뀌지 않습니다', { label: '열기', run: () => location.assign('/' + href.edit(tree.id)) }, 6000)
+  }
+  // U38·Q3: 첫 채점 토스트 [복제] = 헤더 복제와 같은 흐름(U57 중복 확인 포함)
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- 트리가 바뀔 때만 새 소스(체험 토스트 1회 유지)
+  const source = useMemo(() => (t ? memorySource(t, () => void doCopy()) : null), [t])
   const [menu, setMenu] = useState(false)
   const [report, setReport] = useState(false)
   const [reason, setReason] = useState<ReportReason>('copyright')
@@ -131,18 +147,6 @@ export default function SharedPage({ slug, mode, rootId }: { slug: string; mode:
   const root = t.nodes.find((n) => n.parentId === null)
   const url = location.origin + href.shared(slug)
 
-  const doCopy = async (again = false) => {
-    setDup(null)
-    const mine = await listTrees()
-    // U57: 이미 복제한 트리가 있으면 먼저 묻는다(삭제된 것은 listTrees 가 뺀다)
-    const prev = !again && mine.find((x) => x.sourceTreeId === t.id)
-    if (prev) { setDup(prev); return }
-    // C5: 로그인 사용자는 서버 한도에 닿으면 복제를 막는다(비로그인은 막지 않음)
-    if (me && mine.length >= CAP.treesPerUser) { toast('트리는 200개까지 저장할 수 있습니다'); return }
-    const tree = await copyTree(t)
-    void api(`/api/t/${slug}/copy`, { method: 'POST' }).catch(() => {}) // copy_count 용, 실패 무시
-    toast('복제됨 · 원본이 바뀌어도 이 트리는 바뀌지 않습니다', { label: '열기', run: () => location.assign('/' + href.edit(tree.id)) }, 6000)
-  }
   // 접기는 DOM 상태(<details>) — React 상태 없음. 루트는 늘 펼친다
   const fold = (open: boolean) => treeRef.current?.querySelectorAll<HTMLDetailsElement>('.share-tree:not(.share-top) details').forEach((d) => (d.open = open))
   const copyLink = async () => {

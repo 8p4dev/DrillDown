@@ -13,6 +13,8 @@ export interface StudySource {
   record(nodeId: ID, ok: boolean): Promise<NodeSrs>
   /** true 면 기록이 저장되지 않는 체험 모드(첫 채점 때 토스트 1회) */
   readonly ephemeral?: boolean
+  /** 체험 토스트의 [복제] 동작(공유 보기만) */
+  readonly copy?: () => void
 }
 
 export function dexieSource(treeId: ID): StudySource {
