@@ -49,7 +49,11 @@ export default function AccountPage() {
     void listTrees().then((ts) => setTreeCount(ts.length))
     void db.trees.toArray().then((ts) => setTrash(ts.filter((t) => t.deletedAt)))
   }
-  useEffect(reload, [])
+  useEffect(() => {
+    reload()
+    addEventListener('dd:remote', reload) // 다른 기기 삭제가 pull 로 오면 휴지통 갱신(U03)
+    return () => removeEventListener('dd:remote', reload)
+  }, [])
   // 휴지통·내보내기는 비로그인도 쓴다(로컬 데이터). 서버 호출은 로그인일 때만
   const restore = async (t: Tree) => {
     await restoreTree(t.id)
