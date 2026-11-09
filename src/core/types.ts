@@ -65,7 +65,6 @@ export type EventType =
   | 'blank_node_graded'
   | 'blank_grade_overridden'
   | 'blank_attempt_completed'
-  | 'self_graded_node_rechecked'
   | 'drilldown_retrieval_submitted'
   | 'tree_created'
   | 'outline_imported'
