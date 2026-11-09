@@ -280,7 +280,7 @@ mark.hl-b { background: #6cc8ff66; }
 .focus-all, .focus-here { font-size: var(--fs-sm); white-space: nowrap; }
 .detail-path { display: flex; align-items: center; gap: .25rem .75rem; flex-wrap: wrap; padding: .55rem .85rem 0; }
 .detail-path .focus-here, .editor .to-import { margin-left: auto; }
-.editor .focus-here + .to-import { margin-left: 0; }
+.editor .focus-here + .to-import, .editor .to-import + .to-import { margin-left: 0; }
 .editor .to-import { flex: none; display: inline-grid; place-items: center; min-width: 2rem; min-height: 2rem; padding: 0; border: none; background: transparent; box-shadow: none; color: var(--muted); }
 @media (pointer: coarse) { .editor .to-import { min-width: var(--tap); min-height: var(--tap); } }
 /* U51: 폰은 패널 위 경로를 한 줄로 — 조상 칸이 줄며 말줄임, 지금 노드는 끝까지 보인다 */
@@ -312,3 +312,10 @@ mark.hl-b { background: #6cc8ff66; }
 }
 /* coarse: 단축키 버튼은 숨긴다(구조 바가 대신, R6-M2) — 폰 폭에서 확대 도구가 캔버스를 넘지 않게 */
 @media (pointer: coarse) { .editor .zoom-tools button[popovertarget] { display: none; } }
+
+/* U28 별칭 칩: 제목 아래 한 줄, 넘치면 줄바꿈 */
+.aliases { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem; padding: .1rem .85rem .35rem; }
+.alias-chip { display: inline-flex; align-items: center; gap: .1rem; padding: .05rem .15rem .05rem .45rem; border: 1px solid var(--border); background: var(--surface-2); font-size: var(--fs-sm); }
+.alias-chip button { display: inline-grid; place-items: center; min-width: 1.5rem; min-height: 1.5rem; padding: 0; border: none; background: transparent; box-shadow: none; color: var(--muted); }
+.aliases input:not([type]) { flex: 1 1 8rem; min-width: 6rem; padding: .2rem 0; border: none; background: transparent; box-shadow: none; font-size: var(--fs-sm); }
+@media (pointer: coarse) { .alias-chip button { min-width: var(--tap); min-height: var(--tap); } }
