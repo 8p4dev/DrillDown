@@ -1,5 +1,5 @@
 // 실행: npx tsx src/core/outline.check.ts
-import { nodesToOutline, outlineToNodes, parseOutline, serializeOutline, splitTitle, type OutlineItem } from './outline'
+import { cloneBranch, nodesToOutline, outlineToNodes, parseOutline, serializeOutline, splitTitle, type OutlineItem } from './outline'
 
 function eq(actual: unknown, expected: unknown, msg: string) {
   const a = JSON.stringify(actual)
@@ -20,7 +20,7 @@ eq(
   parseOutline(
     ['- 가', '* 나', '• 다', '1. 라', '2) 마', '가. 바', '나) 사', '(1) 아', '(가) 자', '① 차', 'Ⅱ. 카', '1.2. 타', '1.2 파', '1.하'].join('\n'),
   ).map((x) => x.text),
-  ['가', '나', '다', '라', '마', '바', '사', '아', '자', '차', '카', '타', '파', '하'],
+  ['가', '나', '다', '라', '마', '바', '사', '아', '자', '차', '카', '타', '파', '1.하'], // U12: 공백 없는 번호는 남긴다(R4-A9)
   'bullet/number stripping',
 )
 // 번호처럼 보이지만 본문인 것은 남긴다
@@ -52,3 +52,35 @@ console.log('outline ok')
   eq(splitTitle('짧은 제목'), { title: '짧은 제목' }, 'short title untouched')
   eq(splitTitle('a'.repeat(200)), { title: 'a'.repeat(200) }, 'exactly CAP.title untouched')
 }
+
+// U12(R4-A9 실패 예): 기호·번호 뒤 공백이 없으면 본문. 체크박스·인용 접두 제거
+eq(
+  parseOutline(['1.5배 증가', 'Ⅳ호 차량', '-5V 전원', '-5도 이상', 'TCP-SYN', '*args', '**굵게** 강조', '- [ ] 체크박스', '- [x] 완료', '> 인용', '- 5도 이상'].join('\n')).map((x) => x.text),
+  ['1.5배 증가', 'Ⅳ호 차량', '-5V 전원', '-5도 이상', 'TCP-SYN', '*args', '**굵게** 강조', '체크박스', '완료', '인용', '5도 이상'],
+  'bullet needs trailing space',
+)
+// 마크다운 헤딩 = 깊이, 헤딩 아래 불릿은 그 헤딩의 자식
+eq(parseOutline('# 제목 헤더\n## 소제목\n- 불릿\n  - 하위\n## 둘\n# 다음'), [I('제목 헤더', I('소제목', I('불릿', I('하위'))), I('둘')), I('다음')], 'markdown headings')
+// R4-A10: 2칸 문서의 탭은 한 단계(형제), 4칸 기본
+eq(parseOutline('위\n  - 불릿 하나\n  - 불릿 둘\n\t탭'), [I('위', I('불릿 하나'), I('불릿 둘'), I('탭'))], 'tab = doc indent unit')
+eq(parseOutline('위\n\t탭\n    넷'), [I('위', I('탭'), I('넷'))], 'tab default 4')
+
+// U27(C6): `제목 :: 메모` 한 줄 메모, 내보내기 왕복(한 줄 메모만)
+{
+  const [it] = parseOutline('SYN Flood :: 대책: SYN Cookie\nC::D')
+  eq([it.text, it.note], ['SYN Flood', '대책: SYN Cookie'], 'memo parsed')
+  eq(parseOutline('C::D')[0], I('C::D'), 'no-space :: kept in title')
+  const ns = [
+    { id: 'R', treeId: 't', parentId: null, order: 0, title: 'R', aliases: [], updatedAt: 0 },
+    ...outlineToNodes(parseOutline('A :: 한 줄\n  B'), 't', 'R'),
+  ]
+  eq(ns[1].note, '한 줄', 'memo → note')
+  eq(serializeOutline(nodesToOutline(ns, 'R')), 'A :: 한 줄\n  B', 'memo roundtrip')
+  eq(serializeOutline(nodesToOutline([...ns.slice(0, 1), { ...ns[1], note: '둘\n줄' }, ns[2]], 'R')), 'A\n  B', 'multi-line note not exported')
+
+  // U26: 가지 복제 — 새 id, 같은 부모, 구조·메모 유지
+  const copy = cloneBranch(ns, ns[1].id, 0.5)
+  eq(copy.map((n) => [n.title, n.note ?? null]), [['A', '한 줄'], ['B', null]], 'clone titles')
+  eq([copy[0].parentId, copy[0].order, copy[1].parentId === copy[0].id, copy.some((c) => ns.some((n) => n.id === c.id))], ['R', 0.5, true, false], 'clone ids/parents')
+}
+console.log('outline U12/U26/U27 ok')

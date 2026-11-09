@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { logEvent } from '../../core/events'
-import { nodesToOutline, outlineToNodes, parseOutline, serializeOutline, splitTitle } from '../../core/outline'
+import { cloneBranch, nodesToOutline, outlineToNodes, parseOutline, serializeOutline, splitTitle } from '../../core/outline'
 import { childrenOf, deleteNodes, descendantsOf, getTreeNodes, putNodes } from '../../core/repo'
 import { getSrsMap, missHeat } from '../../core/srs'
 import { ancestorsOf } from '../../core/path'
@@ -10,7 +10,7 @@ import { href } from '../../router'
 import { Icon } from '../../ui/Icon'
 import { I } from '../../ui/icons'
 import { NodePath } from '../../ui/NodePath'
-import { clipboardPaste, copy, cornerDownRight, eraser, highlighter, keyboard, list, maximize, network, search, undo2, zoomIn, zoomOut } from '../../ui/icons.all'
+import { clipboardPaste, copy, cornerDownRight, eraser, highlighter, keyboard, list, maximize, network, search, undo2, x, zoomIn, zoomOut } from '../../ui/icons.all'
 import NodeRow from './NodeRow'
 import NoteEditor, { type NoteApi, type NoteOp } from './content/NoteEditor'
 import GraphView from './graph/GraphView'
@@ -579,6 +579,17 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
     haptic('warn')
     toast(coarse() ? '잘라냄 · 옮길 곳 선택 후 붙이기' : '잘라냄 · 대상 선택 후 Ctrl+V')
   }
+  /** U26 가지 복제: 서브트리 사본(새 id)을 바로 아래 형제로. 실행 취소 1회 */
+  function duplicate(id: ID) {
+    const n = get(id)!
+    if (isTop(n)) return toast(n.parentId === null ? '루트는 복제할 수 없음' : '포커스 루트는 복제할 수 없음')
+    const ns = nodesRef.current
+    if (isFull(1 + descendantsOf(ns, id).length)) return
+    const copy = cloneBranch(ns, id, orderAfter(ns, n))
+    commit([...ns, ...copy], `"${n.title}" 복제`)
+    setSelId(copy[0].id)
+    toast(`"${n.title}" 복제${copy.length > 1 ? ` (하위 ${copy.length - 1}개)` : ''}`, { label: '되돌리기', run: () => undoIf(ns) }, UNDO_MS)
+  }
   /** 마지막 자식으로 새 노드를 만들고 제목 편집 (구조 바 +자식 — 키보드의 Enter 후 Tab) */
   function addChild(id: ID) {
     if (isFull()) return
@@ -619,9 +630,11 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
     else if (e.key === 'End') setSelId(rows[rows.length - 1].node.id) // 마지막 보이는 노드(전위 순서, R6-M6)
     else if (e.key === '.') centerOn(sel.id) // U15: 선택으로 이동
     else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-      const sib = sel.parentId && !isTop(sel) ? childrenOf(nodesRef.current, sel.parentId) : [sel]
-      const to = sib[sib.indexOf(sel) + (e.key === 'ArrowLeft' ? -1 : 1)]
-      if (to) setSelId(to.id)
+      // U19: 보이는 같은 깊이의 이웃 — 형제가 먼저, 형제 끝에서는 사촌으로(전위 순서라 형제 사이엔 더 깊은 줄만 있다)
+      const d = rows.find((r) => r.node.id === sel.id)?.depth
+      const same = rows.filter((r) => r.depth === d)
+      const to = same[same.findIndex((r) => r.node.id === sel.id) + (e.key === 'ArrowLeft' ? -1 : 1)]
+      if (to) setSelId(to.node.id)
     } else if (e.key === ' ' || e.key === 'F2') startEdit(sel.id)
     else if (e.key === 'Enter') {
       if (!isFull()) startEdit(insertBelow(sel.id), '')
@@ -651,10 +664,11 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
     const added = outlineToNodes(list, treeId, target.id, nextOrder(ns, target.id))
     if (isFull(added.length)) return
     const rootTitle = asRoot ? splitTitle(items[0].text) : null
-    // 긴 루트 제목의 나머지는 기존 메모 앞에 붙인다(C5)
-    const rootNote = rootTitle?.note !== undefined ? { note: [rootTitle.note, target.note].filter(Boolean).join('\n') } : {}
+    // 긴 루트 제목의 나머지·`:: 메모`(C6)는 기존 메모 앞에 붙인다(C5)
+    const rootMemo = [rootTitle?.note, asRoot ? items[0].note : undefined].filter(Boolean)
+    const rootNote = rootMemo.length ? { note: [...rootMemo, target.note].filter(Boolean).join('\n') } : {}
     const base = patch(ns, target.id, rootTitle ? { title: rootTitle.title, collapsed: false, ...rootNote } : { collapsed: false })
-    const long = added.filter((n) => n.note !== undefined).length + (rootTitle?.note !== undefined ? 1 : 0)
+    const long = added.filter((n) => n.title.length === CAP.title && n.note !== undefined).length + (rootTitle?.note !== undefined ? 1 : 0)
     if (added.length) fitPending.current = true // 통째로 들어온 트리는 진입과 같게 맞춘다
     const count = added.length + (asRoot ? 1 : 0)
     // U11: 같은 개요를 두 번 붙이는 실수 — 최상위 항목만 기존 자식 제목과 비교(R4-A3)
@@ -873,6 +887,9 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
           onWidth={(width) => width !== (cur.width ?? 1) && commit(patch(nodesRef.current, cur.id, { width }), '너비')}
           onFormat={(op) => (noteEditId === cur.id ? cardNote : panelNote).current?.apply(op)}
           onImport={openImport}
+          onAliases={(aliases) => commit(patch(nodesRef.current, cur.id, { aliases }), '별칭')}
+          onDuplicate={cur.id !== top!.id ? () => duplicate(cur.id) : undefined}
+          onExport={() => copyText(serializeOutline(nodesToOutline(nodesRef.current, cur.id, true)))}
         />
         <details className="io" open={ioOpen} onToggle={(e) => setIoOpen(e.currentTarget.open)}>
           <summary><Icon d={clipboardPaste} />개요 붙여넣기 · 내보내기</summary>
@@ -880,7 +897,7 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
             aria-label="개요 텍스트"
             rows={narrow() ? 3 : 5}
             value={importText}
-            placeholder={'들여쓰기 목차를 붙여넣으세요 (탭·스페이스, -, 1., 가., ① 등 허용)\n노동법\n  개별적 근로관계법\n    근로계약'}
+            placeholder={'들여쓰기 목차를 붙여넣으세요 (탭·스페이스, -, 1., 가., ①, # 허용 · 제목 :: 메모)\n노동법\n  개별적 근로관계법\n    근로계약 :: 근로자와 사용자의 합의'}
             onChange={(e) => setImportText(e.target.value)}
           />
           <div className="io-actions">
@@ -924,12 +941,13 @@ const ICON = {
   scissors: '<circle cx="6" cy="6" r="3" /><path d="M8.12 8.12 12 12" /><path d="M20 4 8.12 15.88" /><circle cx="6" cy="18" r="3" /><path d="M14.8 14.8 20 20" />',
   fold: '<path d="m7 20 5-5 5 5" /><path d="m7 4 5 5 5-5" />',
   unfold: '<path d="m7 15 5 5 5-5" /><path d="m7 9 5-5 5 5" />',
+  copyPlus: '<line x1="15" x2="15" y1="12" y2="18" /><line x1="12" x2="18" y1="15" y2="15" /><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />',
   redo: '<path d="m15 14 5-5-5-5" /><path d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5A5.5 5.5 0 0 0 9.5 20H13" />',
 }
 /** 단축키 팝오버: [키(공백 = 여러 키), 2~3단어 동작] */
 const KEYS: [string, string][] = [
   ['↑ ↓', '부모 · 첫 자식'],
-  ['← →', '형제 이동'],
+  ['← →', '형제 · 사촌 이동'],
   ['Alt+← Alt+→', '순서 바꾸기'],
   ['Space F2', '제목 편집'],
   ['Enter', '형제 추가'],
@@ -973,6 +991,10 @@ function DetailPanel({ api, ...p }: {
   focusHref?: string
   /** 개요 붙여넣기 칸 열고 포커스(R4-A17) */
   onImport: () => void
+  onAliases: (aliases: string[]) => void
+  /** U26 가지 복제(포커스 루트·루트면 없음) · 이 가지 내보내기 */
+  onDuplicate?: () => void
+  onExport: () => void
 }) {
   const [title, setTitle] = useState<string | null>(null) // 입력 중일 때만 로컬 값 (빈 제목은 저장하지 않음)
   const width = p.node.width ?? 1
@@ -981,6 +1003,8 @@ function DetailPanel({ api, ...p }: {
       <div className="detail-path">
         {p.path}
         {p.focusHref && <a className="focus-here" href={p.focusHref}>이 가지만 보기</a>}
+        {p.onDuplicate && <button type="button" className="to-import" aria-label="가지 복제" data-tip="가지 복제" onClick={p.onDuplicate}><Icon d={ICON.copyPlus} /></button>}
+        <button type="button" className="to-import" aria-label="이 가지 내보내기" data-tip="이 가지 내보내기 (개요 복사)" onClick={p.onExport}><Icon d={copy} /></button>
         <button type="button" className="to-import" aria-label="개요 붙여넣기 열기" data-tip="개요 붙여넣기" onClick={p.onImport}><Icon d={clipboardPaste} /></button>
       </div>
       <input
@@ -1002,6 +1026,7 @@ function DetailPanel({ api, ...p }: {
           else if (e.key === 'Escape') p.onEscape()
         }}
       />
+      <Aliases value={p.node.aliases} onChange={p.onAliases} />
       <div className="toolbar" role="toolbar" aria-label="내용 서식">
         {TOOLS.map((t) => (
           <button
@@ -1033,6 +1058,44 @@ function DetailPanel({ api, ...p }: {
         onFocus={p.onBegin}
         onBlur={p.onEnd}
         onEscape={p.onEscape}
+      />
+    </div>
+  )
+}
+
+/** 서버 map.ts LIMITS 와 같은 값: 별칭 50개, 각 50자 — 넘기 전에 막는다 */
+const ALIAS_MAX = 50
+/** U28 별칭 칩(C5 aliases): Enter·쉼표로 추가, × 로 삭제. 채점은 기존 별칭 비교가 쓴다 */
+function Aliases({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
+  const [text, setText] = useState('')
+  function add(raw: string) {
+    const next = [...value]
+    for (const a of raw.split(',').map((s) => s.trim().slice(0, ALIAS_MAX)))
+      if (a && !next.includes(a) && next.length < ALIAS_MAX) next.push(a)
+    if (next.length !== value.length) onChange(next)
+    if (next.length >= ALIAS_MAX) toast(`별칭은 ${ALIAS_MAX}개까지입니다`)
+    setText('')
+  }
+  return (
+    <div className="aliases" role="group" aria-label="별칭">
+      {value.map((a) => (
+        <span key={a} className="alias-chip">
+          {a}
+          <button type="button" aria-label={`별칭 ${a} 삭제`} onClick={() => onChange(value.filter((v) => v !== a))}><Icon d={x} size={16} /></button>
+        </span>
+      ))}
+      <input
+        aria-label="별칭 추가"
+        placeholder={value.length ? '별칭 추가' : '별칭 (Enter·쉼표로 추가)'}
+        maxLength={ALIAS_MAX}
+        value={text}
+        disabled={value.length >= ALIAS_MAX}
+        onChange={(e) => (e.target.value.includes(',') ? add(e.target.value) : setText(e.target.value))}
+        onBlur={() => text.trim() && add(text)}
+        onKeyDown={(e) => {
+          if (e.nativeEvent.isComposing || e.keyCode === 229) return
+          if (e.key === 'Enter') { e.preventDefault(); add(text) }
+        }}
       />
     </div>
   )
