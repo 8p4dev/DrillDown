@@ -23,7 +23,7 @@
 | 최소 텍스트 | 아이콘 전용 15곳, 아이콘+짧은 글자 25곳, 글자 유지 30곳(§3.5 인벤토리). 모든 아이콘 전용 컨트롤은 `aria-label` + 툴팁. `confirm()` 은 앱 전체에서 제거(트리 삭제 = 되돌리기 토스트 10초) | 전부 아이콘화 | 평가·제출 동작(알음·모름·채점)은 오독 비용이 커 글자 유지 | M |
 | 인터랙션 | 상태 변화 알림 22종(§3.6). `transform`/`opacity` 전용, 무한 애니메이션은 로딩·동기화 중 3종만, `--ease-spring`·`pulse-ring`·고스트 기울기 **삭제**. 파괴적 확인은 2단계 버튼(#22) | 현행 유지 | R3 "장식 금지", R5_liquid_glass 2·3단계(주의 분산) [출처 1] | M |
 | 테마 | 3상태 `auto/light/dark`, `:root[data-theme]`, localStorage `theme`, head 인라인 부팅 스크립트, `color-scheme`·단일 `<meta theme-color>` 동기화 | 2상태 토글 | R4 원문 "시스템 자동 + 수동" | S |
-| 리소스 | 첫 화면 **gzip ≤ 120 KB**(현 108), CSS 합계 ≤ 44 KB 비압축(현 49.6), 폰트 0(기본값 웹폰트 채택 시 536 KB 는 precache 밖 런타임 캐시), precache **≤ 600 KiB 비압축**(현 489.88), 관리자 청크 precache 제외, 의존성 추가 0. 구현 1단계 뒤 `bundle.md` 재측정이 완료 기준 | — | bundle.md 기준선 [측정], plan §3.5 M6 | — |
+| 리소스 | 첫 화면 **gzip ≤ 120 KB**(현 108), CSS 합계 ≤ 44 KB 비압축(현 49.6), 폰트 0(기본값 웹폰트 채택 시 536 KB 는 precache 밖 런타임 캐시), precache **≤ 640 KiB 비압축**(현 618.42 — 2026-11-09 P1 뒤 600→640 상향), 관리자 청크 precache 제외, 의존성 추가 0. 구현 1단계 뒤 `bundle.md` 재측정이 완료 기준 | — | bundle.md 기준선 [측정], plan §3.5 M6 | — |
 | 형광펜 | **현행 3색(분홍·노랑·하늘) 유지가 기본값**(2026-11-01 사용자 결정 > A6). 대안 초록·빨강·밑줄은 §6 Q1 | 초록·빨강·밑줄 | plan §3.5 M13, A6 보강 "사용자 데이터 색·외부 브랜드 색은 예외" | 0 |
 
 ## 3. 상세 설계
@@ -318,7 +318,7 @@ E2E 로 확인할 항목 [제안]: (1) 저장값 없음 + `colorScheme: dark` �
 |---|---|---|---|---|
 | 첫 화면 전송(목록) | **gzip** | ≈ 108 KB | **≤ 120 KB** | 메인 청크 추가분: 목록용 아이콘 22개 ≈ 1.2 KB, 테마 훅·토글 ≈ 1 KB, 툴팁 JS ≈ 0.3 KB, AA `useMe`·SH `sync.ts`·상태 표시·LM `viewport.ts` ≈ 10~12 KB(RV §5.4 추정) → ≈ 121 KB 경계. `sync.ts` 는 로그인 뒤 동적 import 로 메인 청크에서 빼는 것을 SH 에 요청(§3.9) |
 | CSS 합계 | 비압축 | 49,623 B | **≤ 44 KB** | 삭제 항목(아래) ≈ 6 KB, 신규 화면 CSS 는 각 화면 lazy CSS 로 |
-| precache | **비압축**(Workbox 수치 = bundle.md JS+CSS+html 합과 일치) | 489.88 KiB | **≤ 600 KiB** | 네 문서 추가분 ≈ +95 KB(RV §5.4) → ≈ 585 KiB. **관리자 청크는 `workbox.globIgnores: ['**/AdminPage-*.js', '**/admin-*.css']` 로 precache 제외**(런타임 `NetworkFirst`, 운영자 1~2인). 공유 보기 청크는 anon 첫 진입 화면이라 precache 유지 |
+| precache | **비압축**(Workbox 수치 = bundle.md JS+CSS+html 합과 일치) | 489.88 KiB | **≤ 640 KiB**(2026-11-09 상향) | 네 문서 추가분 ≈ +95 KB(RV §5.4) → ≈ 585 KiB. **관리자 청크는 `workbox.globIgnores: ['**/AdminPage-*.js', '**/admin-*.css']` 로 precache 제외**(런타임 `NetworkFirst`, 운영자 1~2인). 공유 보기 청크는 anon 첫 진입 화면이라 precache 유지 |
 | 폰트 | 바이트(woff2, 압축 불가) | 0 | **precache 0**. 기본값(Pretendard 서브셋) 채택 시 535,848 B 는 런타임 `CacheFirst`(§3.4.3) — precache·첫 화면 예산 밖 | §3.4.2 |
 | 의존성 | 개수 | 4 (dexie·react·react-dom·ts-fsrs) | **+0** | 아이콘·테마·툴팁·2단계 버튼 모두 자체 코드 |
 
