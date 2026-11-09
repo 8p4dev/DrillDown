@@ -15,10 +15,15 @@ export function runDaily(db: DB, now = Date.now()): DailyResult {
   try {
     // 1. 만료·180일 세션 (관리자 24h 는 세션 미들웨어가 요청 때 지운다)
     r.purged_sessions = Number(db.prepare('DELETE FROM sessions WHERE expires_at < ? OR created_at < ?').run(now, now - ABS_USER).changes)
-    // 2. 탈퇴 7일 경과 purge — 사용자마다 한 트랜잭션
+    // 2. 탈퇴 7일 경과 purge — 사용자마다 한 트랜잭션. 한 명이 실패해도 롤백·기록하고 나머지는 계속(F15)
     for (const { id } of db.prepare('SELECT id FROM users WHERE deleted_at < ?').all(now - GRACE_MS) as { id: string }[]) {
       db.exec('BEGIN IMMEDIATE')
-      try { purgeUserNow(db, id); audit(db, null, 'user.purge', 'user', id); db.exec('COMMIT'); r.purged_users++ } catch (e) { db.exec('ROLLBACK'); throw e }
+      try { purgeUserNow(db, id); audit(db, null, 'user.purge', 'user', id); db.exec('COMMIT'); r.purged_users++ } catch (e) {
+        db.exec('ROLLBACK')
+        r.ok = false
+        r.error = `purge ${id}: ${(e as Error).message}`.slice(0, 200)
+        console.error('daily purge failed', id, e)
+      }
     }
     // 3. SH 톰스톤
     r.purged_tombstones = purgeTombstones(db, now - GRACE_MS)

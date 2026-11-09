@@ -26,7 +26,9 @@ export async function runBackup(db: DB, now = new Date()): Promise<BackupResult>
     for (const f of readdirSync(dir).filter((x) => /^app-\d{8}\.db$/.test(x)).sort().slice(0, -KEEP)) rmSync(join(dir, f))
 
     const recipient = process.env.BACKUP_AGE_RECIPIENT, remote = process.env.BACKUP_RCLONE_REMOTE
-    if (recipient && remote && has('age') && has('rclone')) {
+    if (recipient && remote) {
+      // 외부 업로드가 설정돼 있는데 도구가 없으면 조용히 건너뛰지 않고 실패로 기록한다(F16) — 로컬 사본은 이미 남았다
+      if (!has('age') || !has('rclone')) throw new Error('외부 백업 설정(BACKUP_AGE_RECIPIENT·BACKUP_RCLONE_REMOTE)이 있는데 age 또는 rclone 을 PATH 에서 찾을 수 없습니다')
       const enc = `${file}.age`
       execFileSync('age', [recipient.startsWith('age1') ? '-r' : '-R', recipient, '-o', enc, file], { stdio: 'ignore' })
       try { execFileSync('rclone', ['copyto', enc, `${remote.replace(/\/$/, '')}/app-${ymd}.db.age`], { stdio: 'ignore', timeout: 30 * 60_000 }) }

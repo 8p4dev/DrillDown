@@ -217,6 +217,10 @@ assert.ok((db.prepare('SELECT deleted_at FROM users WHERE id = ?').get(kid) as {
 r = await req('/api/auth/kakao/unlink-webhook?user_id=12345&referrer_type=INCOMPLETE_SIGN_UP', { headers: { authorization: 'KakaoAK kadmin' }, ip: 'kakao' })
 assert.equal(r.status, 200)
 assert.equal(db.prepare('SELECT 1 FROM users WHERE id = ?').get(kid), undefined)
+// F12 인증된 웹훅은 OAuth 의 10/분 IP 리밋과 별도 — 같은 IP 에서 연속 15회도 429 없음. 인증 실패 11회째는 auth 버킷으로 429
+for (let i = 0; i < 15; i++) assert.equal((await req('/api/auth/kakao/unlink-webhook?user_id=99999', { headers: { authorization: 'KakaoAK kadmin' }, ip: 'kakao' })).status, 200)
+for (let i = 0; i < 10; i++) await req('/api/auth/kakao/unlink-webhook?user_id=99999', { headers: { authorization: 'KakaoAK wrong!' }, ip: 'kakao-bad' })
+assert.equal((await req('/api/auth/kakao/unlink-webhook?user_id=99999', { headers: { authorization: 'KakaoAK wrong!' }, ip: 'kakao-bad' })).status, 429)
 
 // ---- 세션 슬라이딩·관리자 24h 절대 상한 ----
 const dsid = createHash('sha256').update(d1.slice(4)).digest('hex')
