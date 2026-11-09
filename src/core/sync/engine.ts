@@ -1,6 +1,7 @@
 // 동기화 엔진 — 04 §3.1 push/pull·LWW·톰스톤·고아, §3.8 병합 M1~M6, §3.10 상태. sync.ts 가 onLogin 때만 동적 import 한다.
 import { api, ApiError } from '../api'
 import { db, newId, setKick, track, type MetaRow, type OutboxRow } from '../db'
+import { TRASH_MS } from '../repo'
 import { setSyncState, type MergeChoice, type MergePlan } from '../sync'
 import { CAP, type BlankAttempt, type ID, type NodeSrs, type Tree, type TreeNode } from '../types'
 import { toast } from '../../features/Toast'
@@ -8,7 +9,7 @@ import { toast } from '../../features/Toast'
 type RTree = Tree & { hiddenByAdmin?: boolean }
 type Del = { deletedAt?: number | null }
 interface Batch { trees: (RTree & Del)[]; nodes: (TreeNode & Del)[]; srs: (NodeSrs & Del)[] }
-interface PushRes { seq: number; applied: ID[]; superseded: Batch; dropped: ID[]; id_taken: ID[] }
+interface PushRes { seq: number; applied: ID[]; superseded: Batch; dropped: ID[]; id_taken: ID[]; created?: ID[] }
 interface PullRes extends Batch { seq: number; more: boolean }
 type Row = Omit<OutboxRow, 'seq' | 'at'>
 /** pull 1회 동안 들고 다니는 outbox 사본(R5-P10). top = 이미 읽은 최대 seq */
@@ -17,7 +18,7 @@ interface Pend { pend: Map<string, OutboxRow>; top: number }
 const ALL = () => [db.trees, db.nodes, db.srs, db.attempts, db.outbox, db.meta]
 const ORDER = { tree: 0, node: 1, srs: 2, attempt: 3 } as const
 const MAX_ROWS = 500
-const MAX_BYTES = 900_000 // 서버 상한 1MB 보다 여유
+const MAX_BYTES = 900_000 // 서버 상한 2MB(server/sync/map.ts LIMITS.bytes) 보다 넉넉히 아래 — 행 수 500 과 함께 한 배치 크기
 const enc = new TextEncoder()
 
 const getMeta = async (k: MetaRow['key']) => (await db.meta.get(k))?.value ?? null
@@ -240,7 +241,22 @@ async function pushOnce(slice: OutboxRow[]): Promise<number> {
     toast(`다른 기기 변경 반영됨 ${n}건`, { label: '내 버전 유지', run: () => void keepMine(losers) }, 8000)
   }
   if (taken.size) await reId(taken)
+  if (res.created?.length) await enqueueMissing(res.created, new Set(sent.map((r) => r.kind + r.id)))
   return sent.length
+}
+
+/** 서버가 이번 push 로 새로 만든 트리(F4): 그 트리의 노드·srs 중 outbox 에 없고 이번에 보내지도 않은 행을 넣어 다음 바퀴에 올린다.
+ *  휴지통 복구(repo.restoreTree 는 tree put 1행만 track)나 격리됐던 tree 행이 뒤늦게 통과한 경우 서버에 빈 트리만 남는 것을 막는다 */
+async function enqueueMissing(treeIds: ID[], justSent: Set<string>) {
+  await db.transaction('rw', ALL(), async () => {
+    const pending = new Set((await db.outbox.toArray()).map((o) => o.kind + o.id))
+    const skip = (k: string) => pending.has(k) || justSent.has(k)
+    const [ns, ss] = await Promise.all([db.nodes.where('treeId').anyOf(treeIds).toArray(), db.srs.where('treeId').anyOf(treeIds).toArray()])
+    await track([
+      ...parentFirst(ns).filter((x) => !skip('node' + x.id)).map((x) => ({ kind: 'node' as const, id: x.id, treeId: x.treeId, op: 'put' as const })),
+      ...ss.filter((s) => !skip('srs' + s.nodeId)).map((s) => ({ kind: 'srs' as const, id: s.nodeId, treeId: s.treeId, op: 'put' as const })),
+    ])
+  })
 }
 
 /** tree_limit 으로 보류한 트리 id (C4). 그 트리의 outbox 행은 남겨 두고 전송만 건너뛴다. 로그인·트리 삭제 push/pull 때 비운다 */
@@ -334,14 +350,26 @@ async function pull() {
     await pullFrom(Number(await getMeta('cursor')) || 0)
   } catch (e) {
     if (!(e instanceof ApiError && e.status === 410)) throw e
-    // C18 커서 만료: outbox 먼저 비우고 since=0 스냅샷 → M4 "이 기기에만 있는 트리"는 기본값 '올리기' 자동 적용
+    // C18 커서 만료(톰스톤 purge 뒤 / 서버 기록 되감김 F3): outbox 먼저 비우고 since=0 스냅샷.
+    // F4: "서버에 없는 로컬 트리"는 둘로 가른다 — 7일 안에 고쳤거나 아직 못 올린(outbox·보류) 트리만 다시 올리고(서버 복원 직후 최근 작업 보존),
+    // 나머지는 다른 기기에서 지운 뒤 서버가 정리한 것으로 보고 로컬 휴지통(deletedAt, track 없음)으로 — 7일 안에 계정 화면에서 복구할 수 있다
     await pushAll()
     const seen = await pullFrom(0)
     const only = (await live()).filter((t) => !seen.has(t.id))
-    if (only.length) {
-      await enqueueAll(only.map((t) => t.id))
+    if (!only.length) return
+    const now = Date.now()
+    const pending = new Set((await db.outbox.toArray()).map((o) => o.treeId))
+    const up = only.filter((t) => t.updatedAt > now - TRASH_MS || pending.has(t.id) || held.has(t.id))
+    const trash = only.filter((t) => !up.includes(t))
+    if (trash.length) {
+      await db.trees.bulkPut(trash.map((t) => ({ ...t, deletedAt: now })))
+      emit(trash.map((t) => t.id))
+      toast(`서버에 없는 트리 ${trash.length}개를 휴지통으로 옮겼습니다 (계정 화면에서 7일 안에 복구)`)
+    }
+    if (up.length) {
+      await enqueueAll(up.map((t) => t.id))
       await pushAll()
-      toast(`이 기기에만 있던 트리 ${only.length}개를 계정에 올렸습니다`)
+      toast(`이 기기에만 있던 트리 ${up.length}개를 계정에 올렸습니다`)
     }
   }
 }
@@ -419,6 +447,8 @@ async function applyRemote(r: Batch, p?: Pend): Promise<Set<ID>> {
       } else {
         if (local?.updatedAt === x.updatedAt) continue // 내 push 의 메아리
         await db.nodes.put(rest)
+        // F7·계약 C7: 루트 노드 행이 트리 제목의 기준. 로컬 trees.title 만 맞추고 outbox 는 만들지 않는다(서버도 같은 규칙으로 맞춘다)
+        if (x.parentId === null) await db.trees.where('id').equals(x.treeId).filter((t) => t.title !== x.title).modify({ title: x.title })
       }
       changed.add(x.treeId)
     }
@@ -533,7 +563,9 @@ export async function applyMerge(choice: MergeChoice): Promise<void> {
   if (!userId) return
   pendingUser = null
   if (choice === 'wipe_other') {
-    await db.transaction('rw', ALL(), () => Promise.all(ALL().map((t) => t.clear())))
+    // 이전 계정의 데이터 전부 — 학습 이벤트 로그(events)도 그 계정 것이다 (F17)
+    const all = [...ALL(), db.events]
+    await db.transaction('rw', all, () => Promise.all(all.map((t) => t.clear())))
   } else if (choice === 'copy_other') {
     await rekeyAll()
   }
