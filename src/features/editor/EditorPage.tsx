@@ -139,6 +139,7 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
       undoRef.current = []
       redoRef.current = []
       setNodes(ns)
+      if (saved.depth === undefined && ns.length > 1000) setViewDepth(3) // U21: 큰 트리 첫 열기는 깊이 3(저장된 보기 상태 없을 때만)
       setIoOpen(ns.length === 1)
       setSelId(ns.some((n) => n.id === saved.sel) ? saved.sel! : (ns.find((n) => n.id === rootId)?.id ?? ns.find((n) => n.parentId === null)?.id ?? ''))
     })
