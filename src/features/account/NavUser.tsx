@@ -51,7 +51,7 @@ export default function NavUser() {
       )}
       {dialog && (
         <Suspense fallback={null}>
-          <MergeDialog plan={plan} onChoose={(c) => void choose(c)} onClose={dismissMerge} />
+          <MergeDialog plan={plan} onChoose={(c) => void choose(c)} />
         </Suspense>
       )}
     </>

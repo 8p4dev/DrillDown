@@ -5,7 +5,6 @@
 import { useSyncExternalStore } from 'react'
 import { Icon } from '../ui/Icon'
 import { I } from '../ui/icons'
-import { undo2 } from '../ui/icons.all'
 
 type Action = { label: string; run: () => void; icon?: string }
 type Item = { id: number; text: string; action?: Action; ms: number; hint?: boolean; icon?: string }
@@ -75,7 +74,7 @@ export function Toaster() {
           <span>{t.text}</span>
           {t.action && (
             <button type="button" onClick={() => (t.action!.run(), dismiss(t))}>
-              {(t.action.icon ?? (UNDO.test(t.action.label) ? undo2 : undefined)) && <Icon d={t.action.icon ?? undo2} />}
+              {(t.action.icon ?? (UNDO.test(t.action.label) ? I.undo2 : undefined)) && <Icon d={t.action.icon ?? I.undo2} />}
               {t.action.label}
             </button>
           )}

@@ -89,7 +89,7 @@ export default function AccountPage() {
           {trash.map((t) => (
             <li key={t.id}>
               <span className="grow">{t.title}<br /><span className="muted">{rel(t.deletedAt!)} 삭제 · {daysLeft(t.deletedAt!)}일 뒤 영구 삭제</span></span>
-              <button type="button" className="icon-btn" onClick={() => void restore(t)}><Icon d={undo2} /> 복구</button>
+              <button type="button" className="icon-btn" aria-label={`${t.title} 복구`} onClick={() => void restore(t)}><Icon d={undo2} /> 복구</button>
             </li>
           ))}
         </ul>
