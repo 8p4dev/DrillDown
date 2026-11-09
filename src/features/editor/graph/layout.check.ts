@@ -119,4 +119,12 @@ assert.equal(searchNodes(base, '  ').length, 0)
   assert(g.boxes.get('w2999')!.x < g.boxes.get('w0')!.x, '형제는 order 순')
 }
 
+// 세로 보기(dir right): 깊이 = 열(x 증가), 형제는 세로로 쌓임, 겹침 없음, 실제 크기 유지
+{
+  const r = layout(base, '노동법', measure, isOpen, 'right')
+  const all = [...r.boxes.values()]
+  for (const [a, b] of r.edges) assert(r.boxes.get(b)!.x > r.boxes.get(a)!.x + r.boxes.get(a)!.w - 1, 'child right of parent')
+  for (let i = 0; i < all.length; i++) for (let j = i + 1; j < all.length; j++) assert(!overlap(all[i], all[j]), 'right: no overlap')
+  for (const n of base) if (r.boxes.has(n.id)) assert(r.boxes.get(n.id)!.w === measure(n).w, 'right keeps size')
+}
 console.log('layout.check: ok')

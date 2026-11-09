@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode }
 import { flushSync } from 'react-dom'
 import type { ID, TreeNode } from '../../../core/types'
 import { haptic } from '../../feel'
-import { isOpen, layout, type Box, type Size } from './layout'
+import { isOpen, layout, type Box, type Dir, type Size } from './layout'
 
 const DRAG_MIN = 4 // 이보다 적게 움직이면 클릭
 const FALLBACK: Size = { w: 64, h: 34 }
@@ -24,8 +24,10 @@ export default function GraphView(p: {
   zoom?: number
   /** 핀치: 화면 좌표 (cx, cy) 를 기준점으로 배율 변경 */
   onZoomAt?: (zoom: number, cx: number, cy: number) => void
-  /** 실측 크기로 배치를 마칠 때마다 (카드 구성이 바뀐 뒤 1회) */
-  onSettled?: (width: number, height: number, rootX: number) => void
+  /** 실측 크기로 배치를 마칠 때마다 (카드 구성이 바뀐 뒤 1회). rootX·rootY = 루트 카드 중심(배치 좌표) */
+  onSettled?: (width: number, height: number, rootX: number, rootY: number) => void
+  /** 'down' 위→아래(기본) · 'right' 세로 보기(왼→오른, 형제가 세로로 쌓임) */
+  dir?: Dir
 }) {
   const z = p.zoom ?? 1
   const ref = useRef<HTMLDivElement>(null)
@@ -38,7 +40,8 @@ export default function GraphView(p: {
     [p.nodes, drag],
   )
   const open = p.open ?? isOpen
-  const g = useMemo(() => layout(shown, p.rootId, (n) => sizes.get(n.id) ?? FALLBACK, open), [shown, p.rootId, sizes, open])
+  const dir = p.dir ?? 'down'
+  const g = useMemo(() => layout(shown, p.rootId, (n) => sizes.get(n.id) ?? FALLBACK, open, dir), [shown, p.rootId, sizes, open, dir])
   const byId = useMemo(() => new Map(shown.map((n) => [n.id, n])), [shown])
 
   // 위치 정착한 카드 id. 처음엔 FALLBACK 크기로 놓였다가 측정 후 옮겨지므로, 정착 전엔 미끄러지지 않게 still
@@ -106,7 +109,7 @@ export default function GraphView(p: {
       // oxlint-disable-next-line react/set-state-in-effect -- 측정 완료 후 정착 표시
       setKnown(new Set(ids))
       const r = g.boxes.get(p.rootId)
-      if (r) p.onSettled?.(g.width, g.height, r.x + r.w / 2)
+      if (r) p.onSettled?.(g.width, g.height, r.x + r.w / 2, r.y + r.h / 2)
     }
   })
   useEffect(() => {
@@ -217,9 +220,15 @@ export default function GraphView(p: {
         {g.edges.map(([a, b]) => {
           const pa = g.boxes.get(a)!
           const pb = g.boxes.get(b)!
+          const cls = `${a === p.rootId ? 'from-root ' : ''}${still(a) || still(b) ? 'still' : ''}`
+          if (g.dir === 'right') {
+            const [x1, y1, x2, y2] = [pa.x + pa.w, pa.y + pa.h / 2, pb.x, pb.y + pb.h / 2]
+            const mx = (x1 + x2) / 2
+            return <path key={b} className={cls} d={`M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`} />
+          }
           const [x1, y1, x2, y2] = [pa.x + pa.w / 2, pa.y + pa.h, pb.x + pb.w / 2, pb.y]
           const my = (y1 + y2) / 2
-          return <path key={b} className={`${a === p.rootId ? 'from-root ' : ''}${still(a) || still(b) ? 'still' : ''}`} d={`M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}`} />
+          return <path key={b} className={cls} d={`M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}`} />
         })}
       </svg>
     ),
@@ -231,7 +240,7 @@ export default function GraphView(p: {
     <div className="graph-zoom" style={{ width: g.width * z, height: g.height * z }}>
     <div
       ref={ref}
-      className={`graph${drag ? ' dragging' : ''}`}
+      className={`graph${drag ? ' dragging' : ''}${dir === 'right' ? ' dir-right' : ''}`}
       style={{ width: g.width, height: g.height, transform: z === 1 ? undefined : `scale(${z})` }}
       onPointerDown={onPointerDown}
       onClickCapture={onTapClick}

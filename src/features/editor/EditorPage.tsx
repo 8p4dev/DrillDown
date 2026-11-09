@@ -10,11 +10,11 @@ import { href } from '../../router'
 import { Icon } from '../../ui/Icon'
 import { I } from '../../ui/icons'
 import { NodePath } from '../../ui/NodePath'
-import { clipboardPaste, copy, cornerDownRight, eraser, highlighter, keyboard, list, maximize, network, search, undo2, x, zoomIn, zoomOut } from '../../ui/icons.all'
+import { clipboardPaste, copy, cornerDownRight, eraser, highlighter, keyboard, list, listTree, maximize, network, search, undo2, x, zoomIn, zoomOut } from '../../ui/icons.all'
 import NodeRow from './NodeRow'
 import NoteEditor, { type NoteApi, type NoteOp } from './content/NoteEditor'
 import GraphView from './graph/GraphView'
-import { isOpen } from './graph/layout'
+import { isOpen, type Dir } from './graph/layout'
 import { searchNodes, SEARCH_LIMIT } from './search'
 import { changedNode } from './edit'
 import TreeHeader from '../TreeHeader'
@@ -97,6 +97,10 @@ function saveView(treeId: string, v: View) {
     localStorage.setItem(viewKey(treeId), JSON.stringify(v))
   } catch { /* 저장 못 해도 편집은 계속 */ }
 }
+// 그래프 방향(세로 보기) — 기기별 선호, 모든 트리 공통
+const DIR_KEY = 'dd:editor-dir'
+const loadDir = (): Dir => { try { return localStorage.getItem(DIR_KEY) === 'right' ? 'right' : 'down' } catch { return 'down' } }
+const saveDir = (d: Dir) => { try { localStorage.setItem(DIR_KEY, d) } catch { /* 저장 못 해도 이번 화면은 바뀐다 */ } }
 const DEPTHS = [1, 2, 3, 0] as const // 0 = ∞ (보기 깊이 제한 없음)
 const mapOf = (ns: TreeNode[]) => new Map(ns.map((n) => [n.id, n]))
 
@@ -252,20 +256,34 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
   // ---- 자동 맞춤: 진입·개요 가져오기 뒤 1회, 넘칠 때만. 일반 편집 중에는 카드가 튀지 않게 하지 않는다 ----
   const restorePending = useRef(sameRoot && typeof saved.sx === 'number' ? { x: saved.sx, y: saved.sy ?? 0 } : null)
   const fitPending = useRef(!restorePending.current) // oxlint-disable-line react/refs -- 첫 렌더 초기값만 읽는다
-  const centerPending = useRef<number | null>(null)
+  const centerPending = useRef<[number, number] | null>(null)
+  const [dir, setDir] = useState<Dir>(loadDir)
+  const dirRef = useRef(dir) // 콜백(onSettled·키)이 최신 방향을 읽는다 — 바꿀 때 flipDir 이 함께 갱신
+  const flipDir = () => {
+    const d: Dir = dirRef.current === 'right' ? 'down' : 'right'
+    dirRef.current = d
+    setDir(d)
+  }
   const centerAfter = useRef<ID | null>(null) // 검색·포커스 해제 뒤 배치가 끝나면 이 카드를 가운데로
   const settledRoot = useRef(rootId)
   const settled = useRef(false) // 첫 배치 전에는 보기 상태를 저장하지 않는다(복원 전 0 으로 덮지 않게)
-  /** rootX = 배치 좌표의 루트 중심. 루트 카드의 rect 는 재배치 트랜지션 중이라 쓸 수 없다 */
-  function centerRoot(rootX: number) {
+  /** rootX·rootY = 배치 좌표의 루트 중심. 루트 카드의 rect 는 재배치 트랜지션 중이라 쓸 수 없다.
+   *  위→아래: 맨 위 + 루트를 가로 가운데. 세로 보기: 맨 왼쪽 + 루트를 세로 가운데 */
+  function centerRoot([rootX, rootY]: [number, number]) {
     const box = outlineRef.current
     const g = box?.querySelector('.graph')
     if (!box || !g) return
+    const [r, b, z] = [g.getBoundingClientRect(), box.getBoundingClientRect(), zoomRef.current]
+    if (dirRef.current === 'right') {
+      box.scrollLeft = 0
+      box.scrollTop += r.top + rootY * z - (b.top + box.clientHeight / 2)
+      return
+    }
     box.scrollTop = 0
-    box.scrollLeft += g.getBoundingClientRect().left + rootX * zoomRef.current - (box.getBoundingClientRect().left + box.clientWidth / 2)
+    box.scrollLeft += r.left + rootX * z - (b.left + box.clientWidth / 2)
   }
   /** GraphView 가 실측 크기로 배치를 마칠 때마다 호출 (FALLBACK 크기로는 호출되지 않음) */
-  function onSettled(w: number, h: number, rootX: number) {
+  function onSettled(w: number, h: number, rootX: number, rootY: number) {
     const box = outlineRef.current
     if (!box) return
     settled.current = true
@@ -293,9 +311,9 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
     const [cw, ch] = [box.clientWidth, box.clientHeight]
     if (w <= cw && h <= ch) return
     const next = clampZoom(Math.max(0.5, Math.min(1, (cw - 16) / w, (ch - 16) / h)))
-    if (next === zoomRef.current) return centerRoot(rootX)
+    if (next === zoomRef.current) return centerRoot([rootX, rootY])
     // 레이아웃 이펙트 안이라 flushSync 불가: 배율이 반영된 뒤 아래 이펙트에서 페인트 전에 스크롤한다
-    centerPending.current = rootX
+    centerPending.current = [rootX, rootY]
     zoomRef.current = next
     setZoom(next)
   }
@@ -323,6 +341,12 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
     viewRef.current = { open, depth: viewDepth, top: top?.id ?? '' }
     selRef.current = sel?.id ?? ''
   })
+  const firstDir = useRef(true)
+  useLayoutEffect(() => {
+    if (firstDir.current) return void (firstDir.current = false)
+    saveDir(dir)
+    fitZoom() // 방향을 바꾸면 배치가 통째로 바뀐다 → 맞춤 + 선택 가운데
+  }, [dir]) // oxlint-disable-line react-hooks/exhaustive-deps -- fitZoom 은 ref 만 쓴다
   // U18: 선택·배율·깊이가 바뀔 때, 스크롤이 멈출 때, 떠날 때 저장
   const saveNow = () => {
     const box = outlineRef.current
@@ -605,6 +629,9 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
   function onNavKey(e: React.KeyboardEvent<HTMLDivElement>) {
     if (e.target !== e.currentTarget || isComposing(e) || !sel) return
     const ctrl = e.ctrlKey || e.metaKey
+    // 세로 보기: 화살표를 화면 방향에 맞춘다(← 부모 · → 첫 자식 · ↑↓ 형제·사촌, Alt+↑↓ 형제 순서) → 아래 분기는 위→아래 기준 그대로
+    const ROT: Record<string, string> = { ArrowLeft: 'ArrowUp', ArrowRight: 'ArrowDown', ArrowUp: 'ArrowLeft', ArrowDown: 'ArrowRight' }
+    const key = dirRef.current === 'right' ? (ROT[e.key] ?? e.key) : e.key
     const hasKids = childrenOf(nodesRef.current, sel.id).length > 0
     let handled = true
     // 문자 단축키는 e.code 로 판정 → 한글 자판 상태에서도 동작
@@ -617,11 +644,11 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
     else if (ctrl && e.code === 'KeyV') paste(sel.id)
     else if (ctrl) handled = false
     // 그래프 방향: ↑ 부모 · ↓ 첫 자식 · ←→ 형제 (plan G4)
-    else if (e.altKey && e.key === 'ArrowLeft') moveSibling(sel.id, -1)
-    else if (e.altKey && e.key === 'ArrowRight') moveSibling(sel.id, 1)
-    else if (e.key === 'ArrowUp') {
+    else if (e.altKey && key === 'ArrowLeft') moveSibling(sel.id, -1)
+    else if (e.altKey && key === 'ArrowRight') moveSibling(sel.id, 1)
+    else if (key === 'ArrowUp') {
       if (sel.parentId && !isTop(sel)) setSelId(sel.parentId)
-    } else if (e.key === 'ArrowDown') {
+    } else if (key === 'ArrowDown') {
       if (hasKids) {
         const first = childrenOf(nodesRef.current, sel.id)[0]
         if (!shown.has(first.id)) setOpen(sel, true)
@@ -630,11 +657,11 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
     } else if (e.key === 'Home') setSelId(top!.id) // U19: 루트(포커스면 포커스 루트)
     else if (e.key === 'End') setSelId(rows[rows.length - 1].node.id) // 마지막 보이는 노드(전위 순서, R6-M6)
     else if (e.key === '.') centerOn(sel.id) // U15: 선택으로 이동
-    else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+    else if (key === 'ArrowLeft' || key === 'ArrowRight') {
       // U19: 보이는 같은 깊이의 이웃 — 형제가 먼저, 형제 끝에서는 사촌으로(전위 순서라 형제 사이엔 더 깊은 줄만 있다)
       const d = rows.find((r) => r.node.id === sel.id)?.depth
       const same = rows.filter((r) => r.depth === d)
-      const to = same[same.findIndex((r) => r.node.id === sel.id) + (e.key === 'ArrowLeft' ? -1 : 1)]
+      const to = same[same.findIndex((r) => r.node.id === sel.id) + (key === 'ArrowLeft' ? -1 : 1)]
       if (to) setSelId(to.node.id)
     } else if (e.key === ' ' || e.key === 'F2') startEdit(sel.id)
     else if (e.key === 'Enter') {
@@ -793,6 +820,7 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
           open={open}
           onZoomAt={zoomTo}
           onSettled={onSettled}
+          dir={dir}
           onMove={(id, offset) => commit(patch(nodesRef.current, id, { offset }), '위치 조정')}
           renderNode={(n, box, m) => {
             const [pos, setSize] = n.id === top!.id ? [1, 1] : counts.pos(n.id)
@@ -859,12 +887,13 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
           ))}
         </span>
         <span className="zoom-group" role="group" aria-label="확대·축소">
-          <button type="button" aria-label="축소" data-tip="축소 (-)" onClick={() => zoomBy(1 / 1.2)}><Icon d={zoomOut} size={20} /></button>
+          <button type="button" className="zoom-step" aria-label="축소" data-tip="축소 (-)" onClick={() => zoomBy(1 / 1.2)}><Icon d={zoomOut} size={20} /></button>
           <button type="button" className="zoom-reset" data-tip="100%로 (0)" onClick={() => zoomTo(1)}>
             <output className="tnum" aria-label="배율">{Math.round(zoom * 100)}%</output>
           </button>
-          <button type="button" aria-label="확대" data-tip="확대 (=)" onClick={() => zoomBy(1.2)}><Icon d={zoomIn} size={20} /></button>
+          <button type="button" className="zoom-step" aria-label="확대" data-tip="확대 (=)" onClick={() => zoomBy(1.2)}><Icon d={zoomIn} size={20} /></button>
         </span>
+        <button type="button" aria-label="세로 보기" aria-pressed={dir === 'right'} data-tip={dir === 'right' ? '가로 보기로' : '세로 보기'} onClick={flipDir}><Icon d={dir === 'right' ? network : listTree} size={20} /></button>
         <button type="button" aria-label="화면 맞춤" data-tip="화면 맞춤" onClick={fitZoom}><Icon d={maximize} size={20} /></button>
         {nodes.some((n) => n.offset) && (
           <button type="button" className="arrange" aria-label="자동 정렬" data-tip="자동 정렬" onClick={autoArrange}><Icon d={network} size={20} /></button>
@@ -947,8 +976,8 @@ const ICON = {
 }
 /** 단축키 팝오버: [키(공백 = 여러 키), 2~3단어 동작] */
 const KEYS: [string, string][] = [
-  ['↑ ↓', '부모 · 첫 자식'],
-  ['← →', '형제 · 사촌 이동'],
+  ['↑ ↓', '부모 · 첫 자식 (세로 보기는 ← →)'],
+  ['← →', '형제 · 사촌 (세로 보기는 ↑ ↓)'],
   ['Alt+← Alt+→', '순서 바꾸기'],
   ['Space F2', '제목 편집'],
   ['Enter', '형제 추가'],

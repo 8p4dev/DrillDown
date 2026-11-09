@@ -143,6 +143,12 @@ mark.hl-b { background: #6cc8ff66; }
 .node-row.selected .badge { opacity: 1; }
 .badge.folded { color: var(--bg); background: var(--text); border-color: var(--text); }
 .badge.folded svg { transform: rotate(180deg); }
+/* 세로 보기(.dir-right): 자식이 오른쪽에 있으므로 접기 배지는 카드 오른쪽 가운데, 화살표도 오른쪽 */
+.graph.dir-right .badge { left: auto; right: 0; bottom: 50%; transform: translate(50%, 50%); }
+.graph.dir-right .badge:active { transform: translate(50%, 50%) scale(.92); }
+.graph.dir-right .badge svg { transform: rotate(-90deg); }
+.graph.dir-right .badge.folded svg { transform: rotate(90deg); }
+.graph.dir-right .node-row:has(> .badge) > .add-note { right: .5rem; transform: translateY(50%); }
 @media (hover: hover) {
   .node-row:hover .w-handle::after { opacity: .7; }
   .node-row:hover .badge { opacity: 1; }
@@ -170,6 +176,7 @@ mark.hl-b { background: #6cc8ff66; }
 @media (pointer: coarse) {
   .w-handle { display: none; } /* 너비는 패널 1·2·3 (R6-M7) */
   .badge::after, .editor .node-row .add-note::after { content: ''; position: absolute; inset: 50% -8px -12px; }
+  .graph.dir-right .badge::after { inset: -8px -12px -8px 50%; } /* 세로 보기: 카드 바깥(오른쪽)으로만 넓힌다 */
   .node-row:not(.selected) > .badge:not(.folded) { pointer-events: none; } /* 안 보이는 배지는 탭을 받지 않는다(그 자리 탭 = 카드 선택) */
 }
 
@@ -312,7 +319,7 @@ mark.hl-b { background: #6cc8ff66; }
   .zoom-tools, .search { top: calc(var(--tap) + 6px + 1.25rem); }
 }
 /* coarse: 단축키 버튼은 숨긴다(구조 바가 대신, R6-M2) — 폰 폭에서 확대 도구가 캔버스를 넘지 않게 */
-@media (pointer: coarse) { .editor .zoom-tools button[popovertarget] { display: none; } }
+@media (pointer: coarse) { .editor .zoom-tools button[popovertarget], .editor .zoom-tools .zoom-step { display: none; } } /* 폰은 핀치로 확대·축소, % 는 100% 복귀로 남김 */
 
 /* U28 별칭 칩: 제목 아래 한 줄, 넘치면 줄바꿈 */
 .aliases { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem; padding: .1rem .85rem .35rem; }

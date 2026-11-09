@@ -284,10 +284,10 @@
 
 ### 3.7 테마 전환 [R4]
 
-상태 기계 [결정]: 저장값 `theme ∈ {light, dark}` 또는 없음(=auto). 유효 테마 = `theme ?? (matchMedia('(prefers-color-scheme: dark)').matches ? dark : light)`.
+상태 기계 [결정, 2026-11-09 개정: '자동' 칸 삭제]: 저장값 `theme ∈ {light, dark}` 또는 없음(= 아직 안 고름 → 시스템 설정을 따름, 토글엔 그 칸이 눌려 보임). 한 번 고르면 저장되어 시스템 설정이 바뀌어도 유지. 유효 테마 = `theme ?? (matchMedia('(prefers-color-scheme: dark)').matches ? dark : light)`.
 
 ```
-auto ──[토글: light]──▶ light ──[토글: dark]──▶ dark ──[토글: auto]──▶ auto
+(없음=시스템) ──[light 칸]──▶ light ⇄ [dark 칸] dark  (없음으로 돌아가는 칸 없음)
  │ 시스템 변경(matchMedia change) → 유효 테마 재계산, DOM 갱신       │
  └────────────── light/dark 에서는 시스템 변경 무시 ──────────────────┘
 ```
