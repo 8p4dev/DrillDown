@@ -66,7 +66,8 @@ export default function GraphView(p: {
   const seen = useRef(new Map<ID, { el: HTMLElement; node: TreeNode | undefined }>())
   // 주어진 카드만 재서 바뀐 것만 반영. 크기가 같으면 이전 Map 그대로 → 리렌더 없음
   function measure(els: Iterable<HTMLElement>) {
-    const now = [...els].map((el) => [el.dataset.nodeId!, { w: el.offsetWidth, h: el.offsetHeight }] as const)
+    // 0×0 = 아직 배치 안 됨(라우트 전환 직후 숨은 컨테이너 등). 잰 것으로 치면 0 크기로 정착해 진입 맞춤·보기 복원이 틀린다 → RO 가 실제 크기를 알릴 때까지 미룬다
+    const now = [...els].map((el) => [el.dataset.nodeId!, { w: el.offsetWidth, h: el.offsetHeight }] as const).filter(([, s]) => s.w > 0 || s.h > 0)
     if (!now.length) return
     setSizes((prev) => {
       let changed = false

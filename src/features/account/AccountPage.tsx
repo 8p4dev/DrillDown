@@ -56,9 +56,14 @@ export default function AccountPage() {
   }, [])
   // 휴지통·내보내기는 비로그인도 쓴다(로컬 데이터). 서버 호출은 로그인일 때만
   const restore = async (t: Tree) => {
+    // 서버 7일 휴지통 먼저 — 410 = 서버가 이미 영구 삭제(노드 없음) → 빈 트리로 되살리지 않고 로컬도 지운다. 동기화 안 된 로컬 트리는 404 라 무시
+    const gone = me && (await api(`/api/trees/${t.id}/restore`, { method: 'POST', body: {} }).then(() => false, (e) => e instanceof ApiError && e.status === 410))
+    if (gone) {
+      await deleteTree(t.id)
+      toast('복구 기간(7일)이 지나 복구할 수 없습니다')
+      return reload()
+    }
     await restoreTree(t.id)
-    // 서버 7일 휴지통 — 동기화 안 된 로컬 트리는 404 라 무시
-    if (me) await api(`/api/trees/${t.id}/restore`, { method: 'POST', body: {} }).catch(() => undefined)
     retrySync()
     reload()
   }

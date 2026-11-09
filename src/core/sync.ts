@@ -28,6 +28,7 @@ let engine: Engine | undefined
 
 /** 로그인 확인(/api/me 200) 때 CA 가 1회 호출 */
 export async function onLogin(userId: string): Promise<MergePlan> {
+  if (navigator.onLine) setSyncState({ kind: 'syncing' }) // 첫 pull 이 끝나기 전에 '저장됨'을 보이지 않게(엔진 로드 중 포함)
   engine ??= await import('./sync/engine')
   return engine.onLogin(userId)
 }

@@ -70,6 +70,8 @@ eq(parseOutline('위\n\t탭\n    넷'), [I('위', I('탭'), I('넷'))], 'tab def
   const [it] = parseOutline('SYN Flood :: 대책: SYN Cookie\nC::D')
   eq([it.text, it.note], ['SYN Flood', '대책: SYN Cookie'], 'memo parsed')
   eq(parseOutline('C::D')[0], I('C::D'), 'no-space :: kept in title')
+  eq(parseOutline('A \\:: B :: 메모')[0], { text: 'A :: B', note: '메모', children: [] }, 'escaped :: stays in title')
+  eq(parseOutline(serializeOutline([I('A :: B')]))[0], I('A :: B'), 'title with :: roundtrips')
   const ns = [
     { id: 'R', treeId: 't', parentId: null, order: 0, title: 'R', aliases: [], updatedAt: 0 },
     ...outlineToNodes(parseOutline('A :: 한 줄\n  B'), 't', 'R'),

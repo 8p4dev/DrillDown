@@ -1,7 +1,7 @@
 // oxlint-disable react/only-export-components -- 토스트 API(toast·hint) 와 Toaster 를 한 파일에 둔다
 // 전역 토스트 + 1회성 힌트 — 공유 계약 orchestration_ui_first.md §3.2 (DS 소유). 01 §3.6 #13 · 02 §3.5.
 // 동시 1개(큐): 떠 있는 것이 끝나야 다음이 나온다. 힌트(hint)는 [확인] 을 누를 때까지 떠 있고 그동안 일반 토스트는 대기한다.
-// 단, 정보 토스트(버튼 없음)는 기다리지 않는다: 액션·힌트 토스트 앞에 끼어 바로 보이고, 끝나면 밀린 것이 다시 뜬다(타이머 새로).
+// 단, 정보 토스트(버튼 없음)는 기다리지 않는다: 액션·힌트 토스트 앞에 끼어 바로 보이고, 끝나면 밀린 것이 남은 시간만큼 다시 뜬다.
 import { useSyncExternalStore } from 'react'
 import { Icon } from '../ui/Icon'
 import { I } from '../ui/icons'
@@ -13,12 +13,14 @@ type Item = { id: number; text: string; action?: Action; ms: number; hint?: bool
 let queue: Item[] = [] // queue[0] 이 지금 보이는 것
 let seq = 0
 let timer = 0
+let armedAt = 0
 const subs = new Set<() => void>()
 const emit = () => subs.forEach((f) => f())
 
 function arm() {
   clearTimeout(timer)
   const cur = queue[0]
+  armedAt = Date.now()
   if (cur && cur.ms > 0) timer = window.setTimeout(() => dismiss(cur), cur.ms)
 }
 function dismiss(t: Item) {
@@ -40,6 +42,8 @@ function push(t: Item, now = false) {
   // 기다리는 일반 토스트는 2개까지(오래된 것부터 버림). 힌트는 버리지 않는다
   while (next.filter((x, k) => k > 0 && !x.hint).length > 2) next.splice(next.findIndex((x, k) => k > 0 && !x.hint), 1)
   queue = next
+  // 밀려난 토스트는 남은 시간만 다시 받는다(최소 2초 — 돌아왔을 때 읽고 누를 틈)
+  if (head && queue[0] !== head && queue.includes(head) && head.ms > 0) head.ms = Math.max(2000, head.ms - (Date.now() - armedAt))
   if (queue[0] !== head) arm()
   emit()
 }

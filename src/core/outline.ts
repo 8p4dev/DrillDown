@@ -42,6 +42,7 @@ export function parseOutline(text: string): OutlineItem[] {
     const memo = MEMO.exec(t)
     const note = memo && t.slice(memo.index + memo[0].length)
     if (note) t = t.slice(0, memo.index) // t 는 trim 됐으므로 memo.index > 0
+    t = t.replace(/\\::/g, '::') // 제목 속 ' :: ' 는 ' \:: ' 로 적는다(내보내기가 이렇게 쓴다)
     const item: OutlineItem = note ? { text: t, note, children: [] } : { text: t, children: [] }
     ;(stack.length ? stack[stack.length - 1].item.children : top).push(item)
     stack.push({ level, item })
@@ -53,7 +54,7 @@ export function serializeOutline(items: OutlineItem[]): string {
   const lines: string[] = []
   const walk = (xs: OutlineItem[], depth: number) => {
     for (const x of xs) {
-      lines.push('  '.repeat(depth) + x.text + (x.note ? ` :: ${x.note}` : ''))
+      lines.push('  '.repeat(depth) + x.text.replace(/(\s)::(?=\s)/g, '$1\\::') + (x.note ? ` :: ${x.note}` : ''))
       walk(x.children, depth + 1)
     }
   }
