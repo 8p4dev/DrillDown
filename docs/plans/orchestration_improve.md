@@ -153,3 +153,4 @@
 - 선행 커밋 1a0519d. Run run_1fcc74119dbf. 디스패치: WY ctx_ff1831d76ad6 · WS ctx_ac14ca2a6691 · WE ctx_89a86ae088e2 · WH ctx_9fe23836e92a (새 워크트리 agent-W*-improve, base main)
 - WH 완료(먼저 도착, 파일 겹침 없어 순서 바꿔 먼저 머지) 1b2a803: H1~H22·S14 25건. 첫 화면 gzip 85.7KB, precache 630.0 KiB(PNG 는 includeManifestIcons:false 로 제외), icons.all 첫 화면 제외. 남김: dismissMerge 는 다른 분기가 써서 유지(MergeDialog 만 닫기 금지), .c-misplaced 는 srs 가 사용 중이라 유지
 - WE 완료 6068584 → 머지 3364027: E1~E21·F2·F5·F11. 검색 placeholder·단축키 표 문구 바뀜(E2E 미사용). 남김: 삭제 srs 보관 Map 은 세션 메모리(새로 고침 뒤 되돌리기는 srs 미복원), E6·E8·F11·E16 은 코드 검토만 → 통합 확인 대상
+- WY 완료(4커밋) → 머지 b2688b6: F1·F3·F4·F7·F9·F10·F12~F18. 계획 대비 변경: push 응답에 created(새로 INSERT 된 트리) 추가 → 엔진이 그 트리의 노드·srs 를 뒤따라 올림(휴지통 복구가 서버에 빈 트리만 만들던 구멍), F7 은 적용된 tree put 도 보정, F13 은 정지 소유자 → 403 hidden(소유자·관리자 통과), F12 인증 웹훅 600/분. 남김: F4 410 경로·F15·F16 은 단언 없음
