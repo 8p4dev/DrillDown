@@ -65,19 +65,19 @@ export function reissueSlug(db: DB, userId: string, id: string) {
   return { slug, url: shareUrl(slug) }
 }
 
-type ShareRow = TreeRow & { nickname: string; avatar_url: string | null; use_provider_avatar: number; owner_deleted_at: number | null }
+type ShareRow = TreeRow & { nickname: string; avatar_url: string | null; use_provider_avatar: number; owner_deleted_at: number | null; owner_suspended_at: number | null }
 
 export type ShareStatus = { ok: true; t: ShareRow } | { ok: false; status: 404 | 410 | 403; code: 'not_found' | 'deleted' | 'hidden' }
 
-/** slug 판정: 404(없음·private) / 410(트리 삭제·소유자 탈퇴 유예) / 403(관리자 숨김; viewer 가 소유자·관리자면 통과) */
+/** slug 판정: 404(없음·private) / 410(트리 삭제·소유자 탈퇴 유예) / 403(관리자 숨김·소유자 정지(F13); viewer 가 소유자·관리자면 통과) */
 export function lookupShare(db: DB, slug: string, viewer?: { id: string; role: string } | null): ShareStatus {
   const t = SLUG_RE.test(slug)
-    ? (db.prepare(`SELECT t.*, u.nickname, u.avatar_url, u.use_provider_avatar, u.deleted_at AS owner_deleted_at
+    ? (db.prepare(`SELECT t.*, u.nickname, u.avatar_url, u.use_provider_avatar, u.deleted_at AS owner_deleted_at, u.suspended_at AS owner_suspended_at
         FROM trees t JOIN users u ON u.id = t.owner_id WHERE t.slug = ?`).get(slug) as ShareRow | undefined)
     : undefined
   if (!t || t.visibility === 'private') return { ok: false, status: 404, code: 'not_found' }
   if (t.deleted_at != null || t.owner_deleted_at != null) return { ok: false, status: 410, code: 'deleted' }
-  if (t.hidden_by_admin_at != null && viewer?.id !== t.owner_id && viewer?.role !== 'admin') return { ok: false, status: 403, code: 'hidden' }
+  if ((t.hidden_by_admin_at != null || t.owner_suspended_at != null) && viewer?.id !== t.owner_id && viewer?.role !== 'admin') return { ok: false, status: 403, code: 'hidden' }
   return { ok: true, t }
 }
 
@@ -91,7 +91,7 @@ export function sharedTree(db: DB, t: ShareRow): SharedTree & { id: string } {
   }
 }
 
-// ---- 갤러리: public·미삭제·미숨김·소유자 미탈퇴, 20건, 메모리 60초 캐시 ----
+// ---- 갤러리: public·미삭제·미숨김·소유자 미탈퇴·미정지(F13), 20건, 메모리 60초 캐시 ----
 const galleryCache = new Map<string, { at: number; v: { items: GalleryItem[]; page: number; hasMore: boolean } }>()
 export const clearGalleryCache = () => galleryCache.clear()
 
@@ -102,7 +102,7 @@ export function gallery(db: DB, sort: 'recent' | 'copies', page: number, now: nu
   const hit = galleryCache.get(key)
   if (hit && now - hit.at < 60_000) return hit.v
   const rows = db.prepare(`SELECT t.slug, t.title, t.node_count, t.copy_count, t.updated_at, u.nickname FROM trees t JOIN users u ON u.id = t.owner_id
-    WHERE t.visibility = 'public' AND t.deleted_at IS NULL AND t.hidden_by_admin_at IS NULL AND u.deleted_at IS NULL AND t.slug IS NOT NULL${q ? " AND t.title LIKE ? ESCAPE '!'" : ''}
+    WHERE t.visibility = 'public' AND t.deleted_at IS NULL AND t.hidden_by_admin_at IS NULL AND u.deleted_at IS NULL AND u.suspended_at IS NULL AND t.slug IS NOT NULL${q ? " AND t.title LIKE ? ESCAPE '!'" : ''}
     ORDER BY ${sort === 'copies' ? 't.copy_count DESC, ' : ''}t.updated_at DESC, t.id LIMIT 21 OFFSET ?`).all(...(q ? [`%${q.replace(/[!%_]/g, '!$&')}%`] : []), (page - 1) * 20) as { slug: string; title: string; node_count: number; copy_count: number; updated_at: number; nickname: string }[]
   const v = {
     items: rows.slice(0, 20).map((r) => ({ slug: r.slug, title: r.title, nodeCount: r.node_count, copyCount: r.copy_count, ownerNickname: r.nickname, updatedAt: r.updated_at })),
