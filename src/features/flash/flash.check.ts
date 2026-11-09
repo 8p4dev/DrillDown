@@ -1,6 +1,6 @@
 // 실행: npx tsx src/features/flash/flash.check.ts
 import type { NodeSrs, TreeNode } from '../../core/types'
-import { byOverdue, conceptsIn, minimapNodes, nextConcept, parentQueue, plainNote } from './flash'
+import { byOverdue, conceptsIn, minimapNodes, missedConcepts, nextConcept, parentQueue, plainNote, PROGRESS_TTL, readProgress, requeueMissed } from './flash'
 
 const ok = (c: unknown, msg: string) => { if (!c) throw new Error(msg) }
 const eq = (a: unknown, b: unknown, msg: string) => ok(JSON.stringify(a) === JSON.stringify(b), `${msg}: expected ${JSON.stringify(b)}, got ${JSON.stringify(a)}`)
@@ -31,5 +31,25 @@ eq(byOverdue([{ id: 'x', due: [d(5), d(9)] }, { id: 'y', due: [d(7), d(2)] }]).m
 ok(minimapNodes([{ ...n('x', null, 0), collapsed: true, offset: { x: 5, y: 5 } }]).every((m) => !m.collapsed && !m.offset), '미니맵은 접힘·offset 무시')
 eq(plainNote('- 하나 ==y:형광== 끝\n둘 ==p:a==b==b:c== '), '- 하나 형광 끝\n둘 abc', '형광펜 마커 제거')
 eq(plainNote(undefined), '', '내용 없음')
+
+// U38 진행 저장: 7일 만료·바뀐 트리·깨진 값은 버림
+const prog = (at: number, queue = ['r', 'a', 'a1', 'c'], pos = 1) => JSON.stringify({ queue, base: queue.length, pos, tally: [['b', false]], shuffled: false, at })
+const concepts = conceptsIn(nodes, 'r')
+eq(readProgress(prog(1000), concepts, 1000 + PROGRESS_TTL - 1)?.pos, 1, '7일 안 → 이어서')
+eq(readProgress(prog(1000), concepts, 1000 + PROGRESS_TTL), null, '7일 지남 → 버림')
+eq(readProgress(prog(0, ['r', 'a', 'a1', 'gone']), concepts, 0), null, '없는 개념 → 버림')
+eq(readProgress(prog(0, ['r', 'a']), concepts, 0), null, '개념이 늘었음 → 버림')
+eq(readProgress(prog(0, ['c', 'a1', 'a', 'r', 'a']), concepts, 0)?.queue.length, 5, '섞인 순서·재출제 꼬리 허용')
+eq(readProgress(prog(0, undefined, 4), concepts, 0), null, 'pos 범위 밖 → 버림')
+eq(readProgress('{', concepts, 0), null, '깨진 값 → 버림')
+eq(readProgress(null, concepts, 0), null, '없음')
+// U40 모름 재출제: 끝에 한 번만, 큐 순서대로
+const byId = new Map(nodes.map((x) => [x.id, x]))
+const missed = missedConcepts(byId, [['a2', false], ['b', false], ['a1', true], ['c1', false]])
+eq([...missed], ['a', 'r', 'c'], '모름 하위의 부모')
+eq(requeueMissed(['r', 'a', 'a1', 'c'], 4, 3, missed), ['r', 'a', 'a1', 'c', 'r', 'a', 'c'], '모름 개념을 끝에 큐 순서로')
+eq(requeueMissed(['r', 'a', 'c', 'a'], 3, 3, new Set(['r'])), ['r', 'a', 'c', 'a'], '이미 붙였으면 다시 안 붙임')
+eq(requeueMissed(['r', 'a'], 2, 1, new Set()), ['r', 'a'], '모름 없음 → 그대로')
+eq(requeueMissed(['r', 'a', 'a1', 'c'], 4, 2, missed), ['r', 'a', 'a1', 'c'], '끝이 아니면 아직 안 붙임')
 
 console.log('flash.check ok')

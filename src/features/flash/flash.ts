@@ -42,3 +42,27 @@ export const minimapNodes = (nodes: TreeNode[]): TreeNode[] =>
 
 /** 내용(note) 평문화: 형광펜 마커 ==p:텍스트== → 텍스트. 줄·불릿은 그대로 */
 export const plainNote = (note = ''): string => note.replace(/==[pyb]:(.*?)==/g, '$1').trim()
+
+/** U38: 플래시 진행(트리+범위별 localStorage). queue = 출제 순서, base = 재출제 붙기 전 길이, tally = 하위 노드별 마지막 평가 */
+export interface Progress { queue: ID[]; base: number; pos: number; tally: [ID, boolean][]; shuffled: boolean; at: number }
+export const PROGRESS_TTL = 7 * 86_400_000
+
+/** 저장본 → 쓸 수 있으면 Progress. 7일 지남·깨짐·트리가 바뀌어 개념 집합이 다름 → null */
+export function readProgress(raw: string | null, concepts: ID[], now: number): Progress | null {
+  try {
+    const p = JSON.parse(raw ?? '') as Progress
+    const ok = new Set(concepts)
+    if (!(now - p.at < PROGRESS_TTL) || !p.queue.every((id) => ok.has(id)) || new Set(p.queue).size !== ok.size || !(p.pos < p.queue.length)) return null
+    return p
+  } catch {
+    return null
+  }
+}
+
+/** U40: 큐 끝(pos 가 마지막)에서 한 번만 — 모름 하위가 있던 개념을 큐 순서대로 다시 붙인다. 끝이 아니거나 이미 붙였으면(길이 > base) 그대로 */
+export const requeueMissed = (queue: ID[], base: number, pos: number, missed: Set<ID>): ID[] =>
+  pos < queue.length - 1 || queue.length > base ? queue : [...queue, ...queue.filter((id) => missed.has(id))]
+
+/** 모름으로 평가한 하위의 부모 = 다시 낼 개념 */
+export const missedConcepts = (byId: Map<ID, TreeNode>, tally: Iterable<[ID, boolean]>): Set<ID> =>
+  new Set([...tally].flatMap(([id, k]) => { const p = byId.get(id)?.parentId; return !k && p ? [p] : [] }))
