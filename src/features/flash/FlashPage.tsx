@@ -9,13 +9,13 @@ import { href } from '../../router'
 import { Icon } from '../../ui/Icon'
 import { I } from '../../ui/icons'
 import { NodePath } from '../../ui/NodePath'
-import { arrowRight, listChecks, rotateCcw, x } from '../../ui/icons.all'
+import { arrowRight, crosshair, listChecks, rotateCcw, x } from '../../ui/icons.all'
 import { shuffle } from '../dnd/dnd'
 import { ScopeSelect } from '../dnd/kit'
 import TreeHeader from '../TreeHeader'
-import FlashCard from './FlashCard'
+import FlashCard, { Summary } from './FlashCard'
 import Minimap from './Minimap'
-import { conceptsIn, missedConcepts, readProgress, requeueMissed, type Progress } from './flash'
+import { conceptsIn, missedConcepts, readProgress, requeueMissed, weakQueue, type Progress } from './flash'
 import { coarseHint, goTo, useStudySource } from './study'
 import './flash.css'
 
@@ -29,7 +29,9 @@ const store = {
   del: (k: string) => { try { localStorage.removeItem(k) } catch { /* 위와 같음 */ } },
   live: (k: string) => { try { return !!sessionStorage.getItem(k) } catch { return false } },
 }
-const fromSaved = (p: Progress): Session => ({ queue: p.queue, base: p.base, pos: p.pos, shuffled: p.shuffled, tally: new Map(p.tally) })
+const fromSaved = (p: Progress): Session => ({ queue: p.queue, base: p.base, pos: p.pos, shuffled: p.shuffled, sub: p.sub, tally: new Map(p.tally) })
+/** 부분 큐 세션(모름만·약점만): 저장은 되지만 개념 수 검사는 건너뛴다(S4) */
+const subSession = (queue: ID[], shuffled: boolean): Session => ({ queue, base: queue.length, pos: 0, shuffled, sub: true, tally: new Map() })
 
 export default function FlashPage({ treeId, rootId, source }: { treeId: string; rootId?: string; source?: StudySource }) {
   const src = useStudySource(source, treeId)
@@ -38,6 +40,7 @@ export default function FlashPage({ treeId, rootId, source }: { treeId: string; 
   const [session, setSession] = useState<Session | null>(null)
   const [offer, setOffer] = useState<Progress | null>(null) // '이어서 하기 / 처음부터' 대기
   const [done, setDone] = useState(false)
+  const [gen, setGen] = useState(0) // 세션을 새로 열 때마다 +1: 같은 자리(0:루트)로 다시 시작해도 카드를 새로 마운트(펼침·평가 초기화)
 
   useEffect(() => {
     Promise.all([src.nodes(), src.srs()]).then(([ns, s]) => {
@@ -46,6 +49,16 @@ export default function FlashPage({ treeId, rootId, source }: { treeId: string; 
       if (ns.length) coarseHint('flash', '카드 탭 = 펼치기', I.layers)
     })
   }, [src])
+  // S7: 동기화가 다른 기기의 학습 기록을 가져오면(dd:remote) 이 트리의 기록을 다시 읽는다. 공유 보기(메모리 소스)는 해당 없음
+  useEffect(() => {
+    if (source) return
+    const onRemote = (e: Event) => {
+      const ids = (e as CustomEvent<{ treeIds?: ID[] }>).detail?.treeIds
+      if (!ids || ids.includes(treeId)) src.srs().then((s) => setSrs({ map: s, at: new Date() }))
+    }
+    addEventListener('dd:remote', onRemote)
+    return () => removeEventListener('dd:remote', onRemote)
+  }, [src, source, treeId])
 
   const tree = useMemo(() => {
     if (!nodes?.length) return null
@@ -56,6 +69,7 @@ export default function FlashPage({ treeId, rootId, source }: { treeId: string; 
   const colors = useMemo(() => colorMap(nodes ?? [], srs.map, srs.at), [nodes, srs])
   const byId = useMemo(() => new Map((nodes ?? []).map((n) => [n.id, n])), [nodes])
   const concepts = useMemo(() => (nodes && tree ? conceptsIn(nodes, tree.scope) : []), [nodes, tree])
+  const weak = useMemo(() => (nodes && tree ? weakQueue(nodes, srs.map, tree.scope) : []), [nodes, tree, srs]) // S9: 자식을 틀린 개념, 많이 틀린 순
   const key = tree && !source ? `flash:${treeId}:${tree.scope}` : null // 공유 보기(D19)는 저장하지 않음
   const fresh = useCallback((shuffled: boolean): Session => {
     const queue = !concepts.length ? [tree?.scope ?? ''] : shuffled ? [concepts[0], ...shuffle(concepts.slice(1))] : concepts // 섞어도 범위 루트(개관)는 맨 앞
@@ -91,8 +105,29 @@ export default function FlashPage({ treeId, rootId, source }: { treeId: string; 
       <p className="empty muted">트리가 비어 있습니다 <a href={href.edit(treeId)}>편집 ›</a></p>
     </section>
   )
+  // S19: 범위에 개념(자식 있는 노드)이 없으면 — 루트만 있는 트리, 리프 범위 — 0/0 카드 대신 빈 상태
+  if (!concepts.length) return (
+    <section className="flash">
+      <TreeHeader treeId={treeId} active="flash"><ScopeSelect nodes={nodes} value={tree.scope} to={to} /></TreeHeader>
+      <p className="empty muted">
+        {tree.scope === tree.root.id ? '하위 개념이 없습니다' : '이 범위에는 하위 개념이 없습니다'}
+        {!source && <a href={href.edit(treeId, rootId)}>편집 ›</a>}
+      </p>
+    </section>
+  )
 
-  const go = (id: ID) => { setDone(false); setSession((s) => s && { ...s, pos: Math.max(0, s.queue.lastIndexOf(id)) }) }
+  const go = (id: ID) => {
+    setDone(false)
+    setSession((s) => {
+      if (!s) return s
+      const i = s.queue.lastIndexOf(id)
+      if (i >= 0) return { ...s, pos: i }
+      // S5: 부분 큐(모름만·약점만)에 없는 개념으로 '더 깊이' → 다음 자리에 끼워 넣고 이동(1번 카드로 튀지 않음)
+      const queue = [...s.queue]
+      queue.splice(s.pos + 1, 0, id)
+      return { ...s, queue, base: s.pos < s.base ? s.base + 1 : s.base, pos: s.pos + 1 }
+    })
+  }
   const pick = (id: ID) => (concepts.includes(id) ? go(id) : goTo(to(id))) // 범위 밖(경로·미니맵)이면 그 노드로 범위를 옮긴다
   const onRated = (s: NodeSrs, known: boolean) => {
     setSrs(({ map }) => ({ map: new Map(map).set(s.nodeId, s), at: new Date() }))
@@ -107,24 +142,28 @@ export default function FlashPage({ treeId, rootId, source }: { treeId: string; 
     setDone(true)
     if (key) store.del(key) // 끝까지 봤으면 이어서 할 것 없음
   }
-  const restart = (s: Session) => { setOffer(null); setDone(false); setSession(s) }
+  const restart = (s: Session) => { setOffer(null); setDone(false); setGen((g) => g + 1); setSession(s) }
   const unknown = [...tally].filter(([, k]) => !k).map(([id]) => byId.get(id)).filter(Boolean) as TreeNode[]
   const missedOnly = (s: Session): Session => {
     const missed = missedConcepts(byId, s.tally)
-    const queue = s.queue.slice(0, s.base).filter((id) => missed.has(id))
-    return { queue, base: queue.length, pos: 0, shuffled: s.shuffled, tally: new Map() }
+    return subSession(s.queue.slice(0, s.base).filter((id) => missed.has(id)), s.shuffled)
   }
+  const weakOnly = () => restart(subSession(weak, false))
+  const weakBtn = weak.length > 0 && (
+    <button type="button" className="ghost flash-weak" data-tip={`자식을 틀린 개념 ${weak.length}개, 많이 틀린 순`} onClick={weakOnly}><Icon d={crosshair} /> 약점만</button>
+  )
 
   return (
     <section className="flash">
       <TreeHeader treeId={treeId} active="flash">
         <ScopeSelect nodes={nodes} value={tree.scope} to={to} />
-        {session && <span className="flash-progress muted" aria-label="진행">{session.pos + 1}/{session.queue.length}</span>}
+        {session && <span className="flash-progress muted" aria-label="진행">{session.pos + 1}/{ext.length}</span>}
         {session && (
           <button type="button" className="ghost" aria-pressed={session.shuffled} data-tip="개념 순서 섞기(처음 카드부터)" onClick={() => restart({ ...fresh(!session.shuffled), tally: session.tally })}>
             섞기
           </button>
         )}
+        {session && weakBtn}
         {/* 보이는 건 ✓N ✕M, 읽히는 텍스트는 "알음 N · 모름 M"(DS .sr-only) */}
         <span className="flash-tally muted" aria-label="평가 집계">
           <Icon d={I.check} className="ok" /><span className="sr-only">알음 </span><b key={`k${known}`} className="pop-num">{known}</b><span className="sr-only"> · </span>
@@ -143,28 +182,16 @@ export default function FlashPage({ treeId, rootId, source }: { treeId: string; 
               </div>
             </div>
           ) : !session ? null : done ? (
-            <div className="card flash-summary" role="region" aria-label="요약">
-              <h2>수고했어요</h2>
-              <p className="flash-summary-nums">
-                <span className="known" data-known={known}>알음 <strong>{known}</strong></span>
-                <span className="unknown" data-unknown={unknown.length}>모름 <strong>{unknown.length}</strong></span>
-              </p>
-              {unknown.length > 0 && (
-                <>
-                  <p className="muted">모름으로 표시한 개념</p>
-                  <ul className="flash-missed">{unknown.map((n) => <li key={n.id}>{n.title}</li>)}</ul>
-                </>
-              )}
-              <div className="actions">
-                {unknown.length > 0 && <button type="button" className="primary" onClick={() => restart(missedOnly(session))}><Icon d={x} /> 모름만 다시</button>}
-                <button type="button" className={unknown.length ? undefined : 'primary'} onClick={() => restart(fresh(session.shuffled))}><Icon d={rotateCcw} /> 처음부터 다시</button>
-                <a className="flash-edit-link" href={href.edit(treeId, rootId)}><Icon d={I.pencil} /> 편집으로</a>
-              </div>
-            </div>
+            <Summary known={known} unknown={unknown}>
+              {unknown.length > 0 && <button type="button" className="primary" onClick={() => restart(missedOnly(session))}><Icon d={x} /> 모름만 다시</button>}
+              {weakBtn}
+              <button type="button" className={unknown.length ? undefined : 'primary'} onClick={() => restart(fresh(session.shuffled))}><Icon d={rotateCcw} /> 처음부터 다시</button>
+              {!source && <a className="flash-edit-link" href={href.edit(treeId, rootId)}><Icon d={I.pencil} /> 편집으로</a>}
+            </Summary>
           ) : (
             <>
               <NodePath path={path} onPick={pick} className="flash-path" />
-              <FlashCard key={`${session.pos}:${at}`} treeId={treeId} nodes={nodes} conceptId={at} colors={colors} source={src} onRated={onRated} onDive={go} initialRated={rated} onNext={advance} />
+              <FlashCard key={`${gen}:${session.pos}:${at}`} treeId={treeId} nodes={nodes} conceptId={at} colors={colors} srs={srs.map} source={src} onRated={onRated} onDive={go} initialRated={rated} onNext={advance} />
               {retrying && <p className="muted flash-retry">모름이었던 카드 다시 보기</p>}
               <div className="actions flash-nav">
                 <button

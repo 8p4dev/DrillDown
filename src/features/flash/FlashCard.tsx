@@ -1,5 +1,5 @@
 // 플래시카드 한 장: 개념 하나 + 가려진 하위 개념. FlashPage·ReviewPage 공용
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { logEvent } from '../../core/events'
 import { childrenOf } from '../../core/repo'
 import type { StudySource } from '../../core/source'
@@ -10,6 +10,7 @@ import { I } from '../../ui/icons'
 import { chevronDown, cornerDownRight, x } from '../../ui/icons.all'
 import { parse, toHtml } from '../editor/content/format'
 import { haptic } from '../feel'
+import { toast } from '../Toast'
 import { plainNote } from './flash'
 
 /** 내용 서식(불릿·형광펜) 표시 — 에디터 렌더러 재사용. toHtml 은 텍스트를 이스케이프한다 */
@@ -27,11 +28,33 @@ const Mark = ({ color }: { color: NodeColor }) => {
 
 const NONE: ColorInfo = { color: 'none', misplaced: false }
 
+/** 세션 끝 요약(.flash-summary) — 플래시·복습 공용. children = 행동 버튼 */
+export function Summary({ known, unknown, children }: { known: number; unknown: TreeNode[]; children: ReactNode }) {
+  return (
+    <div className="card flash-summary" role="region" aria-label="요약">
+      <h2>수고했어요</h2>
+      <p className="flash-summary-nums">
+        <span className="known" data-known={known}>알음 <strong>{known}</strong></span>
+        <span className="unknown" data-unknown={unknown.length}>모름 <strong>{unknown.length}</strong></span>
+      </p>
+      {unknown.length > 0 && (
+        <>
+          <p className="muted">모름으로 표시한 개념</p>
+          <ul className="flash-missed">{unknown.map((n) => <li key={n.id}>{n.title}</li>)}</ul>
+        </>
+      )}
+      <div className="actions">{children}</div>
+    </div>
+  )
+}
+
 interface Props {
   treeId: ID
   nodes: TreeNode[]
   conceptId: ID
   colors: Map<ID, ColorInfo>
+  /** 현재 학습 기록 — 첫 평가 전 상태를 기억해 "다시 평가" 때 기준으로 쓴다(S2) */
+  srs: Map<ID, NodeSrs>
   /** 데이터 소스(04 §3.4.2): record 로 기록, ephemeral 이면 이벤트 로그도 남기지 않는다 */
   source: StudySource
   /** 평가 기록 후 호출 — 부모가 srs 맵·집계를 갱신 */
@@ -50,7 +73,7 @@ interface Props {
 const typing = (e: KeyboardEvent) =>
   e.ctrlKey || e.metaKey || e.altKey || e.isComposing || (e.target as HTMLElement).closest?.('input, textarea, select, [contenteditable]')
 
-export default function FlashCard({ treeId, nodes, conceptId, colors, source, onRated, onDive, initialRated, onNext, rateable }: Props) {
+export default function FlashCard({ treeId, nodes, conceptId, colors, srs, source, onRated, onDive, initialRated, onNext, rateable }: Props) {
   const concept = nodes.find((n) => n.id === conceptId)
   const kids = useMemo(() => childrenOf(nodes, conceptId), [nodes, conceptId])
   const canRate = (id: ID) => !rateable || rateable.has(id)
@@ -58,14 +81,27 @@ export default function FlashCard({ treeId, nodes, conceptId, colors, source, on
   const [mounted, setMounted] = useState(false) // 처음 펼칠 때 마운트. 이후 닫힘은 CSS(.closed)가 맡는다
   const [rated, setRated] = useState(() => new Map<ID, boolean>(initialRated))
   const [shook, setShook] = useState<ID | null>(null) // 방금 모름 평가한 하위 — 한 번 흔든다
+  const before = useRef(new Map<ID, NodeSrs | null>()) // 하위별 첫 평가 전 기록(null = 없었음). 있으면 다시 평가
   const cardRef = useRef<HTMLButtonElement>(null)
   useEffect(() => cardRef.current?.focus({ preventScroll: true }), [])
   const color = (id: ID) => colors.get(id) ?? NONE
   const rate = async (n: TreeNode, known: boolean) => {
     haptic(known ? 'success' : 'warn')
+    const base = before.current.get(n.id) // S2: 다시 평가면 첫 평가 전 기록을 기준으로 다시 계산해 덮어쓴다(복습 2회 아님)
+    if (base === undefined) before.current.set(n.id, srs.get(n.id) ?? null)
     setRated((m) => new Map(m).set(n.id, known))
     setShook(known ? null : n.id)
-    const s = await source.record(n.id, known)
+    let s: NodeSrs | null
+    try {
+      s = await source.record(n.id, known, base)
+    } catch {
+      // S3: 저장 실패 → 화면 평가 되돌림(알음/모름 버튼으로)
+      toast('저장하지 못했어요')
+      setRated((m) => { const c = new Map(m); c.delete(n.id); return c })
+      setShook(null)
+      return
+    }
+    if (!s) return // 노드가 지워짐(다른 기기 삭제가 반영됨) — 기록 없음
     if (!source.ephemeral) await logEvent('flash_rated', { nodeId: n.id, known }, treeId)
     onRated(s, known)
   }

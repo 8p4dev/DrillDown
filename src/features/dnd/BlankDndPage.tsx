@@ -9,6 +9,7 @@ import { Icon } from '../../ui/Icon'
 import { I } from '../../ui/icons'
 import { checkCheck, rotateCcw } from '../../ui/icons.all'
 import { haptic } from '../feel'
+import { toast } from '../Toast'
 import { coarseHint, useStudySource } from '../flash/study'
 import TreeHeader from '../TreeHeader'
 import { attach, detach, gradeBlank, isUnder, placedTree, scopeOf, shuffle, type Links, type Score } from './dnd'
@@ -62,7 +63,14 @@ function Quiz({ treeId, scope, source }: { treeId: ID; scope: TreeNode[]; source
     const s = gradeBlank(scope, links)
     setScore(s)
     haptic(s.correct === s.total ? 'success' : 'warn')
-    if (s.placed.length) await Promise.all(rest.map((n) => source.record(n.id, s.ok[n.id]))) // 하나도 안 놓은 채점은 기록하지 않음(U35), 일부만 놓았으면 남은 카드 = 오답(설계 그대로)
+    if (s.placed.length) { // 하나도 안 놓은 채점은 기록하지 않음(U35), 일부만 놓았으면 남은 카드 = 오답(설계 그대로)
+      try {
+        await source.recordResults(rest.map((n) => n.id), rest.map((n) => s.ok[n.id])) // S18: 한 트랜잭션
+      } catch {
+        toast('저장하지 못했어요') // S3: 채점 전으로 되돌려 다시 누를 수 있게
+        return setScore(null)
+      }
+    }
     if (!source.ephemeral) await logEvent('dnd_attempt_completed', { mode: 'blank_dnd', rootId, total: s.total, correct: s.correct }, treeId)
   }
   function retry() {
@@ -79,6 +87,7 @@ function Quiz({ treeId, scope, source }: { treeId: ID; scope: TreeNode[]; source
       data-card={id}
       data-drop={onCanvas ? id : undefined}
       data-result={result(id)}
+      aria-pressed={sel === id}
       disabled={!!score}
       title={title(id)}
       style={i === undefined ? undefined : ({ '--i': i } as CSSProperties)}

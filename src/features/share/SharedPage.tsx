@@ -46,10 +46,14 @@ function memorySource(t: SharedTree, copy: () => void): StudySource {
     copy,
     nodes: async () => t.nodes,
     srs: async () => srs,
-    record: async (nodeId, ok) => {
-      const { next } = applyGrade(srs.get(nodeId), nodeId, t.slug, ok ? 'exact' : 'auto_reject', ok ? 'ok' : null, new Date())
+    record: async (nodeId, ok, base) => {
+      const next = applyGrade(base === undefined ? srs.get(nodeId) : (base ?? undefined), nodeId, t.slug, ok ? 'exact' : 'auto_reject', ok ? 'ok' : null, new Date())
       srs.set(nodeId, next)
       return next
+    },
+    recordResults: async (ids, oks) => {
+      const now = new Date()
+      ids.forEach((id, i) => srs.set(id, applyGrade(srs.get(id), id, t.slug, oks[i] ? 'exact' : 'auto_reject', oks[i] ? 'ok' : null, now)))
     },
   }
 }
@@ -131,8 +135,10 @@ export default function SharedPage({ slug, mode, rootId }: { slug: string; mode:
   useEffect(() => {
     if (!menu) return
     const close = (e: PointerEvent) => !moreRef.current?.contains(e.target as Node) && setMenu(false)
+    const esc = (e: KeyboardEvent) => e.key === 'Escape' && setMenu(false)
     addEventListener('pointerdown', close)
-    return () => removeEventListener('pointerdown', close)
+    addEventListener('keydown', esc)
+    return () => { removeEventListener('pointerdown', close); removeEventListener('keydown', esc) }
   }, [menu])
 
   if (!load) return <div className="route-loading" aria-busy="true" />
@@ -151,8 +157,12 @@ export default function SharedPage({ slug, mode, rootId }: { slug: string; mode:
   const fold = (open: boolean) => treeRef.current?.querySelectorAll<HTMLDetailsElement>('.share-tree:not(.share-top) details').forEach((d) => (d.open = open))
   const copyLink = async () => {
     setMenu(false)
-    await navigator.clipboard.writeText(url)
-    toast('링크 복사됨')
+    try {
+      await navigator.clipboard.writeText(url)
+      toast('링크 복사됨')
+    } catch {
+      toast('복사하지 못했습니다') // 권한 거부·비보안 문맥 등
+    }
   }
   const sendReport = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -189,13 +199,14 @@ export default function SharedPage({ slug, mode, rootId }: { slug: string; mode:
             <Icon d={copyIcon} size={20} /><span className="share-copy-text">내 트리로 복제</span>
           </button>
           <div className="share-more" ref={moreRef}>
-            <button type="button" className="ghost" aria-label="더 보기" data-tip="더 보기" aria-haspopup="menu" aria-expanded={menu} onClick={() => setMenu((m) => !m)}>
+            {/* H8: 메뉴 키보드 규약(화살표 이동)을 구현하지 않으므로 menu/menuitem 역할은 쓰지 않는다. 버튼 목록 + aria-expanded 만 */}
+            <button type="button" className="ghost" aria-label="더 보기" data-tip="더 보기" aria-expanded={menu} onClick={() => setMenu((m) => !m)}>
               <Icon d={I.ellipsis} size={20} />
             </button>
             {menu && (
-              <ul role="menu" className="share-menu">
-                <li><button type="button" role="menuitem" onClick={() => (setMenu(false), setReport(true))}>신고</button></li>
-                <li><button type="button" role="menuitem" onClick={copyLink}>링크 복사</button></li>
+              <ul className="share-menu">
+                <li><button type="button" onClick={() => (setMenu(false), setReport(true))}>신고</button></li>
+                <li><button type="button" onClick={copyLink}>링크 복사</button></li>
               </ul>
             )}
           </div>

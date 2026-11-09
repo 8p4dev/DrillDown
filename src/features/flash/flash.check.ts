@@ -1,6 +1,6 @@
 // 실행: npx tsx src/features/flash/flash.check.ts
 import type { NodeSrs, TreeNode } from '../../core/types'
-import { byOverdue, conceptsIn, minimapNodes, missedConcepts, nextConcept, parentQueue, plainNote, PROGRESS_TTL, readProgress, requeueMissed } from './flash'
+import { byOverdue, conceptsIn, minimapNodes, missedConcepts, parentQueue, plainNote, PROGRESS_TTL, readProgress, requeueMissed, weakQueue } from './flash'
 
 const ok = (c: unknown, msg: string) => { if (!c) throw new Error(msg) }
 const eq = (a: unknown, b: unknown, msg: string) => ok(JSON.stringify(a) === JSON.stringify(b), `${msg}: expected ${JSON.stringify(b)}, got ${JSON.stringify(a)}`)
@@ -13,12 +13,6 @@ const n = (id: string, parentId: string | null, order: number): TreeNode =>
   ({ id, treeId: 't', parentId, order, title: id, aliases: [], updatedAt: 0 })
 const nodes = [n('c1', 'c', 0), n('r', null, 0), n('c', 'r', 2), n('a', 'r', 0), n('b', 'r', 1), n('a2', 'a', 1), n('a1', 'a', 0), n('a1x', 'a1', 0)]
 
-eq(nextConcept(nodes, 'r', 'r'), 'a', '루트 다음 = a')
-eq(nextConcept(nodes, 'r', 'a'), 'a1', 'a 다음 = a1 (전위)')
-eq(nextConcept(nodes, 'r', 'a1'), 'c', 'a1 다음은 리프 a2·b 건너뛰고 c')
-eq(nextConcept(nodes, 'r', 'c'), null, '마지막 → 요약')
-eq(nextConcept(nodes, 'a', 'a1'), null, '시작 개념 a 범위 밖(c)으로 나가지 않음')
-eq(nextConcept(nodes, 'a', 'c'), null, '범위 밖에서 다음 = 범위 안 다음 없음')
 eq(conceptsIn(nodes, 'r'), ['r', 'a', 'a1', 'c'], '범위 개념: 전위·리프 제외')
 eq(conceptsIn(nodes, 'a'), ['a', 'a1'], '범위 개념: 서브트리만')
 
@@ -33,12 +27,14 @@ eq(plainNote('- 하나 ==y:형광== 끝\n둘 ==p:a==b==b:c== '), '- 하나 형�
 eq(plainNote(undefined), '', '내용 없음')
 
 // U38 진행 저장: 7일 만료·바뀐 트리·깨진 값은 버림
-const prog = (at: number, queue = ['r', 'a', 'a1', 'c'], pos = 1) => JSON.stringify({ queue, base: queue.length, pos, tally: [['b', false]], shuffled: false, at })
+const prog = (at: number, queue = ['r', 'a', 'a1', 'c'], pos = 1, sub?: boolean) => JSON.stringify({ queue, base: queue.length, pos, tally: [['b', false]], shuffled: false, at, sub })
 const concepts = conceptsIn(nodes, 'r')
 eq(readProgress(prog(1000), concepts, 1000 + PROGRESS_TTL - 1)?.pos, 1, '7일 안 → 이어서')
 eq(readProgress(prog(1000), concepts, 1000 + PROGRESS_TTL), null, '7일 지남 → 버림')
 eq(readProgress(prog(0, ['r', 'a', 'a1', 'gone']), concepts, 0), null, '없는 개념 → 버림')
 eq(readProgress(prog(0, ['r', 'a']), concepts, 0), null, '개념이 늘었음 → 버림')
+eq(readProgress(prog(0, ['r', 'a'], 1, true), concepts, 0)?.queue, ['r', 'a'], 'S4 부분 큐(모름만 다시)는 개념 수 검사 없이 이어서')
+eq(readProgress(prog(0, ['r', 'gone'], 1, true), concepts, 0), null, '부분 큐도 없는 개념은 버림')
 eq(readProgress(prog(0, ['c', 'a1', 'a', 'r', 'a']), concepts, 0)?.queue.length, 5, '섞인 순서·재출제 꼬리 허용')
 eq(readProgress(prog(0, undefined, 4), concepts, 0), null, 'pos 범위 밖 → 버림')
 eq(readProgress('{', concepts, 0), null, '깨진 값 → 버림')
@@ -51,5 +47,14 @@ eq(requeueMissed(['r', 'a', 'a1', 'c'], 4, 3, missed), ['r', 'a', 'a1', 'c', 'r'
 eq(requeueMissed(['r', 'a', 'c', 'a'], 3, 3, new Set(['r'])), ['r', 'a', 'c', 'a'], '이미 붙였으면 다시 안 붙임')
 eq(requeueMissed(['r', 'a'], 2, 1, new Set()), ['r', 'a'], '모름 없음 → 그대로')
 eq(requeueMissed(['r', 'a', 'a1', 'c'], 4, 2, missed), ['r', 'a', 'a1', 'c'], '끝이 아니면 아직 안 붙임')
+
+// S9 약점 집중: 자식 miss 합 > 0 인 개념만, 많이 틀린 순
+{
+  const m = (nodeId: string, miss: number) => [nodeId, { nodeId, miss } as NodeSrs] as const
+  const srs = new Map([m('a2', 1), m('c1', 3), m('a1x', 0), m('r', 9)]) // r 자신의 miss 는 부모(없음)에만 쌓인다
+  eq(weakQueue(nodes, srs, 'r'), ['c', 'a'], '많이 틀린 순(c=3, a=1), a1·r 제외')
+  eq(weakQueue(nodes, srs, 'a'), ['a'], '범위 안만')
+  eq(weakQueue(nodes, new Map(), 'r'), [], '대상 없음 → 빈 큐')
+}
 
 console.log('flash.check ok')
