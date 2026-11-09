@@ -1,7 +1,7 @@
 // plan §2 R4 점검 — 순수 함수만 (DB 미사용). 실행: npx tsx src/core/srs/srs.check.ts
 import { Rating } from 'ts-fsrs'
 import type { GradeSource, NodeSrs, Structure, TreeNode } from '../types'
-import { applyGrade, colorClass, colorMap, gradeToRating, isAutoCorrect, isBranchComplete, missHeat, nodeColor, retrievability } from './index'
+import { applyGrade, colorClass, colorMap, gradeToRating, isAutoCorrect, missHeat, nodeColor, retrievability } from './index'
 
 // node:assert 대신 최소 assert — 앱 tsconfig 에 node 타입이 없음
 const assert = {
@@ -35,11 +35,11 @@ for (const s of ['self_partial', 'self_reject', 'auto_reject'] as const) assert.
 assert.ok(isAutoCorrect('fuzzy', 'ok') && !isAutoCorrect('exact', 'misplaced') && !isAutoCorrect('self_accept', 'ok'))
 
 // 2. Hard 간격 < Good 간격 (첫 회, 2회차 모두)
-const good1 = grade(undefined, 'exact', t0).next
-const hard1 = grade(undefined, 'self_accept', t0).next
+const good1 = grade(undefined, 'exact', t0)
+const hard1 = grade(undefined, 'self_accept', t0)
 assert.ok(hard1.due < good1.due, 'Hard < Good (1회)')
-const good2 = grade(good1, 'exact', at(5)).next
-const hard2 = grade(good1, 'self_accept', at(5)).next
+const good2 = grade(good1, 'exact', at(5))
+const hard2 = grade(good1, 'self_accept', at(5))
 assert.ok(hard2.due < good2.due, 'Hard < Good (2회)')
 assert.equal(good1.due, +(good1.card as { dueAt: Date }).dueAt)
 
@@ -51,64 +51,55 @@ const faded = [0, 3, 10, 30, 120].map((d) => nodeColor(good1, at(d)).color)
 assert.equal(faded[0], 'green')
 assert.equal(faded.at(-1), 'none')
 assert.ok(faded.includes('lightgreen'), `바램 단계에 lightgreen: ${faded}`)
-assert.equal(nodeColor(grade(undefined, 'auto_reject', t0).next, t0).color, 'red')
+assert.equal(nodeColor(grade(undefined, 'auto_reject', t0), t0).color, 'red')
 
 // 4. self_accept → green 금지, pendingRecheck. 다음 자동 정답에서 해소
 const sa = grade(undefined, 'self_accept', t0)
-assert.equal(sa.next.pendingRecheck, true)
-assert.equal(sa.recheckResolved, false)
-assert.equal(nodeColor(sa.next, t0).color, 'lightgreen')
-assert.deepEqual(sa.next.autoCorrectDays, [], 'self_accept 는 완료에 산입하지 않음')
+assert.equal(sa.pendingRecheck, true)
+assert.equal(nodeColor(sa, t0).color, 'lightgreen')
+assert.deepEqual(sa.autoCorrectDays, [], 'self_accept 는 자동 정답 날짜에 산입하지 않음')
 // 자동 정답 후 재확인 대기 중인 노드(이전 회차 정답 → self_accept)도 green 금지
-const saAfterGood = grade(good1, 'self_accept', at(5)).next
+const saAfterGood = grade(good1, 'self_accept', at(5))
 assert.notEqual(nodeColor(saAfterGood, at(5)).color, 'green')
 // 위치 오류: Hard, green 금지 + misplaced 표시
-const mis = grade(undefined, 'exact', t0, 'misplaced').next
+const mis = grade(undefined, 'exact', t0, 'misplaced')
 assert.deepEqual(nodeColor(mis, t0), { color: 'lightgreen', misplaced: true })
 assert.equal(colorClass(nodeColor(mis, t0)), 'c-lightgreen c-misplaced')
 assert.deepEqual(mis.autoCorrectDays, [])
-// 재확인 대기 중 Again → 대기 유지, 해소 아님
-const saAgain = grade(sa.next, 'self_reject', at(1))
-assert.equal(saAgain.next.pendingRecheck, true)
-assert.equal(saAgain.recheckResolved, false)
+// 재확인 대기 중 Again → 대기 유지
+const saAgain = grade(sa, 'self_reject', at(1))
+assert.equal(saAgain.pendingRecheck, true)
 // 자동 정답 → 해소
-const rechecked = grade(saAgain.next, 'exact', at(2))
-assert.equal(rechecked.recheckResolved, true)
-assert.equal(rechecked.next.pendingRecheck, false)
-assert.equal(nodeColor(rechecked.next, at(2)).color, 'green')
-assert.equal(grade(rechecked.next, 'exact', at(3)).recheckResolved, false, '해소는 1회만')
+const rechecked = grade(saAgain, 'exact', at(2))
+assert.equal(rechecked.pendingRecheck, false)
+assert.equal(nodeColor(rechecked, at(2)).color, 'green')
 
-// 5. 가지 완료: 서로 다른 날 2회 자동 정답
+// 5. autoCorrectDays: 서로 다른 날만 쌓인다(저장 필드 유지)
 const nodes: TreeNode[] = [
   { id: 'r', treeId: 'T', parentId: null, order: 0, title: 'R', aliases: [], updatedAt: 0 },
   { id: 'a', treeId: 'T', parentId: 'r', order: 0, title: 'A', aliases: [], updatedAt: 0 },
   { id: 'b', treeId: 'T', parentId: 'r', order: 1, title: 'B', aliases: [], updatedAt: 0 },
   { id: 'a1', treeId: 'T', parentId: 'a', order: 0, title: 'A1', aliases: [], updatedAt: 0 },
 ]
-const twice = (id: string, d2: number) => grade(grade(undefined, 'exact', t0, 'ok', id).next, 'exact', at(d2), 'ok', id).next
+const twice = (id: string, d2: number) => grade(grade(undefined, 'exact', t0, 'ok', id), 'exact', at(d2), 'ok', id)
 const srs = new Map(nodes.map((n) => [n.id, twice(n.id, 1)]))
 assert.equal(srs.get('a')!.autoCorrectDays.length, 2)
-assert.ok(isBranchComplete(nodes, srs, 'r'))
-srs.set('a1', twice('a1', 0.1)) // 같은 날 2회
-assert.equal(srs.get('a1')!.autoCorrectDays.length, 1)
-assert.ok(!isBranchComplete(nodes, srs, 'r'), '같은 날 2회는 미완료')
-assert.ok(!isBranchComplete(nodes, srs, 'a'))
-assert.ok(isBranchComplete(nodes, srs, 'b'))
+assert.equal(twice('a1', 0.1).autoCorrectDays.length, 1, '같은 날 2회는 하루')
 
 // 6. 부모 집계
-const g = () => grade(undefined, 'exact', t0).next
+const g = () => grade(undefined, 'exact', t0)
 const set = (m: Record<string, NodeSrs | undefined>) =>
   colorMap(nodes, new Map(Object.entries(m).filter((e): e is [string, NodeSrs] => !!e[1])), t0)
 let cm = set({ r: g(), a: g(), b: g(), a1: g() })
 assert.equal(cm.get('r')!.color, 'green', '자식 모두 green → 부모 green')
-cm = set({ r: g(), a: g(), b: g(), a1: sa.next })
+cm = set({ r: g(), a: g(), b: g(), a1: sa })
 assert.equal(cm.get('a')!.color, 'lightgreen', '손자 lightgreen → 부모 lightgreen')
 assert.equal(cm.get('r')!.color, 'lightgreen', '집계가 위로 전파')
 assert.equal(cm.get('a1')!.color, 'lightgreen')
-cm = set({ r: g(), a: g(), b: grade(undefined, 'auto_reject', t0).next, a1: g() })
+cm = set({ r: g(), a: g(), b: grade(undefined, 'auto_reject', t0), a1: g() })
 assert.equal(cm.get('r')!.color, 'lightgreen', 'red 자식 → 부모 green 아님')
 assert.equal(cm.get('b')!.color, 'red')
-cm = set({ r: undefined, a: g(), b: grade(undefined, 'auto_reject', t0).next, a1: g() })
+cm = set({ r: undefined, a: g(), b: grade(undefined, 'auto_reject', t0), a1: g() })
 assert.equal(cm.get('r')!.color, 'none', 'red 자식이 있어도 부모는 자기 상태(A5)')
 cm = set({ r: g(), a: g(), b: undefined, a1: g() })
 assert.equal(cm.get('r')!.color, 'lightgreen', '미학습 자식 → 부모 green 아님')
@@ -117,13 +108,13 @@ assert.equal(cm.size, nodes.length)
 // miss: 틀리면 +1, 맞히면 -1, 0 미만 없음 → 붉은 농도
 {
   const t0 = new Date('2026-01-01T00:00:00Z')
-  let m = applyGrade(undefined, 'm', 't', 'auto_reject', null, t0).next
-  m = applyGrade(m, 'm', 't', 'auto_reject', null, t0).next
+  let m = applyGrade(undefined, 'm', 't', 'auto_reject', null, t0)
+  m = applyGrade(m, 'm', 't', 'auto_reject', null, t0)
   assert.equal(m.miss, 2)
   assert.equal(missHeat(m), 0.5)
-  m = applyGrade(m, 'm', 't', 'exact', 'ok', t0).next
-  m = applyGrade(m, 'm', 't', 'exact', 'ok', t0).next
-  m = applyGrade(m, 'm', 't', 'exact', 'ok', t0).next
+  m = applyGrade(m, 'm', 't', 'exact', 'ok', t0)
+  m = applyGrade(m, 'm', 't', 'exact', 'ok', t0)
+  m = applyGrade(m, 'm', 't', 'exact', 'ok', t0)
   assert.equal(m.miss, 0)
   assert.equal(missHeat(undefined), 0)
 }
@@ -132,7 +123,7 @@ assert.equal(cm.size, nodes.length)
 {
   const days = new Map<number, number>()
   for (let i = 0; i < 100; i++) {
-    const d = Math.floor(grade(undefined, 'exact', t0, 'ok', `f${i}`).next.due / DAY)
+    const d = Math.floor(grade(undefined, 'exact', t0, 'ok', `f${i}`).due / DAY)
     days.set(d, (days.get(d) ?? 0) + 1)
   }
   assert.ok(days.size >= 2 && Math.max(...days.values()) < 60, `fuzz 분포 ${JSON.stringify([...days])}`)
@@ -143,9 +134,19 @@ console.log('srs.check: ok')
 // 서버에서 받은 행(JSON 직렬화된 card)도 채점·색 판정이 된다
 {
   const t0 = new Date('2026-01-01T00:00:00Z')
-  const first = applyGrade(undefined, 'n', 't', 'exact', 'ok', t0).next
+  const first = applyGrade(undefined, 'n', 't', 'exact', 'ok', t0)
   const wire = JSON.parse(JSON.stringify(first)) as typeof first
   const later = new Date(+t0 + 3 * 864e5)
   assert.ok(retrievability(wire, later) > 0, 'wire card retrievability')
-  assert.ok(applyGrade(wire, 'n', 't', 'exact', 'ok', later).next.due > +later, 'wire card regrade')
+  assert.ok(applyGrade(wire, 'n', 't', 'exact', 'ok', later).due > +later, 'wire card regrade')
+}
+
+// S2 다시 평가: 첫 평가 전 기록(base=없음)을 기준으로 다시 계산하면 "처음부터 모름 1회" 와 같다. 이어서 기록하면 복습 2회가 된다
+{
+  const reps = (s: NodeSrs) => (s.card as { reps: number }).reps
+  const known = applyGrade(undefined, 'n', 't', 'exact', 'ok', t0)
+  const regraded = applyGrade(undefined, 'n', 't', 'auto_reject', null, t0) // base = undefined
+  const fresh = applyGrade(undefined, 'n', 't', 'auto_reject', null, t0)
+  assert.equal([regraded.miss, reps(regraded), regraded.lastGradeSource], [fresh.miss, reps(fresh), fresh.lastGradeSource], '다시 평가 = 처음 모름 1회')
+  assert.equal(reps(applyGrade(known, 'n', 't', 'auto_reject', null, t0)), 2, '이어서 기록하면 2회')
 }

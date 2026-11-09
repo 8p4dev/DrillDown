@@ -9,12 +9,15 @@ export function useStudySource(source: StudySource | undefined, treeId: string):
     const s = source ?? dexieSource(treeId)
     if (!s.ephemeral) return s
     let warned = false
+    const warn = () => {
+      if (warned) return
+      warned = true
+      toast('복제하면 학습 기록이 남습니다', s.copy && { label: '복제', run: s.copy }, 6000)
+    }
     return {
       ...s,
-      record: (id, ok) => {
-        if (!warned) { warned = true; toast('복제하면 학습 기록이 남습니다', s.copy && { label: '복제', run: s.copy }, 6000) }
-        return s.record(id, ok)
-      },
+      record: (id, ok, base) => (warn(), s.record(id, ok, base)),
+      recordResults: (ids, oks) => (warn(), s.recordResults(ids, oks)),
     }
   }, [source, treeId])
 }

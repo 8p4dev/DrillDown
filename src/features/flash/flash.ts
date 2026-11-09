@@ -8,19 +8,17 @@ export const preorder = (nodes: TreeNode[]): TreeNode[] => {
   return [root, ...descendantsOf(nodes, root.id)]
 }
 
-/** 전위 순서상 current 다음의 "자식 있는 노드" 중 scope 서브트리 안의 첫 노드. 없으면 null(=요약) */
-export function nextConcept(nodes: TreeNode[], scopeId: ID, currentId: ID): ID | null {
-  const inScope = new Set([scopeId, ...descendantsOf(nodes, scopeId).map((n) => n.id)])
-  const hasKids = new Set(nodes.map((n) => n.parentId))
-  const order = preorder(nodes)
-  const at = order.findIndex((n) => n.id === currentId)
-  return order.slice(at + 1).find((n) => inScope.has(n.id) && hasKids.has(n.id))?.id ?? null
-}
-
 /** 범위 안 개념(자식 있는 노드) id, 전위 순서 — 진행 n/m 의 m(U30) */
 export function conceptsIn(nodes: TreeNode[], scopeId: ID): ID[] {
   const hasKids = new Set(nodes.map((n) => n.parentId))
   return [scopeId, ...descendantsOf(nodes, scopeId).map((n) => n.id)].filter((id) => hasKids.has(id))
+}
+
+/** S9 약점 집중: 범위 개념 중 자식의 miss 합이 0 보다 큰 것만, 많이 틀린 순(동률은 전위 순서) */
+export function weakQueue(nodes: TreeNode[], srs: Map<ID, NodeSrs>, scopeId: ID): ID[] {
+  const heat = new Map<ID, number>()
+  for (const n of nodes) if (n.parentId !== null) heat.set(n.parentId, (heat.get(n.parentId) ?? 0) + (srs.get(n.id)?.miss ?? 0))
+  return conceptsIn(nodes, scopeId).filter((id) => heat.get(id)! > 0).sort((a, b) => heat.get(b)! - heat.get(a)!)
 }
 
 /** 복습 큐: 기한 노드의 부모(루트면 자신)를 전위 순서로 중복 없이. 부모가 곧 플래시카드 개념 */
@@ -43,16 +41,16 @@ export const minimapNodes = (nodes: TreeNode[]): TreeNode[] =>
 /** 내용(note) 평문화: 형광펜 마커 ==p:텍스트== → 텍스트. 줄·불릿은 그대로 */
 export const plainNote = (note = ''): string => note.replace(/==[pyb]:(.*?)==/g, '$1').trim()
 
-/** U38: 플래시 진행(트리+범위별 localStorage). queue = 출제 순서, base = 재출제 붙기 전 길이, tally = 하위 노드별 마지막 평가 */
-export interface Progress { queue: ID[]; base: number; pos: number; tally: [ID, boolean][]; shuffled: boolean; at: number }
+/** U38: 플래시 진행(트리+범위별 localStorage). queue = 출제 순서, base = 재출제 붙기 전 길이, tally = 하위 노드별 마지막 평가, sub = 부분 큐(모름만·약점만) */
+export interface Progress { queue: ID[]; base: number; pos: number; tally: [ID, boolean][]; shuffled: boolean; at: number; sub?: boolean }
 export const PROGRESS_TTL = 7 * 86_400_000
 
-/** 저장본 → 쓸 수 있으면 Progress. 7일 지남·깨짐·트리가 바뀌어 개념 집합이 다름 → null */
+/** 저장본 → 쓸 수 있으면 Progress. 7일 지남·깨짐·트리가 바뀌어 개념 집합이 다름 → null. 부분 큐(sub)는 개념 수 검사를 하지 않는다(S4) */
 export function readProgress(raw: string | null, concepts: ID[], now: number): Progress | null {
   try {
     const p = JSON.parse(raw ?? '') as Progress
     const ok = new Set(concepts)
-    if (!(now - p.at < PROGRESS_TTL) || !p.queue.every((id) => ok.has(id)) || new Set(p.queue).size !== ok.size || !(p.pos < p.queue.length)) return null
+    if (!(now - p.at < PROGRESS_TTL) || !p.queue.every((id) => ok.has(id)) || (!p.sub && new Set(p.queue).size !== ok.size) || !(p.pos < p.queue.length)) return null
     return p
   } catch {
     return null

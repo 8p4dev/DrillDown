@@ -27,6 +27,13 @@ export function useDragDrop(onDrop: (card: string, target: string) => void, enab
   const raf = useRef(0)
   const skipClick = useRef(false)
   useEffect(() => () => cancelAnimationFrame(raf.current), [])
+  // S11: 탭으로 집은 카드는 Esc 로 놓는다
+  useEffect(() => {
+    if (!sel) return
+    const esc = (e: KeyboardEvent) => e.key === 'Escape' && setSel(null)
+    addEventListener('keydown', esc)
+    return () => removeEventListener('keydown', esc)
+  }, [sel])
 
   // 드래그 동안만 도는 루프: 포인터 이동을 프레임당 한 번으로 묶는다
   const frame = () => {

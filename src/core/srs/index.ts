@@ -1,6 +1,6 @@
 import { DefaultScheduler, Rating, type Grade } from 'ts-fsrs'
 import { db, track } from '../db'
-import { logEvent } from '../events'
+import { childIndex } from '../path'
 import type { GradeSource, ID, NodeSrs, Structure, TreeNode } from '../types'
 
 // FSRS-7 기본 설정 + fuzz. 계약 함수가 동기라서 모듈 로드 시 1회 생성한다.
@@ -33,34 +33,24 @@ export function gradeToRating(src: GradeSource, structure: Structure): Rating {
 const dayKey = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
-export function applyGrade(
-  prev: NodeSrs | undefined,
-  nodeId: ID,
-  treeId: ID,
-  src: GradeSource,
-  structure: Structure,
-  now: Date,
-): { next: NodeSrs; recheckResolved: boolean } {
+/** prev 에 채점 1회를 적용한 다음 기록. 저장 필드(autoCorrectDays·pendingRecheck)는 타이핑 설계의 흔적이지만 서버 검증이 요구해 유지 */
+export function applyGrade(prev: NodeSrs | undefined, nodeId: ID, treeId: ID, src: GradeSource, structure: Structure, now: Date): NodeSrs {
   const card = prev?.card ? asCard(prev.card) : scheduler.newCard({ now })
   const { card: nextCard } = scheduler.review({ card, grade: gradeToRating(src, structure) as Grade, now })
   const auto = isAutoCorrect(src, structure)
   const days = prev?.autoCorrectDays ?? []
   const day = dayKey(now)
-  const wasPending = prev?.pendingRecheck ?? false
   return {
-    next: {
-      nodeId,
-      treeId,
-      card: nextCard,
-      due: +nextCard.dueAt,
-      lastGradeSource: src,
-      lastStructure: structure,
-      autoCorrectDays: auto && !days.includes(day) ? [...days, day] : days,
-      pendingRecheck: src === 'self_accept' ? true : auto ? false : wasPending,
-      miss: Math.max(0, (prev?.miss ?? 0) + (gradeToRating(src, structure) === Rating.Again ? 1 : -1)),
-      updatedAt: +now,
-    },
-    recheckResolved: wasPending && auto,
+    nodeId,
+    treeId,
+    card: nextCard,
+    due: +nextCard.dueAt,
+    lastGradeSource: src,
+    lastStructure: structure,
+    autoCorrectDays: auto && !days.includes(day) ? [...days, day] : days,
+    pendingRecheck: src === 'self_accept' ? true : auto ? false : (prev?.pendingRecheck ?? false),
+    miss: Math.max(0, (prev?.miss ?? 0) + (gradeToRating(src, structure) === Rating.Again ? 1 : -1)),
+    updatedAt: +now,
   }
 }
 
@@ -104,19 +94,6 @@ export function colorClass(c: ColorInfo): string {
   return `c-${c.color}${c.misplaced ? ' c-misplaced' : ''}`
 }
 
-export function isBranchComplete(nodes: TreeNode[], srs: Map<ID, NodeSrs>, rootId: ID): boolean {
-  const kids = childIndex(nodes)
-  const done = (id: ID): boolean =>
-    (srs.get(id)?.autoCorrectDays.length ?? 0) >= 2 && (kids.get(id) ?? []).every((c) => done(c.id))
-  return done(rootId)
-}
-
-function childIndex(nodes: TreeNode[]): Map<ID, TreeNode[]> {
-  const m = new Map<ID, TreeNode[]>()
-  for (const n of nodes) if (n.parentId !== null) m.set(n.parentId, [...(m.get(n.parentId) ?? []), n])
-  return m
-}
-
 /** 오답 농도 0..1 — 에디터 붉은색. miss 4 이상이면 최대 */
 export const MISS_MAX = 4
 export function missHeat(s: NodeSrs | undefined): number {
@@ -125,21 +102,42 @@ export function missHeat(s: NodeSrs | undefined): number {
 
 // ── DB 래퍼 ────────────────────────────────────────────────
 
-export async function recordGrade(nodeId: ID, treeId: ID, src: GradeSource, structure: Structure, now = new Date()): Promise<NodeSrs> {
-  const next0 = await db.transaction('rw', [db.srs, db.outbox, db.meta], async () => {
-    const r = applyGrade(await db.srs.get(nodeId), nodeId, treeId, src, structure, now)
-    await db.srs.put(r.next)
+/** 기록을 쓴 뒤 상단 복습 배지 갱신(계약 C3) */
+const notifyDue = () => dispatchEvent(new Event('dd:due'))
+
+/**
+ * 채점 1회 기록. 노드가 지워졌으면(다른 기기 삭제가 pull 된 뒤) 쓰지 않고 null.
+ * base: "다시 평가" 때 첫 평가 전 기록(null = 없었음)을 넘기면 저장된 값 대신 그것을 기준으로 다시 계산해 덮어쓴다(S2)
+ */
+export async function recordGrade(nodeId: ID, treeId: ID, src: GradeSource, structure: Structure, now = new Date(), base?: NodeSrs | null): Promise<NodeSrs | null> {
+  const next = await db.transaction('rw', [db.srs, db.nodes, db.outbox, db.meta], async () => {
+    if (!(await db.nodes.get(nodeId))) return null
+    const prev = base === undefined ? await db.srs.get(nodeId) : (base ?? undefined)
+    const r = applyGrade(prev, nodeId, treeId, src, structure, now)
+    await db.srs.put(r)
     await track([{ kind: 'srs', id: nodeId, treeId, op: 'put' }]) // 04 §3.1 쓰기 훅
     return r
   })
-  const { next, recheckResolved } = next0
-  if (recheckResolved) await logEvent('self_graded_node_rechecked', { origNodeId: nodeId, nextGradeSource: src }, treeId)
+  if (next) notifyDue()
   return next
 }
 
 /** 학습 모드(플래시카드·D&D) 공용 기록: 맞음 = Good(자동 정답과 동일, 초록 가능), 틀림 = Again. miss 도 갱신 */
-export function recordResult(nodeId: ID, treeId: ID, ok: boolean, now = new Date()): Promise<NodeSrs> {
-  return recordGrade(nodeId, treeId, ok ? 'exact' : 'auto_reject', ok ? 'ok' : null, now)
+export function recordResult(nodeId: ID, treeId: ID, ok: boolean, now = new Date(), base?: NodeSrs | null): Promise<NodeSrs | null> {
+  return recordGrade(nodeId, treeId, ok ? 'exact' : 'auto_reject', ok ? 'ok' : null, now, base)
+}
+
+/** 빈칸·백지 채점: 여러 노드를 한 트랜잭션으로(S18). 지워진 노드는 건너뛴다 */
+export async function recordResults(treeId: ID, ids: ID[], oks: boolean[], now = new Date()): Promise<void> {
+  const n = await db.transaction('rw', [db.srs, db.nodes, db.outbox, db.meta], async () => {
+    const alive = new Set((await db.nodes.bulkGet(ids)).flatMap((x) => (x ? [x.id] : [])))
+    const prev = new Map((await db.srs.bulkGet(ids)).flatMap((s) => (s ? [[s.nodeId, s] as const] : [])))
+    const rows = ids.flatMap((id, i) => (alive.has(id) ? [applyGrade(prev.get(id), id, treeId, oks[i] ? 'exact' : 'auto_reject', oks[i] ? 'ok' : null, now)] : []))
+    await db.srs.bulkPut(rows)
+    await track(rows.map((r) => ({ kind: 'srs' as const, id: r.nodeId, treeId, op: 'put' as const })))
+    return rows.length
+  })
+  if (n) notifyDue()
 }
 
 export async function getSrsMap(treeId: ID): Promise<Map<ID, NodeSrs>> {
