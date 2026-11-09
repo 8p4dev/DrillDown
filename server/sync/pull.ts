@@ -8,6 +8,8 @@ export function pullSince(db: DB, userId: string, since: number) {
   const cur = curSeq(db, userId)
   // 이 기기가 아직 받지 않은 톰스톤을 purge 가 지웠으면 커서를 믿을 수 없다 → 스냅샷(since=0)부터
   if (since > 0 && since < cur.purged_seq) fail(410, 'cursor_expired', '오래된 동기화 기록입니다. 전체를 다시 받습니다')
+  // F3: 커서가 서버 seq 보다 앞서면(백업 복원·되감김) 그 뒤의 변경을 영영 못 받는다 → 같은 전체 재동기화 경로
+  if (since > cur.seq) fail(410, 'cursor_expired', '서버 기록이 되감겼습니다. 전체를 다시 받습니다')
   const max = LIMITS.rows
   // 삭제된 트리의 하위 노드·srs 는 가린다(트리 톰스톤 1행이 대표, C11). 부활 시 seq 를 새로 받는다
   const trees = db.prepare('SELECT * FROM trees WHERE owner_id = ? AND seq > ? ORDER BY seq LIMIT ?').all(userId, since, max + 1) as unknown as TreeRow[]

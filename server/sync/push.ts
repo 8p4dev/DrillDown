@@ -13,12 +13,14 @@ export interface PushResult {
   superseded: { trees: ReturnType<typeof treeOut>[]; nodes: ReturnType<typeof nodeOut>[]; srs: ReturnType<typeof srsOut>[] }
   dropped: string[]
   id_taken: string[]
+  /** 이 push 로 새로 INSERT 된 트리 id. 클라이언트가 outbox 에 없는 하위 노드·srs 를 뒤따라 올린다(휴지통 복구·격리 해제, F4) */
+  created: string[]
 }
 
 export function applyPush(db: DB, userId: string, p: PushPayload, now: number): PushResult {
   // 시계가 5분 넘게 앞선 기기가 영원히 이기지 않게 (C15)
   const clamp = (t: number) => (t > now + CLOCK_SKEW ? now : t)
-  const r: PushResult = { seq: 0, applied: [], superseded: { trees: [], nodes: [], srs: [] }, dropped: [], id_taken: [] }
+  const r: PushResult = { seq: 0, applied: [], superseded: { trees: [], nodes: [], srs: [] }, dropped: [], id_taken: [], created: [] }
   const taken = new Set<string>()
   const touched = new Set<string>()
 
@@ -61,11 +63,13 @@ export function applyPush(db: DB, userId: string, p: PushPayload, now: number): 
       if (!cur) {
         db.prepare('INSERT INTO trees(id, owner_id, title, source_tree_id, created_at, updated_at, seq) VALUES (?,?,?,?,?,?,?)')
           .run(t.id, userId, t.title, t.sourceTreeId ?? null, t.createdAt, at, nextSeq(db, userId))
+        r.created.push(t.id)
       } else if (at > cur.updated_at) {
         db.prepare('UPDATE trees SET title = ?, source_tree_id = ?, updated_at = ?, deleted_at = NULL, seq = ? WHERE id = ?')
           .run(t.title, t.sourceTreeId ?? cur.source_tree_id, at, nextSeq(db, userId), t.id)
         if (cur.deleted_at != null) bumpChildren(db, userId, t.id) // 더 새로운 put 이 톰스톤을 이김 → 부활
       } else { r.superseded.trees.push(treeOut(cur)); continue }
+      touched.add(t.id) // 제목이 루트와 어긋나면 아래에서 맞춘다 (F7)
       r.applied.push(t.id)
     }
     // ---- nodes put (트리가 삭제 상태여도 저장, C11. 부모 없는 고아도 받는다 — 클라이언트가 루트로, C8) ----
@@ -101,11 +105,14 @@ export function applyPush(db: DB, userId: string, p: PushPayload, now: number): 
       } else r.superseded.nodes.push(nodeOut(cur))
     }
 
-    // 트리당 노드 상한 + node_count 비정규화 갱신
+    // 트리당 노드 상한 + node_count 비정규화 갱신 + 트리 제목 = 살아 있는 루트 노드 제목 (F7, 계약 C7).
+    // updated_at 은 그대로 두고 seq 만 올린다 — 제목은 파생값이라 LWW 에 끼어들지 않고, 다른 기기는 pull 로 받는다
     for (const id of touched) {
       const n = countLiveNodes(db, id)
       if (n > LIMITS.nodesPerTree) fail(400, 'payload_too_large', `트리가 너무 큽니다(${LIMITS.nodesPerTree.toLocaleString('en')}노드)`)
       db.prepare('UPDATE trees SET node_count = ? WHERE id = ?').run(n, id)
+      const root = db.prepare('SELECT n.title AS root, t.title AS title FROM nodes n JOIN trees t ON t.id = n.tree_id WHERE n.tree_id = ? AND n.parent_id IS NULL AND n.deleted_at IS NULL ORDER BY n."order", n.id LIMIT 1').get(id) as { root: string; title: string } | undefined
+      if (root && root.root !== root.title) db.prepare('UPDATE trees SET title = ?, seq = ? WHERE id = ?').run(root.root, nextSeq(db, userId), id)
     }
 
     // ---- srs: 행 LWW + autoCorrectDays 합집합 (C13). 노드가 없거나 삭제·남의 것이면 dropped (C14) ----

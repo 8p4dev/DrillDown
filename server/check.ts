@@ -9,6 +9,24 @@ const app = await createApp(db)
 const r = await app.request('/api/health')
 assert.equal(r.status, 200)
 assert.deepEqual(await r.json(), { ok: true })
+// F9 보안 헤더(CSP·COEP 는 없음 — 인라인 테마 스크립트·외부 아바타 이미지)
+assert.equal(r.headers.get('x-content-type-options'), 'nosniff')
+assert.equal(r.headers.get('x-frame-options'), 'SAMEORIGIN')
+assert.equal(r.headers.get('referrer-policy'), 'no-referrer')
+assert.equal(r.headers.get('content-security-policy'), null)
+assert.equal(r.headers.get('cross-origin-embedder-policy'), null)
+// F1 본문 상한: 3MB POST(익명 신고 경로) → 413 기존 봉투. 상한 바로 아래는 통과(라우트가 400 으로 거절)
+const big = await app.request('/api/t/abcdefghijk/report', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ reason: 'spam', note: 'x'.repeat(3 * 1024 * 1024) }) })
+assert.equal(big.status, 413)
+assert.equal(((await big.json()) as { error: { code: string } }).error.code, 'payload_too_large')
+const under = await app.request('/api/t/abcdefghijk/report', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ reason: 'spam', note: 'x'.repeat(2 * 1024 * 1024) }) })
+assert.equal(under.status, 400)
+// F10 요청 로그에서 공유 slug 가림
+const logs: string[] = []
+const origLog = console.log
+console.log = (...a: unknown[]) => { logs.push(a.join(' ')) }
+try { await app.request('/api/t/abcdefghijk') } finally { console.log = origLog }
+assert.equal(logs.filter((l) => l.includes(' /api/t/:slug ') && !l.includes('abcdefghijk')).length, 1, logs.join('\n'))
 const nf = await app.request('/api/nope')
 assert.equal(nf.status, 404)
 assert.equal(((await nf.json()) as { error: { code: string } }).error.code, 'not_found')

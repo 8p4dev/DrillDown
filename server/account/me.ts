@@ -24,12 +24,16 @@ export function registerMe(app: Hono<AppEnv>) {
     return c.body(null, 204)
   })
 
-  // 카카오 서버 → 우리 서버. CSRF 검사 제외(index.ts). 3초 내 200
+  // 카카오 서버 → 우리 서버. CSRF 검사 제외(index.ts). 3초 내 200.
+  // 리밋(F12): 인증 실패는 OAuth 와 같은 auth 버킷(10/분, 키 추측 억제), 인증된 웹훅은 별도 키·높은 한도 — 해지 폭주가 로그인을 막지 않게
   app.on(['GET', 'POST'], '/api/auth/kakao/unlink-webhook', async (c) => {
-    hit(c, `auth:${clientIp(c)}`, 10, 60_000)
     const want = `KakaoAK ${env.kakao.adminKey}`
     const got = c.req.header('authorization') ?? ''
-    if (!env.kakao.adminKey || got.length !== want.length || !timingSafeEqual(Buffer.from(got), Buffer.from(want))) fail(401, 'unauthorized', '인증 실패')
+    if (!env.kakao.adminKey || got.length !== want.length || !timingSafeEqual(Buffer.from(got), Buffer.from(want))) {
+      hit(c, `auth:${clientIp(c)}`, 10, 60_000)
+      fail(401, 'unauthorized', '인증 실패')
+    }
+    hit(c, `kakao_unlink:${clientIp(c)}`, 600, 60_000)
     let f: Record<string, unknown> = c.req.query()
     if (c.req.method === 'POST') {
       const ct = c.req.header('content-type') ?? ''

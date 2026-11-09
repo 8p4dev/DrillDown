@@ -29,7 +29,7 @@ const throws = (f: () => unknown, status: number, code: string) => assert.throws
 
 // ---- 생성 · seq ----
 const t1 = id(), root = id(), x = id()
-let r = push(A, { trees: [tree(t1, 100)], nodes: [node(root, t1, 100), node(x, t1, 100, { parentId: root, title: '해고', aliases: ['a'], offset: { x: 1, y: 2 }, width: 2, collapsed: true, note: '- a\n- b' })] })
+let r = push(A, { trees: [tree(t1, 100)], nodes: [node(root, t1, 100, { title: 'T' }), node(x, t1, 100, { parentId: root, title: '해고', aliases: ['a'], offset: { x: 1, y: 2 }, width: 2, collapsed: true, note: '- a\n- b' })] })
 assert.deepEqual(r.applied, [t1, root, x])
 assert.equal(r.seq, 3)
 assert.equal(get('SELECT node_count FROM trees WHERE id = ?', t1)!.node_count, 2)
@@ -187,11 +187,36 @@ purgeTombstones(db, 100)
 assert.equal(get('SELECT COUNT(*) AS n FROM nodes WHERE tree_id = ?', te)!.n, 0)
 assert.equal(get('SELECT COUNT(*) AS n FROM srs WHERE tree_id = ?', te)!.n, 0)
 assert.equal(get('SELECT id FROM trees WHERE id = ?', te), undefined)
+// F3 커서가 서버 seq 보다 앞서면(백업 복원으로 되감김) 410 — 같은 전체 재동기화 경로. 정확히 seq 와 같으면 빈 응답
+const eSeq = pullSince(db, E, 0).seq
+throws(() => pullSince(db, E, eSeq + 1), 410, 'cursor_expired')
+assert.equal(pullSince(db, E, eSeq).more, false)
+
+// F7 트리 제목 = 살아 있는 루트 노드 제목(계약 C7). 어긋난 tree put 은 루트 제목으로 고쳐지고 seq 만 오른다(updated_at 그대로)
+const F = id(); addUser(F)
+const tf = id(), rf = id(), cf = id()
+r = push(F, { trees: [tree(tf, 100, '트리제목')], nodes: [node(rf, tf, 100, { title: '루트' }), node(cf, tf, 100, { parentId: rf, title: '자식' })] })
+assert.deepEqual(r.created, [tf]) // 새 트리 → created (휴지통 복구 뒤 노드 재업로드 신호)
+assert.deepEqual(get('SELECT title, updated_at FROM trees WHERE id = ?', tf), { title: '루트', updated_at: 100 })
+const fSeq = pullSince(db, F, 0).seq
+r = push(F, { nodes: [node(rf, tf, 110, { title: '새루트' })] }) // 루트만 바뀌어도 트리 제목이 따라간다
+assert.deepEqual(r.created, [])
+assert.deepEqual(get('SELECT title, updated_at FROM trees WHERE id = ?', tf), { title: '새루트', updated_at: 100 })
+assert.deepEqual(pullSince(db, F, fSeq).trees.map((t) => t.title), ['새루트']) // seq 가 올라 다른 기기가 받는다
+r = push(F, { trees: [tree(tf, 120, '엉뚱한제목')] }) // 루트 없이 트리 제목만 오면 루트가 이긴다
+assert.deepEqual(r.applied, [tf])
+assert.equal(get('SELECT title FROM trees WHERE id = ?', tf)!.title, '새루트')
+push(F, { nodes: [node(cf, tf, 130, { parentId: rf })] }) // 자식 변경은 제목과 무관, 제목 같으면 seq 도 그대로
+const sameSeq = Number(get('SELECT seq FROM trees WHERE id = ?', tf)!.seq)
+push(F, { nodes: [node(cf, tf, 140, { parentId: rf })] })
+assert.equal(Number(get('SELECT seq FROM trees WHERE id = ?', tf)!.seq), sameSeq)
+push(F, { deleted: { nodes: [{ id: rf, treeId: tf, deletedAt: 150 }] } }) // 살아 있는 루트가 없으면 제목 유지
+assert.equal(get('SELECT title FROM trees WHERE id = ?', tf)!.title, '새루트')
 
 // ---- 공개 범위 전이표 (04 §3.3, 11행) ----
 const S = id(); addUser(S)
 const ts = id()
-push(S, { trees: [tree(ts, 1, '공유')], nodes: [node(id(), ts, 1), node(id(), ts, 1)] })
+push(S, { trees: [tree(ts, 1, '공유')], nodes: [node(id(), ts, 1, { title: '공유' }), node(id(), ts, 1, { title: '공유' })] })
 // 1 private → unlisted: slug 발급, seq++
 let seqBefore = Number(get('SELECT seq FROM trees WHERE id = ?', ts)!.seq)
 let v = setVisibility(db, S, ts, 'unlisted')
@@ -200,7 +225,7 @@ assert.ok(Number(get('SELECT seq FROM trees WHERE id = ?', ts)!.seq) > seqBefore
 const slug1 = v.slug!
 // 2·3 → public 조건: 노드 ≥ 3
 throws(() => setVisibility(db, S, ts, 'public'), 400, 'not_publishable')
-push(S, { nodes: [node(id(), ts, 1)] })
+push(S, { nodes: [node(id(), ts, 1, { title: '공유' })] })
 // 3 unlisted → public: slug 유지
 v = setVisibility(db, S, ts, 'public')
 assert.equal(v.slug, slug1)
@@ -240,6 +265,15 @@ assert.deepEqual(lookupShare(db, s4), { ok: false, status: 410, code: 'deleted' 
 throws(() => setVisibility(db, S, ts, 'private'), 404, 'not_found')
 // 9 deleted → restore(7일 이내): 이전 visibility 로 복원
 assert.deepEqual(restoreTree(db, ts), { id: ts, title: '공유' })
+assert.equal(lookupShare(db, s4).ok, true)
+// F13 소유자 정지 → 숨김과 같은 효과(403 hidden, 소유자·관리자 통과), 해제하면 복귀
+db.prepare('UPDATE users SET suspended_at = 1 WHERE id = ?').run(S)
+assert.deepEqual(lookupShare(db, s4), { ok: false, status: 403, code: 'hidden' })
+assert.equal(lookupShare(db, s4, { id: S, role: 'user' }).ok, true)
+assert.equal(lookupShare(db, s4, { id: B, role: 'admin' }).ok, true)
+clearGalleryCache()
+assert.equal(gallery(db, 'recent', 1, T0).items.length, 0)
+db.prepare('UPDATE users SET suspended_at = NULL WHERE id = ?').run(S)
 assert.equal(lookupShare(db, s4).ok, true)
 // 남의 트리 공개 범위 변경 404
 throws(() => setVisibility(db, A, ts, 'private'), 404, 'not_found')
@@ -295,9 +329,12 @@ db.prepare('UPDATE users SET deleted_at = NULL WHERE id = ?').run(W)
 // restoreTree: 7일 지난 삭제는 null
 db.prepare('UPDATE trees SET deleted_at = ? WHERE id = ?').run(Date.now() - GRACE_MS - DAY, wGone)
 assert.equal(restoreTree(db, wGone), null)
-// purgeUser: 전부 물리 삭제
+// purgeUser: 전부 물리 삭제. 신고 행은 남고 신고자 id 만 비운다(F14)
+db.prepare("INSERT INTO reports(id, tree_id, reporter_id, reason, created_at) VALUES ('rep-w', ?, ?, 'spam', 1)").run(ts, W)
 purgeUser(db, W)
 for (const t of ['trees WHERE owner_id', 'nodes WHERE owner_id', 'srs WHERE user_id', 'user_seq WHERE user_id']) assert.equal(get(`SELECT COUNT(*) AS n FROM ${t} = ?`, W)!.n, 0)
+assert.deepEqual(get("SELECT reporter_id FROM reports WHERE id = 'rep-w'"), { reporter_id: null })
+db.prepare("DELETE FROM reports WHERE id = 'rep-w'").run()
 
 // ---- 관리자 조회 ----
 const st = treeStats(db)
