@@ -10,9 +10,13 @@ export function nextSeq(db: DB, userId: string): number {
 export const curSeq = (db: DB, userId: string) =>
   (db.prepare('SELECT seq, purged_seq FROM user_seq WHERE user_id = ?').get(userId) as { seq: number; purged_seq: number } | undefined) ?? { seq: 0, purged_seq: 0 }
 
+/** U48: owner_id 로 nodes_owner_seq 인덱스를 탄다(tree_id 만이면 부분 인덱스 nodes_tree 를 못 써 SCAN).
+ *  노드 톰스톤도 포함 — 트리 삭제 중 pull 이 가렸으므로 부활 때 다시 보내야 한다 */
+export const TREE_NODES_SQL = 'SELECT id FROM nodes WHERE owner_id = ? AND tree_id = ?'
+
 /** 트리 톰스톤 동안 pull 이 하위를 가리므로, 부활하면 하위 노드·srs 에 새 seq 를 줘서 다른 기기가 다시 받게 한다 */
 export function bumpChildren(db: DB, ownerId: string, treeId: string) {
-  const nodes = db.prepare('SELECT id FROM nodes WHERE tree_id = ?').all(treeId) as { id: string }[]
+  const nodes = db.prepare(TREE_NODES_SQL).all(ownerId, treeId) as { id: string }[]
   const n = db.prepare('UPDATE nodes SET seq = ? WHERE id = ?')
   for (const r of nodes) n.run(nextSeq(db, ownerId), r.id)
   const srs = db.prepare('SELECT node_id FROM srs WHERE user_id = ? AND tree_id = ?').all(ownerId, treeId) as { node_id: string }[]

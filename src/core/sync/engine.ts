@@ -11,6 +11,8 @@ interface Batch { trees: (RTree & Del)[]; nodes: (TreeNode & Del)[]; srs: (NodeS
 interface PushRes { seq: number; applied: ID[]; superseded: Batch; dropped: ID[]; id_taken: ID[] }
 interface PullRes extends Batch { seq: number; more: boolean }
 type Row = Omit<OutboxRow, 'seq' | 'at'>
+/** pull 1회 동안 들고 다니는 outbox 사본(R5-P10). top = 이미 읽은 최대 seq */
+interface Pend { pend: Map<string, OutboxRow>; top: number }
 
 const ALL = () => [db.trees, db.nodes, db.srs, db.attempts, db.outbox, db.meta]
 const ORDER = { tree: 0, node: 1, srs: 2, attempt: 3 } as const
@@ -232,7 +234,7 @@ async function pushOnce(slice: OutboxRow[]): Promise<number> {
       nodes: sup.nodes.map((x) => cur.get(x.id) as TreeNode).filter(isDef),
       srs: sup.srs.map((s) => cur.get('srs' + s.nodeId) as NodeSrs).filter(isDef),
     }
-    const ch = await applyRemote(sup, true)
+    const ch = await applyRemote(sup)
     await rescueOrphans(ch)
     emit(ch)
     toast(`다른 기기 변경 반영됨 ${n}건`, { label: '내 버전 유지', run: () => void keepMine(losers) }, 8000)
@@ -349,10 +351,11 @@ async function pullFrom(since: number): Promise<Set<ID>> {
   const seen = new Set<ID>()
   const changed = new Set<ID>()
   pullDone = false
+  const p: Pend = { pend: new Map(), top: 0 }
   for (let guard = 0; guard < 1000; guard++) {
     const r = await api<PullRes>(`/api/sync?since=${since}`)
     for (const t of r.trees) seen.add(t.id)
-    const ch = await applyRemote(r, false)
+    const ch = await applyRemote(r, p)
     ch.forEach((id) => changed.add(id))
     emit(ch)
     await db.meta.put({ key: 'cursor', value: r.seq })
@@ -368,28 +371,33 @@ async function pullFrom(since: number): Promise<Set<ID>> {
 }
 
 /**
- * 서버 행 적용(sequences S2). force=false: 로컬에 보내지 않은 변경(outbox)이 더 나중이면 로컬 유지(다음 push 가 이김).
- * force=true: push 응답 superseded — 서버가 이겼다. 트리 톰스톤은 deletedAt 만 반영(휴지통, C2), 노드 톰스톤은 하드 삭제.
+ * 서버 행 적용(sequences S2). p 있음(pull): 로컬에 보내지 않은 변경(outbox)이 더 나중이면 로컬 유지(다음 push 가 이김).
+ * p 없음: push 응답 superseded — 서버가 이겼다. 트리 톰스톤은 deletedAt 만 반영(휴지통, C2), 노드 톰스톤은 하드 삭제.
  * 고아 복구는 호출자가 rescueOrphans 로(D1). 바뀐 트리 id 반환
  */
-async function applyRemote(r: Batch, force: boolean): Promise<Set<ID>> {
+async function applyRemote(r: Batch, p?: Pend): Promise<Set<ID>> {
   const changed = new Set<ID>()
   await db.transaction('rw', ALL(), async () => {
-    const pend = new Map((await db.outbox.toArray()).map((o) => [o.kind + o.id, o]))
-    const localWins = (key: string, localAt: number | undefined, remoteAt: number) => !force && pend.has(key) && (localAt ?? pend.get(key)!.at) >= remoteAt
+    // R5-P10: outbox 는 pull 1회에 한 번만 전부 읽고, 다음 페이지부터는 그 사이 새로 생긴 행(seq > top)만 더한다.
+    // 기존 행의 제자리 갱신(track 은 seq 유지·at 만 올림)은 존재 여부가 같으므로 무관하고, at 은 로컬 행이 없을 때만 쓰므로 그때 seq 로 다시 읽는다
+    const pend = p?.pend ?? new Map<string, OutboxRow>()
+    if (p) for (const o of await db.outbox.where('seq').above(p.top).toArray()) { pend.set(o.kind + o.id, o); p.top = Math.max(p.top, o.seq!) }
+    const localWins = async (key: string, localAt: number | undefined, remoteAt: number) =>
+      !!p && pend.has(key) && (localAt ?? (await db.outbox.get(pend.get(key)!.seq!))?.at ?? pend.get(key)!.at) >= remoteAt
 
     for (const t of r.trees ?? []) {
       const { deletedAt, ...rest } = t
       const local: RTree | undefined = await db.trees.get(t.id)
       const serverOwned = { visibility: t.visibility, slug: t.slug, hiddenByAdmin: t.hiddenByAdmin } // 서버가 진실 (04 §3.2)
-      if (localWins('tree' + t.id, local && (local.deletedAt ?? local.updatedAt), deletedAt ?? t.updatedAt)) {
+      if (await localWins('tree' + t.id, local && (local.deletedAt ?? local.updatedAt), deletedAt ?? t.updatedAt)) {
         if (local) await db.trees.update(t.id, JSON.parse(JSON.stringify(serverOwned)))
         continue
       }
       if (deletedAt) {
         // C2: 하드 삭제 대신 톰스톤 보존 → 휴지통에 보인다. 노드는 그대로, 로컬 purge 는 7일 뒤 repo.purgeDeletedTrees
         held.clear() // 다른 기기 삭제로 자리가 났을 수 있다
-        if (!local || local.deletedAt === deletedAt) continue
+        if (local?.deletedAt === deletedAt) continue
+        // 처음 보는 트리(다른 기기에서 지움)도 톰스톤 행만 남겨 휴지통에 보인다(U03). 노드는 서버 복구 뒤 bumpChildren 으로 내려온다
         await db.trees.put({ ...local, ...rest, deletedAt })
       } else {
         if (local && !local.deletedAt && local.updatedAt === t.updatedAt && local.slug === t.slug && local.visibility === t.visibility && !!local.hiddenByAdmin === !!t.hiddenByAdmin) continue
@@ -403,7 +411,7 @@ async function applyRemote(r: Batch, force: boolean): Promise<Set<ID>> {
     for (const x of r.nodes ?? []) {
       const { deletedAt, ...rest } = x
       const local = await db.nodes.get(x.id)
-      if (localWins('node' + x.id, local?.updatedAt, deletedAt ?? x.updatedAt)) continue
+      if (await localWins('node' + x.id, local?.updatedAt, deletedAt ?? x.updatedAt)) continue
       if (deletedAt) {
         if (!local) continue
         await db.nodes.delete(x.id)
@@ -420,7 +428,7 @@ async function applyRemote(r: Batch, force: boolean): Promise<Set<ID>> {
       const { deletedAt, ...rest } = s
       const local = await db.srs.get(s.nodeId)
       const days = [...new Set([...(local?.autoCorrectDays ?? []), ...(rest.autoCorrectDays ?? [])])].sort()
-      if (localWins('srs' + s.nodeId, local?.updatedAt, deletedAt ?? s.updatedAt)) {
+      if (await localWins('srs' + s.nodeId, local?.updatedAt, deletedAt ?? s.updatedAt)) {
         if (local && days.length !== local.autoCorrectDays.length) await db.srs.update(s.nodeId, { autoCorrectDays: days })
         continue
       }
