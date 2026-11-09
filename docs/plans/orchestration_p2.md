@@ -44,3 +44,4 @@
 - WY2 완료 059a601: applyRemote outbox 1회(3만 행 11~23s → 0.4s), bumpChildren owner_id 조건(SCAN → SEARCH), U03 확장 실측 결과 안 보였음 → 톰스톤 트리 저장·휴지통 갱신·복구 확인. 남김: 7일 경계 빈 트리 복구, 새 기기 pull 전 잠깐 saved 표시
 - WG2 질문: source.ts copy? 1줄 + study.ts 토스트 1줄 → 승인. WS2 질문: 백지는 D&D라 '이것도 정답' 성립 안 함 → U28 백지 쪽 생략
 - 통합 1차: WE3·WY2 머지 충돌 0, typecheck·lint·check 통과
+- WS2 완료 39e22d2: U38 진행 저장(7일·이어서/처음부터, 공유 미저장), U40 모름 재출제·'모름만 다시', U41 섞기·복습 기한 아닌 형제 '참고', 미니맵 aside 제거. U28 백지 생략. 머지·게이트 통과
