@@ -1,6 +1,6 @@
 // 공개 범위·slug·공유 보기·갤러리·OG (04 §3.3 전이표, §3.4.1, §3.5)
 import { randomBytes } from 'node:crypto'
-import type { GalleryItem, SharedTree } from '../../src/core/api.ts'
+import type { GalleryItem, Rating, SharedTree } from '../../src/core/api.ts'
 import type { Visibility } from '../../src/core/types.ts'
 import type { DB } from '../db.ts'
 import { env } from '../env.ts'
@@ -65,7 +65,7 @@ export function reissueSlug(db: DB, userId: string, id: string) {
   return { slug, url: shareUrl(slug) }
 }
 
-type ShareRow = TreeRow & { nickname: string; avatar_url: string | null; use_provider_avatar: number; owner_deleted_at: number | null; owner_suspended_at: number | null }
+export type ShareRow = TreeRow & { nickname: string; avatar_url: string | null; use_provider_avatar: number; owner_deleted_at: number | null; owner_suspended_at: number | null }
 
 export type ShareStatus = { ok: true; t: ShareRow } | { ok: false; status: 404 | 410 | 403; code: 'not_found' | 'deleted' | 'hidden' }
 
@@ -81,14 +81,33 @@ export function lookupShare(db: DB, slug: string, viewer?: { id: string; role: s
   return { ok: true, t }
 }
 
-/** GET /api/t/:slug 본문. SharedTree + 원본 id(복제 계보 sourceTreeId, 오케스트레이터 확정) */
-export function sharedTree(db: DB, t: ShareRow): SharedTree & { id: string } {
+type Viewer = { id: string; role: string } | null
+
+const round1 = (avg: number | null) => (avg == null ? null : Math.round(avg * 10) / 10)
+
+/** 별점 요약(계약 C3). canRate = 로그인 + 본인 트리 아님. mine = viewer 의 점수(없으면 null) */
+export function ratingOf(db: DB, t: { id: string; owner_id: string }, viewer?: Viewer): Rating {
+  const agg = db.prepare('SELECT AVG(stars) AS avg, COUNT(*) AS cnt FROM ratings WHERE tree_id = ?').get(t.id) as { avg: number | null; cnt: number }
+  const mine = viewer ? (db.prepare('SELECT stars FROM ratings WHERE user_id = ? AND tree_id = ?').get(viewer.id, t.id) as { stars: number } | undefined)?.stars ?? null : null
+  return { avg: round1(agg.avg), count: agg.cnt, mine, canRate: !!viewer && viewer.id !== t.owner_id }
+}
+
+/** PUT /api/t/:slug/rating — upsert(1인 1표, 수정 가능). 본인 트리는 403. 갤러리 캐시를 비워 ratingAvg 가 바로 반영되게 */
+export function rateTree(db: DB, userId: string, t: ShareRow, stars: number): Rating {
+  if (t.owner_id === userId) fail(403, 'own_tree', '내 트리는 평가할 수 없습니다')
+  db.prepare('INSERT INTO ratings(user_id, tree_id, stars, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT(user_id, tree_id) DO UPDATE SET stars = excluded.stars, updated_at = excluded.updated_at').run(userId, t.id, stars, Date.now())
+  clearGalleryCache()
+  return ratingOf(db, t, { id: userId, role: 'user' })
+}
+
+/** GET /api/t/:slug 본문. SharedTree + 원본 id(복제 계보 sourceTreeId, 오케스트레이터 확정). viewer 는 rating.mine·canRate 용 */
+export function sharedTree(db: DB, t: ShareRow, viewer?: Viewer): SharedTree & { id: string } {
   const nodes = (db.prepare('SELECT * FROM nodes WHERE tree_id = ? AND deleted_at IS NULL').all(t.id) as unknown as NodeRow[]).map(nodeOut)
   return {
     id: t.id, slug: t.slug!, title: t.title, visibility: t.visibility as SharedTree['visibility'],
     owner: { nickname: t.nickname, avatar_url: t.use_provider_avatar ? t.avatar_url : null },
     node_count: nodes.length, copy_count: t.copy_count, updated_at: t.updated_at,
-    rating: { avg: null, count: 0, mine: null, canRate: false }, // 자리표시자 — 계약 C3, WY 가 ratings 집계로 교체
+    rating: ratingOf(db, t, viewer),
     nodes,
   }
 }
@@ -103,11 +122,12 @@ export function gallery(db: DB, sort: 'recent' | 'copies', page: number, now: nu
   const key = `${sort}:${page}:${q}`
   const hit = galleryCache.get(key)
   if (hit && now - hit.at < 60_000) return hit.v
-  const rows = db.prepare(`SELECT t.slug, t.title, t.node_count, t.copy_count, t.updated_at, u.nickname FROM trees t JOIN users u ON u.id = t.owner_id
+  const rows = db.prepare(`SELECT t.slug, t.title, t.node_count, t.copy_count, t.updated_at, u.nickname, r.avg AS rating_avg, r.cnt AS rating_cnt FROM trees t JOIN users u ON u.id = t.owner_id
+    LEFT JOIN (SELECT tree_id, AVG(stars) AS avg, COUNT(*) AS cnt FROM ratings GROUP BY tree_id) r ON r.tree_id = t.id
     WHERE t.visibility = 'public' AND t.deleted_at IS NULL AND t.hidden_by_admin_at IS NULL AND u.deleted_at IS NULL AND u.suspended_at IS NULL AND t.slug IS NOT NULL${q ? " AND t.title LIKE ? ESCAPE '!'" : ''}
-    ORDER BY ${sort === 'copies' ? 't.copy_count DESC, ' : ''}t.updated_at DESC, t.id LIMIT 21 OFFSET ?`).all(...(q ? [`%${q.replace(/[!%_]/g, '!$&')}%`] : []), (page - 1) * 20) as { slug: string; title: string; node_count: number; copy_count: number; updated_at: number; nickname: string }[]
+    ORDER BY ${sort === 'copies' ? 't.copy_count DESC, ' : ''}t.updated_at DESC, t.id LIMIT 21 OFFSET ?`).all(...(q ? [`%${q.replace(/[!%_]/g, '!$&')}%`] : []), (page - 1) * 20) as { slug: string; title: string; node_count: number; copy_count: number; updated_at: number; nickname: string; rating_avg: number | null; rating_cnt: number | null }[]
   const v = {
-    items: rows.slice(0, 20).map((r) => ({ slug: r.slug, title: r.title, nodeCount: r.node_count, copyCount: r.copy_count, ownerNickname: r.nickname, updatedAt: r.updated_at, ratingAvg: null, ratingCount: 0 })), // ratingAvg·ratingCount 자리표시자 — WY 가 집계로 교체
+    items: rows.slice(0, 20).map((r) => ({ slug: r.slug, title: r.title, nodeCount: r.node_count, copyCount: r.copy_count, ownerNickname: r.nickname, updatedAt: r.updated_at, ratingAvg: round1(r.rating_avg), ratingCount: r.rating_cnt ?? 0 })),
     page, hasMore: rows.length > 20,
   }
   if (galleryCache.size > 500) galleryCache.clear()

@@ -14,9 +14,10 @@ export function softDeleteTreesOfUser(db: DB, ownerId: string, now: number): num
 export function restoreTreesOfUser(db: DB, ownerId: string, since: number): number {
   return Number(db.prepare('UPDATE trees SET deleted_at = NULL WHERE owner_id = ? AND deleted_at >= ?').run(ownerId, since).changes)
 }
-/** 7일 경과 purge: trees·nodes·srs·attempts·user_seq 물리 삭제 (events 는 서버 미저장). 신고 행은 남기되 신고자 id 만 지운다(F14) */
+/** 7일 경과 purge: ratings·srs·attempts·nodes·trees·user_seq 물리 삭제 (events 는 서버 미저장). 신고 행은 남기되 신고자 id 만 지운다(F14).
+ *  ratings 는 users(id) FK 라 호출자(SA)가 users 행을 지우기 전인 여기서 먼저 지운다. 이 사용자 트리에 달린 남의 별점은 trees ON DELETE CASCADE */
 export function purgeUser(db: DB, ownerId: string): void {
-  for (const sql of ['DELETE FROM srs WHERE user_id = ?', 'DELETE FROM attempts WHERE user_id = ?', 'DELETE FROM nodes WHERE owner_id = ?', 'DELETE FROM trees WHERE owner_id = ?', 'DELETE FROM user_seq WHERE user_id = ?', 'UPDATE reports SET reporter_id = NULL WHERE reporter_id = ?'])
+  for (const sql of ['DELETE FROM ratings WHERE user_id = ?', 'DELETE FROM srs WHERE user_id = ?', 'DELETE FROM attempts WHERE user_id = ?', 'DELETE FROM nodes WHERE owner_id = ?', 'DELETE FROM trees WHERE owner_id = ?', 'DELETE FROM user_seq WHERE user_id = ?', 'UPDATE reports SET reporter_id = NULL WHERE reporter_id = ?'])
     db.prepare(sql).run(ownerId)
 }
 

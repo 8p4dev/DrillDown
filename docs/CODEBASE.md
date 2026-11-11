@@ -350,6 +350,7 @@ server/  ──▶  src/core/types.ts 의 CAP (한도 상수 하나만 가져다
 | 없음 | `users`, `sessions` | 계정, 로그인 세션 | 서버 전용 |
 | 없음 | `user_seq` | 사용자별 변경 번호 ([7장](#7-동기화)) | 서버 전용 |
 | 없음 | `audit_log`, `settings`, `reports` | 관리 기록, 공지·점검 설정, 신고 | 서버 전용 |
+| 없음 | `ratings` | 공개 트리 별점. 사용자 한 명이 트리 하나에 한 표(1~5), 수정 가능. 트리를 실제 삭제하면 함께 지워진다 | 서버 전용 |
 
 삭제 방식은 대상마다 다르다.
 
@@ -951,6 +952,7 @@ API 목록, 환경 변수, 매일 도는 작업은 [9장](#9-서버-참고표-ap
 | POST `/api/trees/<id>/slug` | 소유자 | 공유 링크 재발급 (옛 링크는 즉시 끊긴다) |
 | GET `/api/t/<slug>` | 없음 | 공유 트리 내용 |
 | POST `/api/t/<slug>/copy` | 없음 | 복제 횟수 +1 |
+| PUT `/api/t/<slug>/rating` | 로그인 | 별점 주기·수정. 본문 `{ stars: 1~5 }`, 응답은 평균·수·내 점수. 본인 트리는 403 `own_tree`. 볼 수 없는 트리는 GET과 같은 404/410/403 |
 | POST `/api/t/<slug>/report` | 없음 | 신고 접수 |
 | GET `/api/gallery` | 없음 | 공개 트리 목록 |
 | GET `/t/<slug>` | 없음 | 공유 링크용 HTML |
