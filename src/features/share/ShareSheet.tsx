@@ -120,7 +120,7 @@ export default function ShareSheet({ tree: initial, onClose, onChange }: { tree:
                 </div>
               </div>
             )}
-            {v === 'public' && <p className="muted">갤러리에 표시됩니다 · 노드 {count ?? '…'}개</p>}
+            {v === 'public' && <p className="muted">공개 트리 목록에 표시됩니다 · 노드 {count ?? '…'}개</p>}
           </>
         )}
       </div>

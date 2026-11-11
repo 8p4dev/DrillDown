@@ -1,4 +1,4 @@
-/* 공유 보기·공유 시트·동기화 상태·공개 배지·갤러리 (SH). 토큰만 사용 — 01 §3.1. 예외: 형광펜 3색 */
+/* 공유 보기·공유 시트·동기화 상태·공개 배지·공개 트리 목록 (SH). 토큰만 사용 — 01 §3.1. 예외: 형광펜 3색 */
 
 /* ── 공유 보기 헤더: 제목+소유자 · 탭 4 · 도구(복제·⋯) ── */
 .share-head { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1rem; margin-bottom: 1rem; }
@@ -6,6 +6,11 @@
 .share-title h1 { margin: 0; font-size: 1.35rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .share-title-row { display: flex; align-items: center; gap: .5rem; min-width: 0; }
 .share-title-row .badge { flex: none; }
+/* editor.css(SharedPage 가 import)의 접기 배지 .badge 규칙(absolute·opacity 0)이 헤더 '읽기 전용' 배지를 덮지 않게 — index.css 값으로 되돌린다 */
+.share-head .share-title-row .badge {
+  position: static; transform: none; opacity: 1; height: auto; min-width: 1.3rem; padding: 0 .4rem; gap: .25rem; line-height: 1.25rem;
+  color: var(--muted); background: var(--surface); border-color: var(--border-strong); cursor: default; transition: none;
+}
 .share-error { padding: 2.5rem 1rem; text-align: center; }
 .share-owner { display: flex; align-items: center; gap: .4rem; margin: .15rem 0 0; font-size: var(--fs-sm); }
 .share-avatar { --avatar-size: 24px; font-size: 12px; }
@@ -43,30 +48,43 @@
   .shared .share-bar { display: none; }
 }
 
-/* ── 보기 탭: 들여쓰기 목록 + <details> 접기(U55). 펼침 표시는 summary::before 꺾쇠 ── */
-.share-fold { display: flex; justify-content: flex-end; gap: .25rem; margin-bottom: .25rem; }
-.share-fold .ghost { min-height: 44px; padding: 0 .6rem; background: none; border-color: transparent; box-shadow: none; color: var(--text-2); font-size: var(--fs-sm); }
-.share-tree { list-style: none; margin: 0; padding: 0 0 0 1rem; border-left: 1px solid var(--border); }
-.share-tree.share-top { padding-left: 0; border-left: 0; }
-.share-node { padding: .45rem .6rem .45rem 1.6rem; border-bottom: 1px solid var(--border); }
-.share-tree summary { display: flex; align-items: flex-start; cursor: pointer; list-style: none; border-bottom: 1px solid var(--border); }
-.share-tree summary::-webkit-details-marker { display: none; }
-.share-tree summary::before {
-  content: ''; flex: none; width: .45rem; height: .45rem; margin: .8rem .35rem 0 .55rem;
-  border: solid var(--muted); border-width: 0 2px 2px 0; transform: rotate(-45deg); transition: transform var(--t-fast);
+/* ── 보기 탭: 편집기와 같은 카드 그래프(editor.css 를 SharedPage 가 import, 계약 C6). editor.css 가 .editor 아래로 묶은 규칙만 .shared 로 다시 쓴다 ── */
+main.main-shared:has(> .shared[data-mode='view']) { max-width: none; }
+/* 높이: 화면 − 상단 바 − main 위·아래 여백. 헤더가 접히는 만큼 캔버스가 남은 높이를 다 쓴다 */
+.shared[data-mode='view'] { display: flex; flex-direction: column; height: calc(100dvh - var(--nav-h) - var(--safe-t) - 4.5rem - var(--safe-b)); }
+.shared .share-head { flex: none; }
+.shared .canvas { flex: 1 1 auto; height: auto; min-height: 260px; }
+.shared .node-row { cursor: pointer; }
+.shared .zoom-tools button {
+  min-width: 2rem; height: 2rem; padding: 0 .3rem; border: none; border-radius: var(--radius-sm); background: transparent; box-shadow: none;
+  display: inline-grid; place-items: center; color: var(--text-2); text-align: center;
 }
-.share-tree details[open] > summary::before { transform: rotate(45deg); }
-.share-tree summary > .share-node { flex: 1; min-width: 0; padding-left: 0; border-bottom: 0; }
-.share-from { flex: none; display: inline-flex; align-items: center; min-height: 44px; padding: 0 .6rem; font-size: var(--fs-sm); white-space: nowrap; }
-.share-top > li > details > summary { margin-bottom: .25rem; background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius); }
-.share-top > li > details > summary::before { margin-top: 1rem; }
-.share-top > li > details > summary > .share-node, .share-top > li > .share-node { padding: .6rem .75rem .6rem 0; }
-.share-top > li > details > summary strong { font-size: var(--fs-lg); }
-.share-note { margin-top: .2rem; color: var(--text-2); font-size: var(--fs-sm); line-height: 1.5; }
-.share-note mark { padding: 0 .1em; border-radius: var(--radius-sm); color: inherit; }
-.share-note mark.hl-p { background: #ff8fb466; }
-.share-note mark.hl-y { background: #ffd84d80; }
-.share-note mark.hl-b { background: #6cc8ff66; }
+.shared .zoom-tools button:active:not(:disabled) { background: var(--surface-2); }
+@media (hover: hover) {
+  .shared .zoom-tools button:hover:not(:disabled) { background: var(--surface-2); border-color: transparent; }
+  .shared .zoom-reset:hover output { color: var(--text); }
+}
+@media (pointer: coarse) {
+  .shared .zoom-tools button { min-width: var(--tap); height: var(--tap); }
+  .shared .zoom-tools { top: .75rem; } /* 편집기의 구조 바 자리(editor.css coarse 규칙)가 없다 */
+  .shared .zoom-tools .zoom-step { display: none; } /* 폰은 핀치, % 는 100% 복귀 */
+}
+/* 여기부터 학습: 선택한 가지로 플래시 탭. 글자 버튼(아이콘 전용 ghost 와 구분) */
+.share-learn { display: inline-flex; align-items: center; gap: .35rem; min-height: 44px; white-space: nowrap; animation: sh-fade var(--t-fast); }
+
+/* ── 별점(C3): ★ 평균(수) + 내 별 5개(44px 표적, 누른 별까지 채움) ── */
+.share-rating { display: flex; flex-wrap: wrap; align-items: center; gap: .15rem .75rem; margin-top: .15rem; font-size: var(--fs-sm); }
+.share-rating-avg { display: inline-flex; align-items: center; gap: .3rem; font-weight: 600; }
+.share-rating-avg svg { width: 16px; height: 16px; fill: currentColor; }
+.share-stars { display: inline-flex; margin-left: -.35rem; }
+.share-stars button { min-width: 36px; min-height: 36px; padding: 0; border: none; background: none; box-shadow: none; color: var(--muted); display: inline-grid; place-items: center; }
+.share-stars button svg { width: 18px; height: 18px; transition: transform var(--t-fast) var(--ease-press); }
+.share-stars button[data-on='true'] { color: var(--text); }
+.share-stars button[data-on='true'] svg { fill: currentColor; }
+.share-stars button:disabled { opacity: .4; cursor: not-allowed; }
+.share-stars button:active:not(:disabled) svg { transform: scale(.85); }
+@media (hover: hover) { .share-stars button:hover:not(:disabled) { color: var(--text); border-color: transparent; } }
+@media (pointer: coarse) { .share-stars button { min-width: 44px; min-height: 44px; } }
 
 /* ── 하단 고정 복제 바(보기 탭): .flash-nav 모양, 60px, bottom var(--kb) ── */
 .share-bar {
@@ -76,6 +94,8 @@
 }
 .share-bar button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: .4rem; min-height: 44px; font-size: var(--fs-md); }
 main.main-shared:has(.share-bar) { padding-bottom: calc(60px + 1.5rem + var(--safe-b)); }
+/* ≤760: main 여백 1rem 위 + (60px 바 + 1.5rem) 아래 */
+@media (max-width: 760px) { .shared[data-mode='view'] { height: calc(100dvh - var(--nav-h) - var(--safe-t) - 1rem - 60px - 1.5rem - var(--safe-b)); } }
 
 /* ── 신고 시트 ── */
 .share-report fieldset { display: flex; flex-wrap: wrap; gap: .5rem 1rem; margin: 0; padding: 0; border: 0; }
@@ -84,17 +104,33 @@ main.main-shared:has(.share-bar) { padding-bottom: calc(60px + 1.5rem + var(--sa
 .share-report textarea { width: 100%; scroll-margin-bottom: 1rem; }
 .share-report .actions { justify-content: flex-end; margin: 0; }
 
-/* ── 갤러리 ── */
-.gallery-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+/* ── 공개 트리 목록(#/gallery, 클래스 이름은 유지 C5): 카드 7요소 — 제목(카드 전체 링크)·유저·별점·노드·복제·날짜·미리보기 ── */
+.gallery-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
 .gallery-head h1 { margin: 0; }
-.gallery-head { flex-wrap: wrap; }
 .gallery-search { flex: 1 0 100%; min-height: 44px; }
 .gallery-cards { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: .9rem; }
-.gallery-cards li { padding: 0; transition: border-color var(--t-fast); }
+.gallery-cards li { position: relative; display: grid; gap: .45rem; padding: .85rem 1rem; transition: border-color var(--t-fast); }
 @media (hover: hover) { .gallery-cards li:hover { border-color: var(--text); } }
-.gallery-cards a { display: grid; gap: .2rem; padding: .85rem 1rem; color: inherit; text-decoration: none; } /* QA #23: 카드 링크 밑줄 없음, 호버는 테두리 */
-@media (hover: hover) { .gallery-cards a:hover { text-decoration: none; } }
-.gallery-cards strong { font-size: var(--fs-md); }
-.gallery-cards .muted { font-size: var(--fs-sm); }
-.gallery-meta { display: inline-flex; align-items: center; gap: .35rem; }
+/* 제목 링크가 ::after 로 카드 전체를 덮는다. 미리보기 버튼은 그 위(z-index) */
+.gallery-cards .gallery-title { font-size: var(--fs-md); font-weight: 600; color: inherit; text-decoration: none; overflow-wrap: anywhere; }
+.gallery-cards .gallery-title::after { content: ''; position: absolute; inset: 0; }
+@media (hover: hover) { .gallery-cards .gallery-title:hover { text-decoration: none; } } /* QA #23: 밑줄 없음, 호버는 테두리 */
+.gallery-cards .gallery-title:focus-visible { outline: none; }
+.gallery-cards li:has(.gallery-title:focus-visible) { outline: 2px solid var(--text); outline-offset: 2px; }
+.gallery-user { display: flex; align-items: center; gap: .4rem; min-width: 0; font-size: var(--fs-sm); }
+.gallery-user span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gallery-avatar { --avatar-size: 24px; font-size: 12px; flex: none; }
+.gallery-meta { display: flex; flex-wrap: wrap; align-items: center; gap: .2rem .6rem; font-size: var(--fs-sm); color: var(--muted); }
+.gallery-rating { display: inline-flex; align-items: center; gap: .25rem; color: var(--text); font-weight: 600; }
+.gallery-rating svg { width: 14px; height: 14px; fill: currentColor; }
+.gallery-rating .muted { font-weight: 500; }
+.gallery-foot { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.gallery-cards .gallery-preview { position: relative; z-index: 1; margin-left: auto; min-height: 36px; padding: .3rem .7rem; font-size: var(--fs-sm); }
+@media (pointer: coarse) { .gallery-cards .gallery-preview { min-height: 44px; } }
 .gallery .empty { padding: 2.5rem 1rem; text-align: center; border: 1px dashed var(--border-strong); border-radius: var(--radius-lg); }
+
+/* ── 미리보기 시트: 제목·유저·별점 한 줄 + 개요 텍스트(앞 60줄) + 공유 보기 열기 ── */
+.gallery-sheet-meta { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem .6rem; font-size: var(--fs-sm); }
+.gallery-outline { margin: 0; max-height: 50dvh; overflow: auto; padding: .6rem .75rem; font-size: var(--fs-sm); line-height: 1.5; white-space: pre; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); }
+.gallery-sheet .actions { justify-content: flex-end; margin: 0; }
+.gallery-sheet .actions a { display: inline-flex; align-items: center; gap: .35rem; min-height: 44px; }

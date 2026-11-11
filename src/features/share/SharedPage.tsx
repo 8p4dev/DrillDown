@@ -1,20 +1,25 @@
 // 공유 보기 /t/<slug>?m= — 04 §3.4·§3.10, 02 §3.1 공유 보기 와이어.
-// 보기 탭 = 읽기 전용 목록 + 하단 복제 바. 플래시·빈칸·백지 = 기존 화면에 메모리 소스 주입(ephemeral). 신고·링크 복사는 헤더 ⋯ 메뉴.
+// 보기 탭 = 편집기와 같은 카드 그래프(GraphView·useZoom·editor.css 재사용, 계약 C6) + 읽기 전용 카드(ShareCard) + 하단 복제 바.
+// 플래시·빈칸·백지 = 기존 화면에 메모리 소스 주입(ephemeral). 신고·링크 복사는 헤더 ⋯ 메뉴. 별점은 헤더(계약 C3).
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
-import { api, ApiError, type ReportReason, type SharedTree } from '../../core/api'
+import { api, ApiError, type Rating, type ReportReason, type SharedTree } from '../../core/api'
 import { useMe } from '../../core/me'
-import { childrenOf, copyTree, listTrees } from '../../core/repo'
+import { copyTree, listTrees } from '../../core/repo'
 import type { StudySource } from '../../core/source'
 import { applyGrade } from '../../core/srs'
 import { CAP, type ID, type NodeSrs, type Tree, type TreeNode } from '../../core/types'
 import { href, navigateShared, type Mode } from '../../router'
 import { Icon } from '../../ui/Icon'
 import { I } from '../../ui/icons'
-import { copy as copyIcon, eye, x } from '../../ui/icons.all'
-import { parse, toHtml } from '../editor/content/format'
+import { copy as copyIcon, eye, listTree, network, star, x, zoomIn, zoomOut } from '../../ui/icons.all'
+import GraphView from '../editor/graph/GraphView'
+import type { Dir } from '../editor/graph/layout'
+import { useZoom } from '../editor/graph/useZoom'
 import { toast } from '../Toast'
 import { Avatar } from '../../ui/Avatar'
 import { Sheet } from '../../ui/Sheet'
+import ShareCard from './ShareCard'
+import '../editor/editor.css'
 import './share-list.css'
 import './share.css'
 
@@ -35,6 +40,9 @@ const REASONS: { v: ReportReason; label: string }[] = [
   { v: 'abuse', label: '욕설/유해' },
   { v: 'other', label: '기타' },
 ]
+const STARS = [1, 2, 3, 4, 5]
+/** 편집기의 세로 보기 선호(dd:editor-dir)를 읽기만 한다(A8). 저장은 편집기만 */
+const loadDir = (): Dir => { try { return localStorage.getItem('dd:editor-dir') === 'right' ? 'right' : 'down' } catch { return 'down' } }
 
 // 체험 학습 기록: 탭을 오가도 세션 동안 유지, 저장 안 함 (04 §3.4.2)
 const sessions = new Map<string, Map<ID, NodeSrs>>()
@@ -58,37 +66,23 @@ function memorySource(t: SharedTree, copy: () => void): StudySource {
   }
 }
 
-// 목록 의미(ul/li) + 네이티브 <details> 접기(U55, E1: role=tree 대신). 깊이 ≤2 는 펼친 채 시작. 가지마다 '여기부터 학습' = ?root=
-function Branch({ nodes, items, level, slug }: { nodes: TreeNode[]; items: TreeNode[]; level: number; slug: string }) {
-  return (
-    <ul className={level === 1 ? 'share-tree share-top' : 'share-tree'}>
-      {items.map((n) => {
-        const kids = childrenOf(nodes, n.id)
-        const body = (
-          <div className="share-node">
-            <strong>{n.title}</strong>
-            {n.aliases.length > 0 && <span className="muted"> · {n.aliases.join(', ')}</span>}
-            {n.note && <div className="share-note" dangerouslySetInnerHTML={{ __html: toHtml(parse(n.note)) }} />}
-          </div>
-        )
-        return (
-          <li key={n.id} data-node-id={n.id}>
-            {kids.length > 0 ? (
-              <details open={level <= 2}>
-                <summary>
-                  {body}
-                  {level > 1 && (
-                    <a className="share-from" href={href.shared(slug, 'flash', n.id)} aria-label={`${n.title}부터 학습`} onClick={(e) => (e.preventDefault(), navigateShared(slug, 'flash', n.id))}>여기부터 학습</a>
-                  )}
-                </summary>
-                <Branch nodes={nodes} items={kids} level={level + 1} slug={slug} />
-              </details>
-            ) : body}
-          </li>
-        )
-      })}
-    </ul>
-  )
+/** 노드별 자식 유무·하위 수 (EditorPage countTree 의 읽기 전용 축소판, O(n)) */
+function countTree(ns: TreeNode[]) {
+  const kids = new Map<ID, ID[]>()
+  for (const n of ns) {
+    if (n.parentId === null) continue
+    const k = kids.get(n.parentId)
+    if (k) k.push(n.id)
+    else kids.set(n.parentId, [n.id])
+  }
+  const desc = new Map<ID, number>()
+  const walk = (id: ID): number => {
+    const total = (kids.get(id) ?? []).reduce((sum, k) => sum + 1 + walk(k), 0)
+    desc.set(id, total)
+    return total
+  }
+  for (const n of ns) if (n.parentId === null) walk(n.id)
+  return { hasKids: (id: ID) => kids.has(id), desc: (id: ID) => desc.get(id) ?? 0 }
 }
 
 // 서버 오류 코드 → 한 줄 화면 (04 §3.3·§3.6: 404 / 410 deleted / 403 hidden)
@@ -98,16 +92,45 @@ type Load = ({ t: SharedTree } | { fail: string }) & { slug: string }
 export default function SharedPage({ slug, mode, rootId }: { slug: string; mode: ViewMode; rootId?: string }) {
   const me = useMe()
   const [loaded, setLoad] = useState<Load | null>(null)
+  const [rating, setRating] = useState<Rating | null>(null)
+  // 보기 탭 그래프: 접기·선택은 이 화면의 로컬 상태(저장·동기화 없음). 접기 초기값은 소유자가 접어 둔 노드
+  const [folded, setFolded] = useState<Set<ID>>(() => new Set())
+  const [selId, setSelId] = useState<ID>('')
+  const [dir, setDir] = useState<Dir>(loadDir)
+  const outlineRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const ac = new AbortController()
     api<SharedTree>(`/api/t/${slug}`, { signal: ac.signal }).then(
-      (t) => setLoad({ slug, t }),
+      (t) => {
+        setLoad({ slug, t })
+        setRating(t.rating)
+        setFolded(new Set(t.nodes.filter((n) => n.collapsed).map((n) => n.id)))
+        setSelId('')
+      },
       (e) => !ac.signal.aborted && setLoad({ slug, fail: FAIL[e instanceof ApiError ? e.status : -1] ?? FAIL[404] }),
     )
     return () => ac.abort()
   }, [slug])
   const load = loaded?.slug === slug ? loaded : null
   const t = load && 't' in load ? load.t : null
+  const root = t?.nodes.find((n) => n.parentId === null)
+  const counts = useMemo(() => countTree(t?.nodes ?? []), [t])
+  const open = useMemo(() => (n: TreeNode) => !folded.has(n.id), [folded])
+  // 확대·축소(계약 C2): 버튼·휠·핀치. 자동 맞춤은 카드 구성이 바뀔 때(onSettled)와 방향 전환 때
+  const { zoom, zoomTo, zoomBy, fit } = useZoom(outlineRef, 1, mode === 'view' && !!root)
+  // onSettled 는 GraphView 의 레이아웃 이펙트 안에서 불려 flushSync(zoomTo)를 바로 못 쓴다 → 커밋이 끝난 뒤(마이크로태스크, 페인트 전)
+  const refit = (id: ID) => queueMicrotask(() => fit(id || root?.id))
+  const flipDir = () => {
+    setDir((d) => (d === 'right' ? 'down' : 'right'))
+    refit(selId) // 방향이 바뀌어도 카드 집합은 같아 onSettled 가 오지 않는다
+  }
+  const toggleFold = (id: ID) => setFolded((s) => {
+    const next = new Set(s)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    return next
+  })
+
   const doCopy = async (again = false) => {
     if (!t) return
     setDup(null)
@@ -129,7 +152,6 @@ export default function SharedPage({ slug, mode, rootId }: { slug: string; mode:
   const [reason, setReason] = useState<ReportReason>('copyright')
   const [note, setNote] = useState('')
   const moreRef = useRef<HTMLDivElement>(null)
-  const treeRef = useRef<HTMLDivElement>(null)
   const [dup, setDup] = useState<Tree | null>(null)
 
   useEffect(() => {
@@ -150,11 +172,8 @@ export default function SharedPage({ slug, mode, rootId }: { slug: string; mode:
       </section>
     )
   }
-  const root = t.nodes.find((n) => n.parentId === null)
   const url = location.origin + href.shared(slug)
 
-  // 접기는 DOM 상태(<details>) — React 상태 없음. 루트는 늘 펼친다
-  const fold = (open: boolean) => treeRef.current?.querySelectorAll<HTMLDetailsElement>('.share-tree:not(.share-top) details').forEach((d) => (d.open = open))
   const copyLink = async () => {
     setMenu(false)
     try {
@@ -175,6 +194,19 @@ export default function SharedPage({ slug, mode, rootId }: { slug: string; mode:
     setNote('')
     toast('신고 접수됨')
   }
+  // 별점(계약 C3): 로그인 + 남의 트리면 PUT. 비로그인은 로그인 안내, 내 트리는 버튼 비활성
+  const rate = async (stars: number) => {
+    if (!me) return toast('로그인하면 별점을 남길 수 있습니다', { label: '로그인', run: () => location.assign('/' + href.login(location.pathname + location.search)) })
+    try {
+      setRating(await api<Rating>(`/api/t/${slug}/rating`, { method: 'PUT', body: { stars } }))
+      toast(`별점 ${stars}점`)
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : '별점을 남기지 못했습니다')
+    }
+  }
+  const ownTree = !!me && !!rating && !rating.canRate
+  // 선택한 카드가 자식 있는 비루트 노드면 그 가지로 플래시 탭을 연다
+  const learnFrom = mode === 'view' && selId && selId !== root?.id && counts.hasKids(selId) ? selId : ''
 
   return (
     <section className="shared" data-mode={mode}>
@@ -182,6 +214,22 @@ export default function SharedPage({ slug, mode, rootId }: { slug: string; mode:
         <div className="share-title">
           <div className="share-title-row"><h1>{t.title}</h1><span className="badge">읽기 전용</span></div>
           <p className="muted share-owner"><Avatar name={t.owner.nickname} url={t.owner.avatar_url} size={32} className="share-avatar" />{t.owner.nickname} · 노드 {t.node_count}개</p>
+          {rating && (
+            <div className="share-rating">
+              <span className="share-rating-avg"><Icon d={star} />{rating.avg === null ? <span className="muted">평가 없음</span> : <><span className="tnum">{rating.avg.toFixed(1)}</span><span className="muted tnum">({rating.count})</span></>}</span>
+              <span className="share-stars" role="group" aria-label="내 별점" data-tip={ownTree ? '내 트리는 평가할 수 없습니다' : undefined}>
+                {STARS.map((n) => (
+                  <button
+                    key={n} type="button" aria-label={`별점 ${n}점`} aria-pressed={rating.mine === n} disabled={ownTree}
+                    data-on={rating.mine !== null && n <= rating.mine} data-tip={ownTree ? '내 트리는 평가할 수 없습니다' : `별점 ${n}점`}
+                    onClick={() => void rate(n)}
+                  >
+                    <Icon d={star} />
+                  </button>
+                ))}
+              </span>
+            </div>
+          )}
         </div>
         <nav aria-label="학습 모드" className="share-tabs">
           {TABS.map((tab) => (
@@ -195,6 +243,11 @@ export default function SharedPage({ slug, mode, rootId }: { slug: string; mode:
           ))}
         </nav>
         <div className="share-tools">
+          {learnFrom && (
+            <button type="button" className="share-learn" onClick={() => navigateShared(slug, 'flash', learnFrom)}>
+              <Icon d={I.layers} size={20} />여기부터 학습
+            </button>
+          )}
           <button type="button" className="ghost share-copy" aria-label="내 트리로 복제" data-tip="내 트리로 복제" onClick={() => void doCopy()}>
             <Icon d={copyIcon} size={20} /><span className="share-copy-text">내 트리로 복제</span>
           </button>
@@ -214,12 +267,45 @@ export default function SharedPage({ slug, mode, rootId }: { slug: string; mode:
       </header>
 
       {mode === 'view' && root && (
-        <div ref={treeRef}>
-          <div className="share-fold">
-            <button type="button" className="ghost" onClick={() => fold(true)}>모두 펼치기</button>
-            <button type="button" className="ghost" onClick={() => fold(false)}>모두 접기</button>
+        <div className="canvas">
+          <div className="outline" role="tree" aria-label="트리" ref={outlineRef}>
+            <GraphView
+              key={slug}
+              zoom={zoom}
+              nodes={t.nodes}
+              rootId={root.id}
+              open={open}
+              onZoomAt={zoomTo}
+              onSettled={() => refit(selId)}
+              dir={dir}
+              onMove={() => {}} // 읽기 전용: 끌어도 위치가 바뀌지 않는다
+              renderNode={(n, box, m) => (
+                <ShareCard
+                  key={n.id}
+                  node={n}
+                  depth={box.depth}
+                  x={box.x}
+                  y={box.y}
+                  hasChildren={counts.hasKids(n.id)}
+                  hiddenCount={open(n) ? 0 : counts.desc(n.id)}
+                  selected={n.id === selId}
+                  still={m.still}
+                  onSelect={() => setSelId(n.id)}
+                  onToggle={() => toggleFold(n.id)}
+                />
+              )}
+            />
           </div>
-          <Branch nodes={t.nodes} items={[root]} level={1} slug={slug} />
+          <div className="zoom-tools">
+            <span className="zoom-group" role="group" aria-label="확대·축소">
+              <button type="button" className="zoom-step" aria-label="축소" data-tip="축소" onClick={() => zoomBy(1 / 1.2)}><Icon d={zoomOut} size={20} /></button>
+              <button type="button" className="zoom-reset" aria-label={`100%로 (현재 ${Math.round(zoom * 100)}%)`} data-tip="100%로" onClick={() => zoomTo(1)}>
+                <output className="tnum" aria-label="배율">{Math.round(zoom * 100)}%</output>
+              </button>
+              <button type="button" className="zoom-step" aria-label="확대" data-tip="확대" onClick={() => zoomBy(1.2)}><Icon d={zoomIn} size={20} /></button>
+            </span>
+            <button type="button" aria-label="세로 보기" aria-pressed={dir === 'right'} data-tip={dir === 'right' ? '가로 보기로' : '세로 보기'} onClick={flipDir}><Icon d={dir === 'right' ? network : listTree} size={20} /></button>
+          </div>
         </div>
       )}
       {mode !== 'view' && source && (

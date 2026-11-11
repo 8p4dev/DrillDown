@@ -294,7 +294,7 @@ function SystemForm({ settings, audit: { items, next, more }, onSaved }: {
         </tbody>
       </table>
       <More next={next} more={more} />
-      <p className="muted"><Icon d={eye} /> 숨김 트리는 공유 보기·갤러리에서 보이지 않습니다</p>
+      <p className="muted"><Icon d={eye} /> 숨김 트리는 공유 보기·공개 트리에서 보이지 않습니다</p>
     </>
   )
 }
