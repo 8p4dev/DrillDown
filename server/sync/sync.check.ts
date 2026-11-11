@@ -1,14 +1,14 @@
 // 동기화·공유 서버 자가 검사. server/check.ts 가 import. 판정 함수를 메모리 DB 로 직접 부른다(세션은 SA 소유라 우회)
 import assert from 'node:assert/strict'
 import { randomUUID as id } from 'node:crypto'
-import { Hono } from 'hono'
+import { Hono, type ErrorHandler } from 'hono'
 import { openDb, type DB } from '../db.ts'
 import { DAY, GRACE_MS, HttpError, type AppEnv } from '../http.ts'
 import { parsePush } from './map.ts'
 import { listTreesForAdmin, purgeTombstones, purgeUser, restoreTree, restoreTreesOfUser, setHidden, softDeleteTreesOfUser, treeCountOf, treeIdBySlug, treeStats, treesOfUser } from './owner.ts'
 import { pullSince } from './pull.ts'
 import { applyPush } from './push.ts'
-import { clearGalleryCache, gallery, lookupShare, newSlug, reissueSlug, renderShare, setVisibility, SLUG_RE } from './share.ts'
+import { clearGalleryCache, gallery, lookupShare, newSlug, rateTree, ratingOf, reissueSlug, renderShare, setVisibility, sharedTree, SLUG_RE } from './share.ts'
 import { registerSharePages, registerSync } from './index.ts'
 
 const db: DB = await openDb(':memory:')
@@ -305,6 +305,32 @@ const gq = (q: string) => gallery(db, 'recent', 1, T0, q).items.length
 assert.deepEqual([gq('유 1'), gq('0%'), gq('  '), gq('없음'), gq('%%'), gq('1_0'), gq('!'), gq('x'.repeat(500))], [1, 1, 1, 0, 0, 0, 0, 0])
 db.prepare('UPDATE trees SET title = ? WHERE id = ?').run('공유', ts); clearGalleryCache()
 
+// ---- 별점 (계약 C3): 1인 1표·수정 가능·본인 불가, 평균 소수 1자리, 갤러리 반영(캐시 비움) ----
+const shareRow = (slug: string) => { const s = lookupShare(db, slug); assert.ok(s.ok); return s.t }
+const tsRow = shareRow(s4)
+assert.deepEqual(ratingOf(db, tsRow), { avg: null, count: 0, mine: null, canRate: false }) // 비로그인
+assert.deepEqual(ratingOf(db, tsRow, { id: A, role: 'user' }), { avg: null, count: 0, mine: null, canRate: true })
+assert.equal(ratingOf(db, tsRow, { id: S, role: 'user' }).canRate, false) // 본인
+throws(() => rateTree(db, S, tsRow, 5), 403, 'own_tree')
+assert.deepEqual(rateTree(db, A, tsRow, 4), { avg: 4, count: 1, mine: 4, canRate: true })
+assert.deepEqual(rateTree(db, A, tsRow, 5), { avg: 5, count: 1, mine: 5, canRate: true }) // 재평가: count 유지, avg 갱신
+assert.deepEqual(rateTree(db, B, tsRow, 2), { avg: 3.5, count: 2, mine: 2, canRate: true }) // 다른 사용자: count 2
+assert.deepEqual(ratingOf(db, tsRow, { id: A, role: 'user' }), { avg: 3.5, count: 2, mine: 5, canRate: true })
+assert.equal(ratingOf(db, tsRow, { id: S, role: 'user' }).mine, null)
+assert.equal(rateTree(db, C, tsRow, 1).avg, 2.7) // (5+2+1)/3 = 2.666… → 소수 1자리
+assert.throws(() => rateTree(db, A, tsRow, 6)) // DB CHECK 안전망(라우트가 먼저 400)
+assert.equal(ratingOf(db, tsRow).count, 3)
+// sharedTree 가 viewer 기준 rating 을 채운다
+assert.deepEqual(sharedTree(db, tsRow).rating, { avg: 2.7, count: 3, mine: null, canRate: false })
+assert.equal(sharedTree(db, tsRow, { id: B, role: 'user' }).rating.mine, 2)
+// 갤러리 항목: rateTree 가 캐시를 비워 같은 now 로 다시 불러도 새 값
+let gi = gallery(db, 'recent', 1, T0).items[0]
+assert.deepEqual([gi.ratingAvg, gi.ratingCount], [2.7, 3])
+assert.equal(gallery(db, 'recent', 1, T0).items[0].ratingAvg, 2.7) // 캐시 적중
+rateTree(db, C, tsRow, 5) // (5+2+5)/3 = 4
+gi = gallery(db, 'recent', 1, T0).items[0]
+assert.deepEqual([gi.ratingAvg, gi.ratingCount], [4, 3])
+
 // ---- 탈퇴 유예: softDelete → 410, restoreTreesOfUser 는 탈퇴 전 삭제 트리를 되살리지 않음 ----
 const W = id(); addUser(W)
 const wKeep = id(), wGone = id()
@@ -329,10 +355,16 @@ db.prepare('UPDATE users SET deleted_at = NULL WHERE id = ?').run(W)
 // restoreTree: 7일 지난 삭제는 null
 db.prepare('UPDATE trees SET deleted_at = ? WHERE id = ?').run(Date.now() - GRACE_MS - DAY, wGone)
 assert.equal(restoreTree(db, wGone), null)
-// purgeUser: 전부 물리 삭제. 신고 행은 남고 신고자 id 만 비운다(F14)
+// purgeUser: 전부 물리 삭제. 신고 행은 남고 신고자 id 만 비운다(F14). 별점은 준 것(user_id)·받은 것(trees CASCADE) 모두 사라진다
 db.prepare("INSERT INTO reports(id, tree_id, reporter_id, reason, created_at) VALUES ('rep-w', ?, ?, 'spam', 1)").run(ts, W)
+rateTree(db, W, tsRow, 3)
+rateTree(db, A, shareRow(wSlug), 5)
+assert.equal(ratingOf(db, tsRow).count, 4)
 purgeUser(db, W)
-for (const t of ['trees WHERE owner_id', 'nodes WHERE owner_id', 'srs WHERE user_id', 'user_seq WHERE user_id']) assert.equal(get(`SELECT COUNT(*) AS n FROM ${t} = ?`, W)!.n, 0)
+for (const t of ['trees WHERE owner_id', 'nodes WHERE owner_id', 'srs WHERE user_id', 'user_seq WHERE user_id', 'ratings WHERE user_id']) assert.equal(get(`SELECT COUNT(*) AS n FROM ${t} = ?`, W)!.n, 0)
+assert.equal(get('SELECT COUNT(*) AS n FROM ratings WHERE tree_id = ?', wKeep)!.n, 0)
+assert.equal(ratingOf(db, tsRow).count, 3)
+db.prepare('DELETE FROM users WHERE id = ?').run(W) // SA 가 purgeUser 뒤에 하는 일 — FK 위반 없이 지워진다
 assert.deepEqual(get("SELECT reporter_id FROM reports WHERE id = 'rep-w'"), { reporter_id: null })
 db.prepare("DELETE FROM reports WHERE id = 'rep-w'").run()
 
@@ -367,8 +399,9 @@ assert.equal((html.match(/<title>/g) ?? []).length, 1)
 assert.ok(!renderShare(shell, { slug: 'abcdefghijk', title: 'x', node_count: 3, visibility: 'public' }).includes('noindex'))
 
 // ---- 라우트: 세션 없이 401, /api/t 상태 코드·캐시 헤더, /t/:slug 셸 ----
+const onErr: ErrorHandler<AppEnv> = (e, c) => (e instanceof HttpError ? c.json({ error: { code: e.code } }, e.status as 400) : c.json({ error: { code: 'internal', m: String(e) } }, 500))
 const app = new Hono<AppEnv>()
-app.onError((e, c) => (e instanceof HttpError ? c.json({ error: { code: e.code } }, e.status as 400) : c.json({ error: { code: 'internal', m: String(e) } }, 500)))
+app.onError(onErr)
 app.use(async (c, next) => { c.set('db', db); c.set('user', null); await next() })
 registerSync(app)
 registerSharePages(app, () => shell)
@@ -407,12 +440,42 @@ assert.deepEqual([g.page, g.hasMore, g.items[0].copyCount], [1, false, 1])
 assert.equal((await app.request('/api/gallery?sort=bogus')).status, 400)
 // U60: /api/trees 는 본인 트리만 + copyCount (남의 트리 안 보임)
 const ownApp = new Hono<AppEnv>()
+ownApp.onError(onErr)
 ownApp.use(async (c, next) => { c.set('db', db); c.set('user', { id: S, role: 'user', nickname: 's', sessionId: 'x' }); await next() })
 registerSync(ownApp)
 const own = (await (await ownApp.request('/api/trees')).json()) as { trees: { id: string; copyCount: number; hiddenByAdmin: boolean }[] }
 assert.ok(own.trees.length > 0 && own.trees.every((t) => get('SELECT owner_id FROM trees WHERE id = ?', t.id)!.owner_id === S))
 assert.ok(!own.trees.some((t) => zt.includes(t.id)))
 assert.deepEqual([own.trees.find((t) => t.id === ts)?.copyCount, own.trees.find((t) => t.id === ts)?.hiddenByAdmin], [1, false])
+// 별점 라우트(계약 C3): 비로그인 401 · stars 검증 400 · 본인 403 own_tree · 정상 200 Rating · 재평가 200 · 없는 slug 404 · 숨김 403
+const appA = new Hono<AppEnv>()
+appA.onError(onErr)
+appA.use(async (c, next) => { c.set('db', db); c.set('user', { id: A, role: 'user', nickname: 'a', sessionId: 'y' }); await next() })
+registerSync(appA)
+const rate = (a: Hono<AppEnv>, slug: string, b: unknown) => a.request(`/api/t/${slug}/rating`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) })
+const code = async (res: Response) => ((await res.json()) as { error: { code: string } }).error.code
+assert.equal((await rate(app, s4, { stars: 3 })).status, 401)
+for (const stars of [0, 6, 'a', 2.5, null]) {
+  const bad = await rate(appA, s4, { stars })
+  assert.equal(bad.status, 400, String(stars))
+  assert.equal(await code(bad), 'bad_request')
+}
+assert.equal((await rate(appA, s4, {})).status, 400)
+const ownRate = await rate(ownApp, s4, { stars: 3 })
+assert.equal(ownRate.status, 403)
+assert.equal(await code(ownRate), 'own_tree')
+const r1 = await rate(appA, s4, { stars: 3 }) // A: 5 → 3, B 2, C 5 → 3.333…
+assert.equal(r1.status, 200)
+assert.deepEqual(await r1.json(), { avg: 3.3, count: 3, mine: 3, canRate: true })
+const r2 = await rate(appA, s4, { stars: 4 }) // 재평가
+assert.equal(r2.status, 200)
+assert.deepEqual(await r2.json(), { avg: 3.7, count: 3, mine: 4, canRate: true })
+assert.equal((await rate(appA, newSlug(), { stars: 4 })).status, 404)
+assert.deepEqual(((await (await appA.request(`/api/t/${s4}`)).json()) as { rating: unknown }).rating, { avg: 3.7, count: 3, mine: 4, canRate: true })
+assert.deepEqual(((await (await app.request(`/api/t/${s4}`)).json()) as { rating: unknown }).rating, { avg: 3.7, count: 3, mine: null, canRate: false })
+setHidden(db, ts, true, 11)
+assert.equal(await code(await rate(appA, s4, { stars: 4 })), 'hidden')
+setHidden(db, ts, false, 12)
 // 응답 시간 동일화: 404·200 모두 하한 이상
 const t404 = performance.now(); await app.request(`/api/t/${newSlug()}`)
 assert.ok(performance.now() - t404 >= 35)

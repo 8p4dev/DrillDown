@@ -8,7 +8,7 @@ import { restoreTree } from './owner.ts'
 import { pullSince } from './pull.ts'
 import { applyPush } from './push.ts'
 import { nextSeq } from './seq.ts'
-import { gallery, lookupShare, ownTree, reissueSlug, renderShare, setVisibility, sharedTree } from './share.ts'
+import { gallery, lookupShare, ownTree, rateTree, reissueSlug, renderShare, setVisibility, sharedTree } from './share.ts'
 
 const MIN = 60_000
 /** 404·410·403·200 응답 시간을 맞춘다(존재 여부 누설 방지, 04 §3.3) */
@@ -22,7 +22,7 @@ const treeId = (c: Context<AppEnv>) => {
   return id.toLowerCase()
 }
 
-/** /api/sync /api/trees* /api/t/:slug(GET·copy) /api/gallery */
+/** /api/sync /api/trees* /api/t/:slug(GET·copy·rating) /api/gallery */
 export function registerSync(app: Hono<AppEnv>) {
   app.post('/api/sync', requireUser, limit('sync_push', 300, MIN), async (c) => {
     const p = parsePush(await body(c, LIMITS.bytes))
@@ -84,7 +84,7 @@ export function registerSync(app: Hono<AppEnv>) {
     const t0 = performance.now()
     const db = c.get('db')
     const s = lookupShare(db, c.req.param('slug'), c.get('user'))
-    const out = s.ok ? sharedTree(db, s.t) : null
+    const out = s.ok ? sharedTree(db, s.t, c.get('user')) : null
     await pad(t0)
     if (!s.ok) fail(s.status, s.code, s.code === 'deleted' ? '삭제된 트리입니다' : s.code === 'hidden' ? '운영 정책으로 숨김 처리된 트리입니다' : '없는 링크입니다')
     return c.json(out)
@@ -96,6 +96,15 @@ export function registerSync(app: Hono<AppEnv>) {
     if (!s.ok) fail(404, 'not_found', '없는 링크입니다')
     else db.prepare('UPDATE trees SET copy_count = copy_count + 1 WHERE id = ?').run(s.t.id)
     return c.body(null, 204)
+  })
+  // 별점(계약 C3): 로그인 필수, 1..5 정수, slug 판정은 GET 과 같은 404/410/403, 본인 트리 403 own_tree
+  app.put('/api/t/:slug/rating', requireUser, limit('rate', 30, MIN), async (c) => {
+    const { stars } = await body<{ stars?: unknown }>(c)
+    if (!Number.isInteger(stars) || (stars as number) < 1 || (stars as number) > 5) fail(400, 'bad_request', '별점은 1~5 사이 정수여야 합니다', 'stars')
+    const db = c.get('db')
+    const s = lookupShare(db, c.req.param('slug'), c.get('user'))
+    if (!s.ok) fail(s.status, s.code, s.code === 'deleted' ? '삭제된 트리입니다' : s.code === 'hidden' ? '운영 정책으로 숨김 처리된 트리입니다' : '없는 링크입니다')
+    else return c.json(rateTree(db, uid(c), s.t, stars as number))
   })
   app.get('/api/gallery', (c) => {
     hit(c, `gallery:${clientIp(c)}`, 30, MIN)
