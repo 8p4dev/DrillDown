@@ -126,5 +126,19 @@ assert.equal(searchNodes(base, '  ').length, 0)
   for (const [a, b] of r.edges) assert(r.boxes.get(b)!.x > r.boxes.get(a)!.x + r.boxes.get(a)!.w - 1, 'child right of parent')
   for (let i = 0; i < all.length; i++) for (let j = i + 1; j < all.length; j++) assert(!overlap(all[i], all[j]), 'right: no overlap')
   for (const n of base) if (r.boxes.has(n.id)) assert(r.boxes.get(n.id)!.w === measure(n).w, 'right keeps size')
+  // 방향별 위치(C1): right 는 vx·vy 만 쓰고 x·y 는 무시, down 은 반대
+  const both = base.map((n) => (n.id === '해고' ? { ...n, offset: { x: 50, y: 30, vx: 70, vy: 40 } } : n))
+  const rv = layout(both, '노동법', measure, isOpen, 'right')
+  for (const id of ['해고', '해고예고', '부당해고 구제']) {
+    assert.equal(rv.boxes.get(id)!.x, r.boxes.get(id)!.x + 70, 'right: vx → 화면 x')
+    assert.equal(rv.boxes.get(id)!.y, r.boxes.get(id)!.y + 40, 'right: vy → 화면 y')
+  }
+  assert.equal(rv.boxes.get('임금')!.x, r.boxes.get('임금')!.x)
+  const onlyXY = layout(base.map((n) => (n.id === '해고' ? { ...n, offset: { x: 50, y: 30 } } : n)), '노동법', measure, isOpen, 'right')
+  for (const [id, b] of onlyXY.boxes) assert(b.x === r.boxes.get(id)!.x && b.y === r.boxes.get(id)!.y, 'right ignores x·y')
+  const dv = layout(both, '노동법', measure)
+  for (const id of ['해고', '해고예고', '부당해고 구제']) assert(dv.boxes.get(id)!.x === box(id).x + 50 && dv.boxes.get(id)!.y === box(id).y + 30, 'down: x·y')
+  const onlyV = layout(base.map((n) => (n.id === '해고' ? { ...n, offset: { x: 0, y: 0, vx: 70, vy: 40 } } : n)), '노동법', measure)
+  for (const [id, b] of onlyV.boxes) assert(b.x === box(id).x && b.y === box(id).y, 'down ignores vx·vy')
 }
 console.log('layout.check: ok')

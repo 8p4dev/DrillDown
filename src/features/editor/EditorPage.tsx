@@ -10,7 +10,8 @@ import { href } from '../../router'
 import { Icon } from '../../ui/Icon'
 import { I } from '../../ui/icons'
 import { NodePath } from '../../ui/NodePath'
-import { clipboardPaste, copy, cornerDownRight, eraser, highlighter, keyboard, list, listTree, maximize, network, search, undo2, x, zoomIn, zoomOut } from '../../ui/icons.all'
+import { Sheet } from '../../ui/Sheet'
+import { clipboardPaste, copy, cornerDownRight, eraser, highlighter, keyboard, list, listTree, network, search, sparkles, undo2, x, zoomIn, zoomOut } from '../../ui/icons.all'
 import NodeRow from './NodeRow'
 import NoteEditor, { type NoteApi, type NoteOp } from './content/NoteEditor'
 import GraphView from './graph/GraphView'
@@ -52,6 +53,13 @@ const orderAfter = (ns: TreeNode[], node: TreeNode): [TreeNode[], number] => {
   if (!next) return [ns, node.order + 1]
   const mid = (node.order + next.order) / 2
   return mid > node.order && mid < next.order ? [ns, mid] : [renumber(ns, sib), i + 0.5]
+}
+/** 그 방향에서 손으로 옮긴 위치가 있는가 (C1: down = x·y, right = vx·vy) */
+const moved = (n: TreeNode, d: Dir) => !!(d === 'right' ? n.offset?.vx || n.offset?.vy : n.offset?.x || n.offset?.y)
+/** 그 방향의 위치만 지운 offset. 두 방향 모두 비면 undefined */
+function clearOffset(o: NonNullable<TreeNode['offset']>, d: Dir): TreeNode['offset'] {
+  if (d === 'right') return o.x || o.y ? { x: o.x, y: o.y } : undefined
+  return o.vx || o.vy ? { x: 0, y: 0, vx: o.vx, vy: o.vy } : undefined
 }
 type Open = (n: TreeNode, depth: number) => boolean
 /** 화면에 그려지는 노드(전위 순서). open = 접기 + 보기 깊이(C3), depth 는 root(포커스 루트) 기준. O(n) */
@@ -139,7 +147,7 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
   const [draft, setDraft] = useState('')
   const [noteEditId, setNoteEditId] = useState<ID | null>(null) // 카드 안에서 내용 편집 중인 노드
   const [cutId, setCutId] = useState<ID | null>(null)
-  const [ioOpen, setIoOpen] = useState(false) // 개요 붙여넣기: 빈 트리일 때만 펼친 채 시작
+  const [ioOpen, setIoOpen] = useState(false) // 개요 붙여넣기 · 내보내기 시트. 루트만 있는 트리에 들어오면 자동으로 1회 연다(A2)
   const [importText, setImportText] = useState('')
   const [exportText, setExportText] = useState('')
   // 핸들러가 같은 이벤트 안에서 여러 번 commit 해도 최신 상태를 보도록 ref 를 기준으로 삼는다
@@ -149,6 +157,7 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
   const undoRef = useRef<Step[]>([])
   const redoRef = useRef<Step[]>([])
   const outlineRef = useRef<HTMLDivElement>(null)
+  const importRef = useRef<HTMLTextAreaElement>(null)
   const liveBase = useRef<TreeNode[] | null>(null) // 실시간 편집 시작 시점 스냅샷 (끝날 때 실행취소 1단계로)
   const cardNote = useRef<NoteApi | null>(null)
   const panelNote = useRef<NoteApi | null>(null)
@@ -174,8 +183,11 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
 
   const loaded = nodes !== null
   useEffect(() => {
-    if (loaded) outlineRef.current?.focus() // 진입 즉시 키보드로 편집 가능
-  }, [loaded])
+    if (!loaded) return
+    // 진입 즉시 키보드로 편집 가능. 개요 시트가 자동으로 열렸으면 캔버스 대신 시트 입력칸(터치는 키보드가 튀어나오므로 시트 기본 포커스)
+    if (!ioOpen) outlineRef.current?.focus()
+    else if (!coarse()) importRef.current?.focus()
+  }, [loaded]) // oxlint-disable-line react-hooks/exhaustive-deps -- 진입 1회: ioOpen 은 nodes 와 같은 배치에서 정해진다
   // 동기화 엔진이 pull 뒤 쏘는 dd:remote{treeIds}: 내 트리면 노드·학습 기록을 다시 읽어 교체한다(E16).
   // undo/redo 스택은 비운다(E2: 옛 스냅샷으로 되돌리면 다른 기기가 추가한 노드가 지워진다).
   // 편집 중인 노드(카드 제목·카드 내용·패널 live)는 로컬 값을 유지해 입력칸을 덮지 않는다.
@@ -227,79 +239,40 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
       outlineRef.current?.focus()
   }, [editId])
 
-  // ---- 확대·축소: 버튼, Ctrl+휠, 핀치, 탐색 모드 키 - = 0 (graph/useZoom, 계약 C2) ----
-  const { zoom, zoomRef, setZoom, zoomTo, zoomBy, fit, centerOn } = useZoom(outlineRef, sameRoot && saved.zoom ? saved.zoom : 1, loaded)
-  const fitZoom = () => fit(selRef.current) // U15: 맞춤 뒤에도 선택 노드가 화면 가운데에 남는다
+  // ---- 확대·축소: 버튼, 휠, 핀치, 탐색 모드 키 - = 0 (graph/useZoom, 계약 C2) ----
+  const { zoom, zoomRef, setZoom, zoomTo, zoomBy, centerOn } = useZoom(outlineRef, sameRoot && saved.zoom ? saved.zoom : 1, loaded)
 
-  // ---- 자동 맞춤: 진입·개요 가져오기 뒤 1회, 넘칠 때만. 일반 편집 중에는 카드가 튀지 않게 하지 않는다 ----
+  // ---- 자동 맞춤(R8): 보이는 카드 집합(또는 방향)이 바뀌어 배치가 끝날 때마다 전체가 보이는 배율(≤100%, 하한 clampZoom)로 맞추고 선택을 가운데에.
+  // 입력·드래그·너비 변경은 집합이 그대로라 GraphView 가 onSettled 를 부르지 않는다 ----
   const restorePending = useRef(sameRoot && typeof saved.sx === 'number' ? { x: saved.sx, y: saved.sy ?? 0 } : null)
-  const fitPending = useRef(!restorePending.current) // oxlint-disable-line react/refs -- 첫 렌더 초기값만 읽는다
-  const centerPending = useRef<[number, number] | null>(null)
   const [dir, setDir] = useState<Dir>(loadDir)
-  const dirRef = useRef(dir) // 콜백(onSettled·키)이 최신 방향을 읽는다 — 바꿀 때 flipDir 이 함께 갱신
+  const dirRef = useRef(dir) // 콜백(키)이 최신 방향을 읽는다 — 바꿀 때 flipDir 이 함께 갱신
   const flipDir = () => {
     const d: Dir = dirRef.current === 'right' ? 'down' : 'right'
     dirRef.current = d
     setDir(d)
   }
-  const centerAfter = useRef<ID | null>(null) // 검색·포커스 해제 뒤 배치가 끝나면 이 카드를 가운데로
-  const settledRoot = useRef(rootId)
+  const centerAfter = useRef<ID | null>(null) // 검색·실행 취소로 새로 그려지는 카드: 맞춤 뒤 이 카드를 가운데로
+  const fitPending = useRef<ID | null>(null) // 맞춤 뒤 가운데 맞출 카드('' = 선택). 레이아웃 이펙트 안에선 flushSync(fit) 를 못 써 배율을 먼저 놓고 다음 커밋에서 스크롤한다
   const settled = useRef(false) // 첫 배치 전에는 보기 상태를 저장하지 않는다(복원 전 0 으로 덮지 않게)
-  /** rootX·rootY = 배치 좌표의 루트 중심. 루트 카드의 rect 는 재배치 트랜지션 중이라 쓸 수 없다.
-   *  위→아래: 맨 위 + 루트를 가로 가운데. 세로 보기: 맨 왼쪽 + 루트를 세로 가운데 */
-  function centerRoot([rootX, rootY]: [number, number]) {
-    const box = outlineRef.current
-    const g = box?.querySelector('.graph')
-    if (!box || !g) return
-    const [r, b, z] = [g.getBoundingClientRect(), box.getBoundingClientRect(), zoomRef.current]
-    if (dirRef.current === 'right') {
-      box.scrollLeft = 0
-      box.scrollTop += r.top + rootY * z - (b.top + box.clientHeight / 2)
-      return
-    }
-    box.scrollTop = 0
-    box.scrollLeft += r.left + rootX * z - (b.left + box.clientWidth / 2)
-  }
-  /** GraphView 가 실측 크기로 배치를 마칠 때마다 호출 (FALLBACK 크기로는 호출되지 않음) */
-  function onSettled(w: number, h: number, rootX: number, rootY: number) {
+  /** GraphView 가 실측 크기로 배치를 마칠 때마다 호출 (FALLBACK 크기로는 호출되지 않음). w·h = 그래프 배치 크기 */
+  function onSettled(w: number, h: number) {
     const box = outlineRef.current
     if (!box) return
     settled.current = true
-    // 포커스가 바뀐 뒤 첫 배치: 들어가면 그 가지를 맞추고, 전체로 나오면 선택을 가운데로. (부모 이펙트는 이 콜백보다 늦게 돈다)
-    if (settledRoot.current !== rootId) {
-      settledRoot.current = rootId
-      if (rootId) fitPending.current = true
-      else centerAfter.current ??= selRef.current
-    }
     const r = restorePending.current
     if (r) {
-      restorePending.current = null
-      fitPending.current = false
+      restorePending.current = null // 첫 진입: 저장된 스크롤만 복원
       return box.scrollTo(r.x, r.y)
     }
-    if (centerAfter.current) {
-      fitPending.current = false
-      centerOn(centerAfter.current)
-      centerAfter.current = null
-      return
-    }
-    if (!fitPending.current) return
-    fitPending.current = false
-    box.scrollIntoView({ block: 'nearest' }) // 모바일: 아래쪽 개요 칸에서 가져오면 캔버스로 돌아온다
-    const [cw, ch] = [box.clientWidth, box.clientHeight]
-    if (w <= cw && h <= ch) return
-    const next = clampZoom(Math.max(0.5, Math.min(1, (cw - 16) / w, (ch - 16) / h)))
-    if (next === zoomRef.current) return centerRoot([rootX, rootY])
-    // 레이아웃 이펙트 안이라 flushSync 불가: 배율이 반영된 뒤 아래 이펙트에서 페인트 전에 스크롤한다
-    centerPending.current = [rootX, rootY]
+    box.scrollIntoView({ block: 'nearest' }) // 모바일: 패널 쪽으로 내려가 있었으면 캔버스로 돌아온다
+    fitPending.current = centerAfter.current ?? ''
+    centerAfter.current = null
+    const next = clampZoom(Math.min(1, (box.clientWidth - 16) / w, (box.clientHeight - 16) / h))
+    if (next === zoomRef.current) return
     zoomRef.current = next
     setZoom(next)
   }
-  useLayoutEffect(() => {
-    if (centerPending.current === null) return
-    centerRoot(centerPending.current)
-    centerPending.current = null
-  }, [zoom]) // oxlint-disable-line react-hooks/exhaustive-deps -- centerRoot 는 ref 만 쓴다
 
   const counts = useMemo(() => countTree(nodes ?? []), [nodes])
   const open = useMemo<Open>(() => (n, d) => !n.collapsed && (!viewDepth || d + 1 < viewDepth || reveal.has(n.id)), [viewDepth, reveal])
@@ -319,12 +292,14 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
     viewRef.current = { open, depth: viewDepth, top: top?.id ?? '' }
     selRef.current = sel?.id ?? ''
   })
-  const firstDir = useRef(true)
+  // 맞춤의 스크롤 단계: 배율 상태가 zoomRef 를 따라잡은 커밋에서(같으면 같은 커밋). selRef 갱신 뒤에 와야 한다
   useLayoutEffect(() => {
-    if (firstDir.current) return void (firstDir.current = false)
-    saveDir(dir)
-    fitZoom() // 방향을 바꾸면 배치가 통째로 바뀐다 → 맞춤 + 선택 가운데
-  }, [dir]) // oxlint-disable-line react-hooks/exhaustive-deps -- fitZoom 은 ref 만 쓴다
+    const id = fitPending.current
+    if (id === null || zoomRef.current !== zoom) return
+    fitPending.current = null
+    centerOn(id || selRef.current)
+  })
+  useEffect(() => saveDir(dir), [dir]) // 방향 전환 뒤 맞춤은 GraphView 가 onSettled 로 다시 부른다
   // U18: 선택·배율·깊이가 바뀔 때, 스크롤이 멈출 때, 떠날 때 저장
   const saveNow = () => {
     const box = outlineRef.current
@@ -690,7 +665,6 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
     const rootNote = rootMemo.length ? { note: [...rootMemo, target.note].filter(Boolean).join('\n').slice(0, CAP.note) } : {}
     const base = patch(ns, target.id, rootTitle ? { title: rootTitle.title, collapsed: false, ...rootNote } : { collapsed: false })
     const long = added.filter((n) => n.title.length === CAP.title && n.note !== undefined).length + (rootTitle?.note !== undefined ? 1 : 0)
-    if (added.length) fitPending.current = true // 통째로 들어온 트리는 진입과 같게 맞춘다
     const count = added.length + (asRoot ? 1 : 0)
     // U11: 같은 개요를 두 번 붙이는 실수 — 최상위 항목만 기존 자식 제목과 비교(R4-A3)
     const dup = added.filter((n) => n.parentId === target.id && have.has(n.title)).length
@@ -698,6 +672,7 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
     showKids(target.id)
     void logEvent('outline_imported', { nodeCount: count }, treeId)
     setImportText('')
+    setIoOpen(false)
     toast(
       `${count}개 추가${dup ? ` · 최상위 중복 ${dup}개` : ''}${long ? ` · 긴 제목 ${long}개를 잘라 메모로 옮겼습니다` : ''}`,
       { label: '되돌리기', run: () => undoIf(ns) },
@@ -720,16 +695,16 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
   }
   const exportOutline = () => setExportText(copyOutline(root!.id))
 
-  /** 드래그로 옮긴 위치를 모두 지운다 (실행취소 가능) */
+  /** 현재 방향에서 드래그로 옮긴 위치를 지운다(실행취소 가능). 다른 방향의 위치는 그대로, 둘 다 비면 offset 자체를 뺀다(C1) */
   function autoArrange() {
     const ns = nodesRef.current
-    if (!ns.some((n) => n.offset)) return
-    commit(ns.map((n) => (n.offset ? { ...n, offset: undefined, updatedAt: Date.now() } : n)), '자동 정렬')
+    const d = dirRef.current
+    if (!ns.some((n) => moved(n, d))) return
+    commit(ns.map((n) => (moved(n, d) ? { ...n, offset: clearOffset(n.offset!, d), updatedAt: Date.now() } : n)), '자동 정렬')
   }
   function pickDepth(d: number) {
     setViewDepth(d)
     setReveal(new Set())
-    fitPending.current = true // 깊이를 바꾸면 보이는 만큼 다시 맞춘다(넘칠 때만)
   }
   const cur = sel!
   const selPath = ancestorsOf(byId, cur.id)
@@ -786,7 +761,7 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
   const asRootOk = !focused && nodes.length === 1
   function openImport() {
     flushSync(() => setIoOpen(true))
-    document.querySelector<HTMLTextAreaElement>('textarea[aria-label="개요 텍스트"]')?.focus()
+    importRef.current?.focus()
   }
 
   const header = focused && (
@@ -899,9 +874,8 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
           <button type="button" className="zoom-step" aria-label="확대" data-tip="확대 (=)" onClick={() => zoomBy(1.2)}><Icon d={zoomIn} size={20} /></button>
         </span>
         <button type="button" aria-label="세로 보기" aria-pressed={dir === 'right'} data-tip={dir === 'right' ? '가로 보기로' : '세로 보기'} onClick={flipDir}><Icon d={dir === 'right' ? network : listTree} size={20} /></button>
-        <button type="button" aria-label="화면 맞춤" data-tip="화면 맞춤" onClick={fitZoom}><Icon d={maximize} size={20} /></button>
-        {nodes.some((n) => n.offset) && (
-          <button type="button" className="arrange" aria-label="자동 정렬" data-tip="자동 정렬" onClick={autoArrange}><Icon d={network} size={20} /></button>
+        {nodes.some((n) => moved(n, dir)) && (
+          <button type="button" className="arrange" aria-label="자동 정렬" data-tip="자동 정렬" onClick={autoArrange}><Icon d={sparkles} size={20} /></button>
         )}
         <button type="button" aria-label="검색" data-tip="검색 (/)" aria-expanded={searching} onMouseDown={(e) => e.preventDefault()} onClick={() => setSearching((v) => !v)}><Icon d={search} size={20} /></button>
         <button type="button" aria-label="단축키" data-tip="단축키 (?)" popoverTarget={KEYS_ID}><Icon d={keyboard} size={20} /></button>
@@ -926,9 +900,17 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
           onDuplicate={cur.id !== top!.id ? () => duplicate(cur.id) : undefined}
           onExport={() => copyOutline(cur.id)}
         />
-        <details className="io" open={ioOpen} onToggle={(e) => setIoOpen(e.currentTarget.open)}>
-          <summary><Icon d={clipboardPaste} />개요 붙여넣기 · 내보내기</summary>
+        <button type="button" className="io-open" onClick={openImport}><Icon d={clipboardPaste} />개요 붙여넣기 · 내보내기</button>
+      </aside>
+      <Sheet open={ioOpen} onClose={() => setIoOpen(false)} label="개요 붙여넣기 · 내보내기">
+        <div className="io">
+          <header className="sheet-head">
+            <h2>개요 붙여넣기 · 내보내기</h2>
+            <button type="button" className="ghost sheet-x" aria-label="닫기" data-tip="닫기" onClick={() => setIoOpen(false)}><Icon d={x} /></button>
+          </header>
+          <p className="muted">들여쓰기된 목차를 붙여 넣으면 선택한 노드 아래에 트리가 됩니다. 내보내기는 같은 형식의 텍스트를 복사합니다.</p>
           <textarea
+            ref={importRef}
             aria-label="개요 텍스트"
             rows={narrow() ? 3 : 5}
             value={importText}
@@ -951,8 +933,8 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
               </details>
             </div>
           )}
-        </details>
-      </aside>
+        </div>
+      </Sheet>
       <div id={KEYS_ID} className="keys" popover="auto">
         <dl>
           {KEYS.map(([k, v]) => (

@@ -59,9 +59,9 @@ export function useZoom(box: RefObject<HTMLElement | null>, initial = 1, active 
   useEffect(() => {
     const el = box.current
     if (!el || !active) return
+    // 휠 = 확대·축소(수정자 없이도, 커서 기준). 휠 스크롤은 없다(이동은 빈 곳 드래그·핀치·터치). Ctrl/⌘+휠·트랙패드 핀치도 같은 경로.
     // React 의 wheel 리스너는 passive 라 preventDefault 가 안 된다 → 직접 등록
     const onWheel = (e: WheelEvent) => {
-      if (!e.ctrlKey && !e.metaKey) return
       e.preventDefault()
       zoomTo(zoomRef.current * (e.deltaY < 0 ? 1.1 : 1 / 1.1), e.clientX, e.clientY)
     }
