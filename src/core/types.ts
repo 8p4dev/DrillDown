@@ -28,8 +28,10 @@ export interface TreeNode {
   note?: string // 노드 내용. 형식 계약: docs/plans/orchestration_modes.md §3.2 (줄 단위, '- ' 불릿, ==y:텍스트== 형광펜)
   aliases: string[] // 허용 표현(동의어·약어)
   collapsed?: boolean
-  /** 그래프 뷰에서 마우스로 옮긴 양(px). 자동 배치 위치 기준이며 자손에게도 누적 적용. 없으면 {0,0} */
-  offset?: { x: number; y: number }
+  /** 그래프 뷰에서 마우스로 옮긴 양(px). 자동 배치 위치 기준이며 자손에게도 누적 적용. 없으면 {0,0}.
+   *  x·y = 가로 보기(dir 'down') 화면축, vx·vy = 세로 보기(dir 'right') 화면축 — 방향마다 따로 기억한다(계약 C1).
+   *  ponytail: 열 하나(JSON)에 두 방향을 넣었다. 서버 열을 나누려면 마이그레이션 + map.ts + push.ts */
+  offset?: { x: number; y: number; vx?: number; vy?: number }
   /** 노드 폭 단계 1|2|3 (없으면 1). px 값은 에디터 소유 */
   width?: 1 | 2 | 3
   updatedAt: number

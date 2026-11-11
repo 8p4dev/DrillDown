@@ -15,6 +15,7 @@ import NodeRow from './NodeRow'
 import NoteEditor, { type NoteApi, type NoteOp } from './content/NoteEditor'
 import GraphView from './graph/GraphView'
 import { isOpen, type Dir } from './graph/layout'
+import { clampZoom, useZoom } from './graph/useZoom'
 import { searchNodes, SEARCH_LIMIT } from './search'
 import { changedNode, isComposing } from './edit'
 import TreeHeader from '../TreeHeader'
@@ -27,7 +28,6 @@ const UNDO_LIMIT = 50
 const UNDO_MS = 10_000 // 노드 삭제 되돌리기(02 §3.5: 트리 삭제와 같은 10초)
 const narrow = () => matchMedia('(max-width: 760px)').matches
 const coarse = () => matchMedia('(pointer: coarse)').matches
-const clampZoom = (z: number) => Math.min(2, Math.max(0.3, Math.round(z * 100) / 100))
 
 // ---- 순수 트리 연산 (노드 배열은 불변으로 다룬다: 바뀐 노드만 새 객체) ----
 const patch = (ns: TreeNode[], id: ID, p: Partial<TreeNode>) =>
@@ -227,57 +227,9 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
       outlineRef.current?.focus()
   }, [editId])
 
-  // ---- 확대·축소: 버튼, Ctrl+휠, 핀치, 탐색 모드 키 - = 0 ----
-  const [zoom, setZoom] = useState(() => (sameRoot && saved.zoom ? clampZoom(saved.zoom) : 1))
-  const zoomRef = useRef(zoom)
-  /** 화면 좌표 (cx, cy) 아래의 그래프 지점을 그대로 둔 채 배율 변경. 기준점을 안 주면 캔버스 중앙 */
-  function zoomTo(next: number, cx?: number, cy?: number) {
-    const box = outlineRef.current
-    const g = box?.querySelector<HTMLElement>('.graph')
-    const z = zoomRef.current
-    next = clampZoom(next)
-    if (!box || !g || next === z) return
-    const b = box.getBoundingClientRect()
-    const x = cx ?? b.left + box.clientWidth / 2
-    const y = cy ?? b.top + box.clientHeight / 2
-    const r = g.getBoundingClientRect()
-    const [gx, gy] = [(x - r.left) / z, (y - r.top) / z]
-    zoomRef.current = next
-    flushSync(() => setZoom(next))
-    const r2 = g.getBoundingClientRect()
-    box.scrollLeft += r2.left + gx * next - x
-    box.scrollTop += r2.top + gy * next - y
-  }
-  const zoomBy = (f: number) => zoomTo(zoomRef.current * f)
-  function fitZoom() {
-    const box = outlineRef.current
-    const g = box?.querySelector<HTMLElement>('.graph')
-    if (!box || !g) return
-    zoomTo(Math.min(1, (box.clientWidth - 16) / g.offsetWidth, (box.clientHeight - 16) / g.offsetHeight))
-    centerOn(selRef.current) // U15: 맞춤 뒤에도 선택 노드가 화면 가운데에 남는다
-  }
-  /** 카드 중심을 캔버스 가운데로. 카드 rect 는 재배치 트랜지션 중일 수 있어 목표 좌표(style left/top)를 쓴다 */
-  function centerOn(id: ID) {
-    const box = outlineRef.current
-    const g = box?.querySelector('.graph')
-    const card = box?.querySelector<HTMLElement>(`[data-node-id="${CSS.escape(id)}"]`)
-    if (!box || !g || !card) return
-    const [r, b, z] = [g.getBoundingClientRect(), box.getBoundingClientRect(), zoomRef.current]
-    box.scrollLeft += r.left + (parseFloat(card.style.left) + card.offsetWidth / 2) * z - (b.left + box.clientWidth / 2)
-    box.scrollTop += r.top + (parseFloat(card.style.top) + card.offsetHeight / 2) * z - (b.top + box.clientHeight / 2)
-  }
-  useEffect(() => {
-    const el = outlineRef.current
-    if (!el) return
-    // React 의 wheel 리스너는 passive 라 preventDefault 가 안 된다 → 직접 등록
-    const onWheel = (e: WheelEvent) => {
-      if (!e.ctrlKey && !e.metaKey) return
-      e.preventDefault()
-      zoomTo(zoomRef.current * (e.deltaY < 0 ? 1.1 : 1 / 1.1), e.clientX, e.clientY)
-    }
-    el.addEventListener('wheel', onWheel, { passive: false })
-    return () => el.removeEventListener('wheel', onWheel)
-  }, [loaded]) // oxlint-disable-line react-hooks/exhaustive-deps -- zoomTo 는 ref 와 setState 만 쓴다
+  // ---- 확대·축소: 버튼, Ctrl+휠, 핀치, 탐색 모드 키 - = 0 (graph/useZoom, 계약 C2) ----
+  const { zoom, zoomRef, setZoom, zoomTo, zoomBy, fit, centerOn } = useZoom(outlineRef, sameRoot && saved.zoom ? saved.zoom : 1, loaded)
+  const fitZoom = () => fit(selRef.current) // U15: 맞춤 뒤에도 선택 노드가 화면 가운데에 남는다
 
   // ---- 자동 맞춤: 진입·개요 가져오기 뒤 1회, 넘칠 때만. 일반 편집 중에는 카드가 튀지 않게 하지 않는다 ----
   const restorePending = useRef(sameRoot && typeof saved.sx === 'number' ? { x: saved.sx, y: saved.sy ?? 0 } : null)
@@ -347,7 +299,7 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
     if (centerPending.current === null) return
     centerRoot(centerPending.current)
     centerPending.current = null
-  }, [zoom])
+  }, [zoom]) // oxlint-disable-line react-hooks/exhaustive-deps -- centerRoot 는 ref 만 쓴다
 
   const counts = useMemo(() => countTree(nodes ?? []), [nodes])
   const open = useMemo<Open>(() => (n, d) => !n.collapsed && (!viewDepth || d + 1 < viewDepth || reveal.has(n.id)), [viewDepth, reveal])

@@ -21,7 +21,7 @@ export const nodeOut = (r: NodeRow): TreeNode & { deletedAt?: number } => ({
   id: r.id, treeId: r.tree_id, parentId: r.parent_id, order: r.order, title: r.title,
   ...(r.note != null ? { note: r.note } : {}), aliases: JSON.parse(r.aliases) as string[],
   ...(r.collapsed != null ? { collapsed: !!r.collapsed } : {}),
-  ...(r.offset != null ? { offset: JSON.parse(r.offset) as { x: number; y: number } } : {}),
+  ...(r.offset != null ? { offset: JSON.parse(r.offset) as TreeNode['offset'] } : {}),
   ...(r.width != null ? { width: r.width as 1 | 2 | 3 } : {}),
   updatedAt: r.updated_at, ...(r.deleted_at != null ? { deletedAt: r.deleted_at } : {}),
 })
@@ -61,7 +61,12 @@ export function parseNode(v: unknown, f: string): TreeNode {
   const o = obj(v, f)
   const aliases = arr(o.aliases ?? [], `${f}.aliases`)
   if (aliases.length > LIMITS.aliases) bad(`${f}.aliases`)
-  const offset = opt(o.offset, (x) => { const p = obj(x, `${f}.offset`); return { x: num(p.x, `${f}.offset`), y: num(p.y, `${f}.offset`) } })
+  // 계약 C1: x·y = 가로 보기, vx·vy = 세로 보기(선택)
+  const offset = opt(o.offset, (x) => {
+    const p = obj(x, `${f}.offset`)
+    const v = p.vx !== undefined || p.vy !== undefined ? { vx: num(p.vx ?? 0, `${f}.offset.vx`), vy: num(p.vy ?? 0, `${f}.offset.vy`) } : {}
+    return { x: num(p.x, `${f}.offset`), y: num(p.y, `${f}.offset`), ...v }
+  })
   const width = opt(o.width, (x) => (x === 1 || x === 2 || x === 3 ? x : bad(`${f}.width`)))
   const collapsed = opt(o.collapsed, (x) => (typeof x === 'boolean' ? x : bad(`${f}.collapsed`)))
   const note = opt(o.note, (x) => text(x, `${f}.note`, LIMITS.note, CTRL_NOTE))

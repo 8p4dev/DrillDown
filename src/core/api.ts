@@ -187,7 +187,17 @@ export interface SharedTree {
   node_count: number
   copy_count: number
   updated_at: number
+  /** 별점(계약 C3): avg = 평균(소수 1자리, 없으면 null), count = 평가 수, mine = 내 점수(비로그인·미평가 null), canRate = 로그인 + 본인 트리 아님 */
+  rating: Rating
   nodes: import('./types').TreeNode[]
+}
+
+/** 별점 요약. PUT /api/t/:slug/rating { stars: 1..5 } 의 응답도 이 모양(mine 은 방금 준 점수, canRate true) */
+export interface Rating {
+  avg: number | null
+  count: number
+  mine: number | null
+  canRate: boolean
 }
 
 /** GET /api/gallery 항목 (04 §3.5) */
@@ -198,4 +208,7 @@ export interface GalleryItem {
   copyCount: number
   ownerNickname: string
   updatedAt: number
+  /** 별점 평균(소수 1자리, 평가 없으면 null)·평가 수 (계약 C3) */
+  ratingAvg: number | null
+  ratingCount: number
 }

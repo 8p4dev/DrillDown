@@ -87,7 +87,9 @@ export function sharedTree(db: DB, t: ShareRow): SharedTree & { id: string } {
   return {
     id: t.id, slug: t.slug!, title: t.title, visibility: t.visibility as SharedTree['visibility'],
     owner: { nickname: t.nickname, avatar_url: t.use_provider_avatar ? t.avatar_url : null },
-    node_count: nodes.length, copy_count: t.copy_count, updated_at: t.updated_at, nodes,
+    node_count: nodes.length, copy_count: t.copy_count, updated_at: t.updated_at,
+    rating: { avg: null, count: 0, mine: null, canRate: false }, // 자리표시자 — 계약 C3, WY 가 ratings 집계로 교체
+    nodes,
   }
 }
 
@@ -105,7 +107,7 @@ export function gallery(db: DB, sort: 'recent' | 'copies', page: number, now: nu
     WHERE t.visibility = 'public' AND t.deleted_at IS NULL AND t.hidden_by_admin_at IS NULL AND u.deleted_at IS NULL AND u.suspended_at IS NULL AND t.slug IS NOT NULL${q ? " AND t.title LIKE ? ESCAPE '!'" : ''}
     ORDER BY ${sort === 'copies' ? 't.copy_count DESC, ' : ''}t.updated_at DESC, t.id LIMIT 21 OFFSET ?`).all(...(q ? [`%${q.replace(/[!%_]/g, '!$&')}%`] : []), (page - 1) * 20) as { slug: string; title: string; node_count: number; copy_count: number; updated_at: number; nickname: string }[]
   const v = {
-    items: rows.slice(0, 20).map((r) => ({ slug: r.slug, title: r.title, nodeCount: r.node_count, copyCount: r.copy_count, ownerNickname: r.nickname, updatedAt: r.updated_at })),
+    items: rows.slice(0, 20).map((r) => ({ slug: r.slug, title: r.title, nodeCount: r.node_count, copyCount: r.copy_count, ownerNickname: r.nickname, updatedAt: r.updated_at, ratingAvg: null, ratingCount: 0 })), // ratingAvg·ratingCount 자리표시자 — WY 가 집계로 교체
     page, hasMore: rows.length > 20,
   }
   if (galleryCache.size > 500) galleryCache.clear()
