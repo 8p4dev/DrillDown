@@ -126,4 +126,13 @@ typecheck·lint(경고 0)·check 통과 확인.
 - 머지: WY `4edb186` → `8ddcbf1`, WH `d780e6b` → `6a6c049` (WH 가 WY 와 거의 동시에 끝나 WE·WS 를 기다리지 않고 먼저 머지 — 파일 겹침 없음). 둘 다 typecheck·lint 0·check·build(precache 628.54 KiB) 통과. `e2e/regress.spec.ts` S1 의 `#/review` 이동 삭제.
 - WH 계획 대비 변경: App 의 `dd:remote` 리스너는 공유 보기 '내 트리' 숨김 조건(`countTrees`) 재집계용으로 남김.
 - 머지: WE `1f2f883` → `1866bb4`. typecheck·lint 0·check·build(628.98 KiB) 통과. `e2e/extras.spec.ts` 의 '화면 맞춤' 단계를 자동 맞춤 확인(83% 에서 가지 접기 → 배율 변화·≤100%)으로 교체.
-- (대기) WS 머지 · E2E · 결과
+- 머지: WS `f29a547` → `073b26b`. typecheck·lint 0·check·build(precache 640.00 KiB, 예산 상한과 같음) 통과. `rg 갤러리 src` 결과 0(treelist.css 주석 제외).
+- `npm run e2e` 1회: **22/22 통과**(27.5s).
+- 통합 확인(스크래치 Playwright msedge, 실제 서버 4365, 1440·390): R1 상단 바 복습 없음·`#/review`→내 트리 / R9 '공개 트리' 링크·aria-current / R10 h1·공유 시트 문구 / R2·R3 가로 드래그→세로(자동 정렬 버튼 없음)→가로 복귀 위치 유지(179px) / R4 휠만으로 100→91% / R5 화면 맞춤 버튼 없음 / R6 새 트리 시트 자동 열림·가져오기 뒤 닫힘 / R8 접기 뒤 배율 ≤100 / R7 보기 탭 카드 6·선 5, zoom-tools, 선택→'여기부터 학습'→`?m=flash&root=`, 390 캔버스·복제 바 안 겹침·수평 스크롤 없음 / R11 카드 7요소·미리보기 시트(제목은 머리, 본문은 하위 개요)·Esc / R11b·Y3 별점 4→응답 {avg 4,count 1,mine 4}, 새로고침 유지, 재평가 5→count 1, 본인 403, 비로그인 → 로그인 안내 토스트. 모두 통과.
+- `docs/CODEBASE.md` 갱신(기준일, 화면 표, 라우팅 표, 상단 바, 편집기 구성·확대·자동 맞춤·개요 시트, §6.5 삭제 기록, §6.9 공유 보기·공개 트리 목록, §14, 용어집, '갤러리' 전부 치환).
+
+## 8. 결과 요약
+- 완료: R1~R11 전부(11개 요구), 서버 별점 API Y1~Y5. 미완료 없음.
+- 계획 대비 변경: 머지 순서 WY → WH → WE → WS 유지하되 WY·WH 는 WE·WS 를 기다리지 않고 먼저 머지(파일 겹침 없음). WH 는 App 의 `dd:remote` 리스너를 남김(공유 보기 '내 트리' 숨김 조건용). WS 는 `onSettled` 안 `queueMicrotask(fit)` 로 레이아웃 이펙트의 flushSync 제약을 피함.
+- 남은 위험(후속 후보): ① R8 — Enter 로 카드를 추가하는 순간에도 맞춤이 돌아 입력 중 배율이 바뀔 수 있음(사용자 요구대로). ② 모바일에서 패널 아래 '개요 붙여넣기 · 내보내기' 글자 버튼이 하단 되돌리기 토스트(10초)와 같은 자리. ③ 별점을 줄 때마다 공개 트리 목록 캐시를 전부 비움(비용은 작음). ④ 빌드 precache 가 예산 상한(640 KiB)에 닿음 — 다음 기능 추가 때 청크 분리 필요.
+- 워크트리·브랜치 `agent-WY-rating`·`agent-WH-shell`·`agent-WE-editor`·`agent-WS-share` 는 머지된 채 남아 있다(이전 오케스트레이션과 같음).
