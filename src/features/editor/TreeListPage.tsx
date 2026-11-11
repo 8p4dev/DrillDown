@@ -28,7 +28,6 @@ const coarse = () => matchMedia('(pointer: coarse)').matches
 /** 검색칸을 보일 최소 트리 수(U42), 한도 안내를 시작할 수(U02) */
 const SEARCH_MIN = 10
 const WARN_AT = 190
-const endOfToday = () => new Date().setHours(23, 59, 59, 999)
 const rtf = new Intl.RelativeTimeFormat('ko')
 /** '방금' · 'n분 전' · 'n시간 전' · 'n일 전' · 'n개월 전' · 'n년 전' */
 function ago(t: number): string {
@@ -62,7 +61,7 @@ export default function TreeListPage() {
       .then((r) => setCopies(Object.fromEntries(r.trees.map((t) => [t.id, t.copyCount]))), () => {})
     return () => ac.abort()
   }, [meId])
-  const reload = useCallback(() => listTreeMeta(endOfToday()).then((ts) => {
+  const reload = useCallback(() => listTreeMeta().then((ts) => {
     setTrees(ts)
     // U05: 트리가 생기면 저장소 영구 보존 요청(비로그인 데이터 보호). 실패·미지원 무시
     if (ts.length && !persistAsked) { persistAsked = true; navigator.storage?.persist?.().catch(() => {}) }
@@ -160,7 +159,6 @@ export default function TreeListPage() {
       </form>
       {full ? <p className="trees-full" role="status">트리는 200개까지 저장할 수 있습니다</p>
         : !!me && count >= WARN_AT && <p className="trees-full" role="status">트리 {count}/{CAP.treesPerUser}</p>}
-      <p className="trees-gallery"><a href={href.gallery()}>공개 트리 둘러보기</a></p>
       {count >= SEARCH_MIN && (
         <input ref={search} type="search" className="trees-search" aria-label="트리 검색" placeholder="트리 이름 검색  /"
           value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === 'Escape' && (setQ(''), e.currentTarget.blur())} />
@@ -230,9 +228,9 @@ function TreeCard({ t, meta, copies, isNew, gone, editing, onEdit, onRename, onC
         </details>
       </div>
       {/* stretched link: 제목과 모드 사이 빈칸이 링크 본체, ::after 가 카드 전체를 덮는다. 제목·메뉴·모드 링크는 z-index 로 위에 */}
-      {/* U44: 노드 수 · 오늘 복습(학습한 트리만) · 최근 사용 */}
+      {/* U44: 노드 수 · 최근 사용 */}
       <p className="tree-meta">
-        노드 {meta.nodes}{meta.studiedAt !== undefined && ` · 복습 ${meta.due}`} · {ago(meta.usedAt)}{copies !== undefined && t.visibility && t.visibility !== 'private' && ` · 복제 ${copies}`}
+        노드 {meta.nodes} · {ago(meta.usedAt)}{copies !== undefined && t.visibility && t.visibility !== 'private' && ` · 복제 ${copies}`}
       </p>
       <a className="tree-open" href={href.edit(t.id)} aria-label={`${t.title} 편집`} onClick={() => haptic('tap')} />
       <nav className="tree-modes" aria-label={`${t.title} 학습 모드`}>

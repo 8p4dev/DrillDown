@@ -96,8 +96,7 @@
 .trees-full { margin: -.75rem 0 1.25rem; color: var(--muted); font-size: var(--fs-sm); }
 .trees-head > .trees-trash { flex: none; width: 2.4rem; height: 2.4rem; display: inline-grid; place-items: center; color: var(--muted); }
 
-/* U42 검색, Q1 갤러리 진입, U44 카드 메타, U20 제목 2줄 말줄임 */
-.trees-gallery { margin: -.75rem 0 1rem; font-size: var(--fs-sm); }
+/* U42 검색, U44 카드 메타, U20 제목 2줄 말줄임 */
 .trees .trees-search { width: 100%; box-sizing: border-box; margin-bottom: 1rem; }
 .trees-none { color: var(--muted); font-size: var(--fs-sm); }
 .tree-meta { margin: .1rem 0 .5rem 2.9rem; color: var(--muted); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

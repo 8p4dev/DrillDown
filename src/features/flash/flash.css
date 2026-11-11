@@ -1,4 +1,4 @@
-/* 플래시카드·미니맵·오늘의 복습 — index.css 토큰만(01 §3.1 4색 규칙). 연두 = ok 45% + 점선, 채움 위 글자 = --on-fill */
+/* 플래시카드·미니맵 — index.css 토큰만(01 §3.1 4색 규칙). 연두 = ok 45% + 점선, 채움 위 글자 = --on-fill */
 
 .flash-layout { display: grid; grid-template-columns: minmax(0, 1fr) 220px; gap: 1.5rem; align-items: start; }
 .flash-layout.solo { grid-template-columns: minmax(0, 1fr); } /* 미니맵 숨김(100노드 초과) */
@@ -8,7 +8,7 @@
 .flash-tally svg.ok { color: var(--ok); }
 .flash-tally svg.no { color: var(--danger); }
 .pop-num { display: inline-block; animation: pop var(--t-med) var(--ease-out); }
-.flash .flash-edit-link, .review-link { display: inline-flex; align-items: center; justify-content: center; gap: .35rem; } /* 버튼은 index.css 가 inline-flex */
+.flash .flash-edit-link { display: inline-flex; align-items: center; justify-content: center; gap: .35rem; } /* 버튼은 index.css 가 inline-flex */
 
 /* 경로 */
 .flash-path { margin-bottom: .75rem; } /* 모양은 ui/NodePath(.node-path) */
@@ -137,22 +137,6 @@
 @media (hover: hover) { .mm-node.go:hover rect { stroke: var(--text); stroke-width: 2; } }
 .mm-node:focus { outline: none; }
 
-/* 오늘의 복습 */
-.review-list { list-style: none; padding: 0; display: grid; gap: .6rem; }
-.review-list li { display: flex; align-items: center; gap: .9rem; }
-.review-list li strong { flex: 1; min-width: 0; font-weight: 650; }
-.due-count { font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
-/* 링크를 버튼 규격으로(01 §3.3 버튼 기본 행) */
-.review-link { min-height: var(--tap); padding: .45rem .85rem; font-size: var(--fs-sm); font-weight: 550; color: var(--text); border: 1px solid var(--border-strong); border-radius: var(--radius); text-decoration: none; }
-@media (hover: hover) { .review-link:hover { background: var(--surface-2); border-color: var(--text); text-decoration: none; } }
-.review-head { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
-.review-head h1 { margin: 0; }
-.review-head > .muted { font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
-.review-bar { flex: 1; min-width: 120px; height: 6px; border-radius: 0; background: color-mix(in srgb, var(--text) 8%, transparent); overflow: hidden; }
-.review-bar span { display: block; height: 100%; background: var(--text); transition: width var(--t-slow) var(--ease-out); }
-.review-empty { display: flex; align-items: center; gap: .75rem; color: var(--muted); }
-.review-empty svg { color: var(--ok); }
-
 /* ---- 모바일 (§3.1 브레이크포인트) ---- */
 @media (max-width: 760px) {
   .flash-layout { grid-template-columns: minmax(0, 1fr); gap: .75rem; }
@@ -196,13 +180,6 @@
   /* 바 높이: 44px 버튼 + 위아래 .5rem + 테두리. 토스트(.flash 밖)도 쓰므로 body 에 둔다 */
   body:has(.flash-nav) { --flash-bar-h: 60px; }
   .flash-card-wrap { margin-bottom: calc(var(--flash-bar-h) - 1rem); }
-
-  /* 오늘의 복습: 제목 / [플래시카드 · 복습 시작] 두 줄 */
-  .review-list li { flex-wrap: wrap; gap: .6rem; }
-  .review-list li strong { flex-basis: calc(100% - 4rem); }
-  .review-list li a, .review-list li button { flex: 1 1 8rem; min-height: 44px; } /* 기준 폭이 첫 줄 남은 칸(4rem)보다 커서 둘째 줄로 내려간다 */
-  .review-head { gap: .5rem .75rem; }
-  .review-head h1 { flex: 1 0 100%; }
 }
 /* 가로 모드 폰(02 D11): 바는 흐름으로 */
 @media (max-height: 500px) and (pointer: coarse) {

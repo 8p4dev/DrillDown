@@ -7,7 +7,6 @@ export type AdminTab = 'dashboard' | 'users' | 'trees' | 'system'
 export type Route =
   | { name: 'trees' }
   | { name: Mode; treeId: string; rootId?: string }
-  | { name: 'review' }
   | { name: 'login'; e?: string; returnTo?: string } // e = denied | suspended | state (03 §3.6)
   | { name: 'account' }
   | { name: 'admin'; tab: AdminTab }
@@ -28,7 +27,6 @@ export function parseHash(hash: string): Route {
     const m = MODES.find((x) => x === p[2]) ?? 'edit'
     return { name: m, treeId: p[1], rootId }
   }
-  if (p[0] === 'review') return { name: 'review' }
   if (p[0] === 'login') return { name: 'login', e: qs.get('e') ?? undefined, returnTo: qs.get('return_to') ?? undefined }
   if (p[0] === 'account') return { name: 'account' }
   if (p[0] === 'admin') return { name: 'admin', tab: ADMIN_TABS.find((t) => t === p[1]) ?? 'dashboard' }
@@ -65,7 +63,6 @@ export const href = {
   dnd: (treeId: string, rootId?: string) => `#/tree/${treeId}/dnd${q(rootId)}`,
   /** 백지 드래그 앤 드롭 퀴즈: rootId = 범위 */
   blank: (treeId: string, rootId?: string) => `#/tree/${treeId}/blank${q(rootId)}`,
-  review: () => '#/review',
   login: (returnTo?: string) => `#/login${returnTo ? `?return_to=${encodeURIComponent(returnTo)}` : ''}`,
   account: () => '#/account',
   admin: (tab: AdminTab = 'dashboard') => (tab === 'dashboard' ? '#/admin' : `#/admin/${tab}`),

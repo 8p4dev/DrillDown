@@ -1,12 +1,6 @@
 // 플래시카드 순수 로직 (DOM·DB 없음). 점검: npx tsx src/features/flash/flash.check.ts
-import { descendantsOf, getRoot } from '../../core/repo'
+import { descendantsOf } from '../../core/repo'
 import type { ID, NodeSrs, TreeNode } from '../../core/types'
-
-/** 트리 전체 전위 순서(루트 포함) */
-export const preorder = (nodes: TreeNode[]): TreeNode[] => {
-  const root = getRoot(nodes)
-  return [root, ...descendantsOf(nodes, root.id)]
-}
 
 /** 범위 안 개념(자식 있는 노드) id, 전위 순서 — 진행 n/m 의 m(U30) */
 export function conceptsIn(nodes: TreeNode[], scopeId: ID): ID[] {
@@ -19,19 +13,6 @@ export function weakQueue(nodes: TreeNode[], srs: Map<ID, NodeSrs>, scopeId: ID)
   const heat = new Map<ID, number>()
   for (const n of nodes) if (n.parentId !== null) heat.set(n.parentId, (heat.get(n.parentId) ?? 0) + (srs.get(n.id)?.miss ?? 0))
   return conceptsIn(nodes, scopeId).filter((id) => heat.get(id)! > 0).sort((a, b) => heat.get(b)! - heat.get(a)!)
-}
-
-/** 복습 큐: 기한 노드의 부모(루트면 자신)를 전위 순서로 중복 없이. 부모가 곧 플래시카드 개념 */
-export function parentQueue(nodes: TreeNode[], due: NodeSrs[]): ID[] {
-  const byId = new Map(nodes.map((n) => [n.id, n]))
-  const want = new Set(due.flatMap((s) => { const n = byId.get(s.nodeId); return n ? [n.parentId ?? n.id] : [] }))
-  return preorder(nodes).filter((n) => want.has(n.id)).map((n) => n.id)
-}
-
-/** U34: 복습 목록 — 가장 오래 밀린(기한이 가장 이른 항목이 있는) 트리부터. 카드 순서는 parentQueue(전위)가 정한다 */
-export const byOverdue = <T extends { due: NodeSrs[] }>(rows: T[]): T[] => {
-  const first = (r: T) => Math.min(...r.due.map((s) => s.due))
-  return [...rows].sort((a, b) => first(a) - first(b))
 }
 
 /** 미니맵용: 접힘·마우스 offset 무시하고 전체 트리를 그린다 */
