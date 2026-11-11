@@ -1,5 +1,6 @@
 // 트리 그래프 배치 — 순수 함수 (DOM 없음). 크기 측정은 주입받는다.
-// dir 'down' = 위→아래(깊이 = 행), 'right' = 왼→오른(깊이 = 열, 형제는 세로로 쌓임 — 세로 보기). right 는 down 을 축만 바꿔 계산한다
+// dir 'down' = 위→아래(깊이 = 행), 'right' = 왼→오른(깊이 = 열, 형제는 세로로 쌓임 — 세로 보기). right 는 down 을 축만 바꿔 계산한다.
+// offset: down 은 x·y, right 는 vx·vy 만 쓴다(방향별 위치, 계약 C1)
 import { byOrder } from '../../../core/path'
 import type { ID, TreeNode } from '../../../core/types'
 
@@ -27,9 +28,10 @@ const RIGHT_GAP = { sib: 10, depth: 44 } // 세로 보기: 형제 사이 세로 
 export const isOpen = (n: TreeNode) => !n.collapsed
 export function layout(nodes: TreeNode[], rootId: ID, measure: (n: TreeNode) => Size, open: (n: TreeNode, depth: number) => boolean = isOpen, dir: Dir = 'down'): Graph {
   if (dir === 'down') return core(nodes, rootId, measure, open, HGAP, VGAP)
-  // 축 바꾸기: 크기·offset 을 뒤집어 down 으로 배치한 뒤 좌표를 되돌린다(화면 offset 은 그대로 화면 축)
+  // 축 바꾸기: 크기·offset 을 뒤집어 down 으로 배치한 뒤 좌표를 되돌린다. 세로 보기 offset 은 vx·vy(화면 축, 계약 C1) — x·y(가로 보기) 는 무시.
+  // core 가 축을 바꾸므로 전치해 넣으면({x: vy, y: vx}) 결과에서 vx 는 화면 x, vy 는 화면 y 가 된다
   const t = core(
-    nodes.map((n) => (n.offset ? { ...n, offset: { x: n.offset.y, y: n.offset.x } } : n)), rootId,
+    nodes.map((n) => (n.offset ? { ...n, offset: { x: n.offset.vy ?? 0, y: n.offset.vx ?? 0 } } : n)), rootId,
     (n) => { const s = measure(n); return { w: s.h, h: s.w } }, open, RIGHT_GAP.sib, RIGHT_GAP.depth,
   )
   for (const b of t.boxes.values()) [b.x, b.y, b.w, b.h] = [b.y, b.x, b.h, b.w]

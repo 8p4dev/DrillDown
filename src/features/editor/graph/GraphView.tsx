@@ -6,7 +6,12 @@ import { isOpen, layout, type Box, type Dir, type Size } from './layout'
 
 const DRAG_MIN = 4 // 이보다 적게 움직이면 클릭
 const FALLBACK: Size = { w: 64, h: 34 }
-const offsetOf = (n: TreeNode, dx: number, dy: number) => ({ x: (n.offset?.x ?? 0) + dx, y: (n.offset?.y ?? 0) + dy })
+/** 현재 방향의 키에만 더한다(계약 C1: down = x·y, right = vx·vy). 다른 방향의 값은 그대로 */
+const offsetOf = (n: TreeNode, dx: number, dy: number, dir: Dir): Offset => {
+  const o = { x: 0, y: 0, ...n.offset }
+  return dir === 'right' ? { ...o, vx: (o.vx ?? 0) + dx, vy: (o.vy ?? 0) + dy } : { ...o, x: o.x + dx, y: o.y + dy }
+}
+type Offset = NonNullable<TreeNode['offset']>
 
 /**
  * 위→아래 트리 그래프. 카드 크기는 렌더된 DOM 을 재서 layout 에 주입하고,
@@ -19,12 +24,12 @@ export default function GraphView(p: {
   open?: (n: TreeNode, depth: number) => boolean
   /** still = 위치 트랜지션 끔(측정 전·드래그로 따라오는 중), lifted = 끌고 있는 카드, spawn = 진입 뒤에 새로 생긴 카드 */
   renderNode: (n: TreeNode, box: Box, m: { still: boolean; lifted: boolean; spawn: boolean }) => ReactNode
-  onMove: (id: ID, offset: { x: number; y: number }) => void
+  onMove: (id: ID, offset: Offset) => void
   /** 확대 배율 (1 = 100%). 배치·측정은 배율과 무관한 원래 px, 화면에만 scale */
   zoom?: number
   /** 핀치: 화면 좌표 (cx, cy) 를 기준점으로 배율 변경 */
   onZoomAt?: (zoom: number, cx: number, cy: number) => void
-  /** 실측 크기로 배치를 마칠 때마다 (카드 구성이 바뀐 뒤 1회). rootX·rootY = 루트 카드 중심(배치 좌표) */
+  /** 실측 크기로 배치를 마칠 때마다 (보이는 카드 집합 또는 dir 이 바뀐 뒤 1회 — 입력·드래그·너비 변경은 부르지 않는다). rootX·rootY = 루트 카드 중심(배치 좌표) */
   onSettled?: (width: number, height: number, rootX: number, rootY: number) => void
   /** 'down' 위→아래(기본) · 'right' 세로 보기(왼→오른, 형제가 세로로 쌓임) */
   dir?: Dir
@@ -35,17 +40,18 @@ export default function GraphView(p: {
   const [drag, setDrag] = useState<{ id: ID; dx: number; dy: number } | null>(null)
   const start = useRef<{ id: ID; x: number; y: number; moved: boolean; el: HTMLElement; pointer: number } | null>(null)
 
-  const shown = useMemo(
-    () => (drag ? p.nodes.map((n) => (n.id === drag.id ? { ...n, offset: offsetOf(n, drag.dx, drag.dy) } : n)) : p.nodes),
-    [p.nodes, drag],
-  )
   const open = p.open ?? isOpen
   const dir = p.dir ?? 'down'
+  const shown = useMemo(
+    () => (drag ? p.nodes.map((n) => (n.id === drag.id ? { ...n, offset: offsetOf(n, drag.dx, drag.dy, dir) } : n)) : p.nodes),
+    [p.nodes, drag, dir],
+  )
   const g = useMemo(() => layout(shown, p.rootId, (n) => sizes.get(n.id) ?? FALLBACK, open, dir), [shown, p.rootId, sizes, open, dir])
   const byId = useMemo(() => new Map(shown.map((n) => [n.id, n])), [shown])
 
   // 위치 정착한 카드 id. 처음엔 FALLBACK 크기로 놓였다가 측정 후 옮겨지므로, 정착 전엔 미끄러지지 않게 still
   const [known, setKnown] = useState<Set<ID>>(new Set())
+  const settledDir = useRef(dir) // 방향이 바뀌면 집합이 같아도 배치가 통째로 바뀐다 → onSettled 1회
   const dragId = drag?.id
   // 끄는 카드와 그 하위. 자식 Map 한 번 → O(n) (childrenOf 반복은 O(n²), R5-P9)
   const moving = useMemo(() => {
@@ -105,7 +111,8 @@ export default function GraphView(p: {
     seen.current = next
     measure(dirty)
     const ids = [...g.boxes.keys()]
-    if ((known.size !== ids.length || ids.some((id) => !known.has(id))) && ids.every((id) => sizes.has(id))) {
+    if ((known.size !== ids.length || ids.some((id) => !known.has(id)) || settledDir.current !== dir) && ids.every((id) => sizes.has(id))) {
+      settledDir.current = dir
       // oxlint-disable-next-line react/set-state-in-effect -- 측정 완료 후 정착 표시
       setKnown(new Set(ids))
       const r = g.boxes.get(p.rootId)
@@ -190,7 +197,7 @@ export default function GraphView(p: {
     const n = p.nodes.find((x) => x.id === s.id)
     setDrag(null)
     if (n && (drag.dx || drag.dy)) {
-      p.onMove(n.id, offsetOf(n, drag.dx, drag.dy))
+      p.onMove(n.id, offsetOf(n, drag.dx, drag.dy, dir))
       haptic('tap')
     }
   }
