@@ -122,4 +122,7 @@ typecheck·lint(경고 0)·check 통과 확인.
 - 결과는 §7, `docs/CODEBASE.md` 갱신(§5 라우팅 표, §6.2 확대·개요, §6.5 삭제, §6.9, §9, §14).
 
 ## 7. 진행 기록
-- (대기) 선행 커밋 · 디스패치 · 머지 · 결과
+- 2026-11-11 선행 커밋 `5222a15`. Run `run_7cbe4c3df568`. 디스패치(새 워크트리, base main, 에이전트 claude): WY `ctx_d438370f3e0d` agent-WY-rating · WH `ctx_2ff20815ced1` agent-WH-shell · WE `ctx_e55355c66eb9` agent-WE-editor · WS `ctx_13f859ec9a57` agent-WS-share.
+- 머지: WY `4edb186` → `8ddcbf1`, WH `d780e6b` → `6a6c049` (WH 가 WY 와 거의 동시에 끝나 WE·WS 를 기다리지 않고 먼저 머지 — 파일 겹침 없음). 둘 다 typecheck·lint 0·check·build(precache 628.54 KiB) 통과. `e2e/regress.spec.ts` S1 의 `#/review` 이동 삭제.
+- WH 계획 대비 변경: App 의 `dd:remote` 리스너는 공유 보기 '내 트리' 숨김 조건(`countTrees`) 재집계용으로 남김.
+- (대기) WE·WS 머지 · extras.spec 갱신 · E2E · 결과

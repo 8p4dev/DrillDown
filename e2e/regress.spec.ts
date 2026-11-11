@@ -14,7 +14,7 @@ async function makeTree(page: Page, title: string, outline: string) {
   await page.getByLabel('개요 텍스트').fill(outline)
   await page.getByRole('button', { name: '선택 노드의 자식으로 추가' }).click()
 }
-test('S1: 다른 기기에서 받은 학습 기록으로 플래시·복습이 깨지지 않는다', async ({ browser }) => {
+test('S1: 다른 기기에서 받은 학습 기록으로 플래시가 깨지지 않는다', async ({ browser }) => {
   const a = await browser.newContext(); const pa = await a.newPage()
   await login(pa, 'srs1')
   await makeTree(pa, '헌법', '기본권\n  자유권\n  평등권')
@@ -34,7 +34,6 @@ test('S1: 다른 기기에서 받은 학습 기록으로 플래시·복습이 �
   await pb.locator('button[data-concept-id]').first().click()
   const kb = pb.getByRole('list', { name: '하위 개념' }).locator('li[data-node-id]')
   await kb.first().getByRole('button', { name: '알음', exact: true }).click()
-  await pb.goto('/#/review'); await pb.waitForTimeout(800)
   await pb.goto(`/#/tree/${id}`); await pb.waitForTimeout(800)
   expect(errs).toEqual([])
   await a.close(); await b.close()
