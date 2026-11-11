@@ -102,15 +102,12 @@ export function missHeat(s: NodeSrs | undefined): number {
 
 // ── DB 래퍼 ────────────────────────────────────────────────
 
-/** 기록을 쓴 뒤 상단 복습 배지 갱신(계약 C3) */
-const notifyDue = () => dispatchEvent(new Event('dd:due'))
-
 /**
  * 채점 1회 기록. 노드가 지워졌으면(다른 기기 삭제가 pull 된 뒤) 쓰지 않고 null.
  * base: "다시 평가" 때 첫 평가 전 기록(null = 없었음)을 넘기면 저장된 값 대신 그것을 기준으로 다시 계산해 덮어쓴다(S2)
  */
 export async function recordGrade(nodeId: ID, treeId: ID, src: GradeSource, structure: Structure, now = new Date(), base?: NodeSrs | null): Promise<NodeSrs | null> {
-  const next = await db.transaction('rw', [db.srs, db.nodes, db.outbox, db.meta], async () => {
+  return db.transaction('rw', [db.srs, db.nodes, db.outbox, db.meta], async () => {
     if (!(await db.nodes.get(nodeId))) return null
     const prev = base === undefined ? await db.srs.get(nodeId) : (base ?? undefined)
     const r = applyGrade(prev, nodeId, treeId, src, structure, now)
@@ -118,8 +115,6 @@ export async function recordGrade(nodeId: ID, treeId: ID, src: GradeSource, stru
     await track([{ kind: 'srs', id: nodeId, treeId, op: 'put' }]) // 04 §3.1 쓰기 훅
     return r
   })
-  if (next) notifyDue()
-  return next
 }
 
 /** 학습 모드(플래시카드·D&D) 공용 기록: 맞음 = Good(자동 정답과 동일, 초록 가능), 틀림 = Again. miss 도 갱신 */
@@ -129,24 +124,16 @@ export function recordResult(nodeId: ID, treeId: ID, ok: boolean, now = new Date
 
 /** 빈칸·백지 채점: 여러 노드를 한 트랜잭션으로(S18). 지워진 노드는 건너뛴다 */
 export async function recordResults(treeId: ID, ids: ID[], oks: boolean[], now = new Date()): Promise<void> {
-  const n = await db.transaction('rw', [db.srs, db.nodes, db.outbox, db.meta], async () => {
+  await db.transaction('rw', [db.srs, db.nodes, db.outbox, db.meta], async () => {
     const alive = new Set((await db.nodes.bulkGet(ids)).flatMap((x) => (x ? [x.id] : [])))
     const prev = new Map((await db.srs.bulkGet(ids)).flatMap((s) => (s ? [[s.nodeId, s] as const] : [])))
     const rows = ids.flatMap((id, i) => (alive.has(id) ? [applyGrade(prev.get(id), id, treeId, oks[i] ? 'exact' : 'auto_reject', oks[i] ? 'ok' : null, now)] : []))
     await db.srs.bulkPut(rows)
     await track(rows.map((r) => ({ kind: 'srs' as const, id: r.nodeId, treeId, op: 'put' as const })))
-    return rows.length
   })
-  if (n) notifyDue()
 }
 
 export async function getSrsMap(treeId: ID): Promise<Map<ID, NodeSrs>> {
   const rows = await db.srs.where('treeId').equals(treeId).toArray()
   return new Map(rows.map((s) => [s.nodeId, s]))
-}
-
-export async function dueByTree(now = new Date()): Promise<Map<ID, NodeSrs[]>> {
-  const out = new Map<ID, NodeSrs[]>()
-  for (const s of await db.srs.where('due').belowOrEqual(+now).toArray()) out.set(s.treeId, [...(out.get(s.treeId) ?? []), s])
-  return out
 }

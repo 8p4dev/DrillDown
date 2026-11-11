@@ -74,18 +74,17 @@ export async function purgeDeletedTrees(now = Date.now()): Promise<void> {
 }
 
 /** 목록 카드 한 줄 메타(U44). studiedAt 은 그 트리 srs 의 마지막 학습 시각(없으면 학습 안 함) */
-export interface TreeMeta { tree: Tree; nodes: number; due: number; studiedAt?: number; usedAt: number }
-type SrsLite = Pick<NodeSrs, 'treeId' | 'due' | 'card'>
+export interface TreeMeta { tree: Tree; nodes: number; studiedAt?: number; usedAt: number }
+type SrsLite = Pick<NodeSrs, 'treeId' | 'card'>
 
 /** 순수 집계: 소프트 삭제 제외, 최근 사용 = max(편집, 학습) 내림차순(U43). nodeTreeIds = 노드마다 treeId 하나 */
-export function summarizeTrees(trees: Tree[], srs: SrsLite[], nodeTreeIds: ID[], dueBy: number): TreeMeta[] {
+export function summarizeTrees(trees: Tree[], srs: SrsLite[], nodeTreeIds: ID[]): TreeMeta[] {
   const m = new Map<ID, TreeMeta>()
-  for (const t of trees) if (!t.deletedAt) m.set(t.id, { tree: t, nodes: 0, due: 0, usedAt: t.updatedAt })
+  for (const t of trees) if (!t.deletedAt) m.set(t.id, { tree: t, nodes: 0, usedAt: t.updatedAt })
   for (const id of nodeTreeIds) { const x = m.get(id); if (x) x.nodes++ }
   for (const s of srs) {
     const x = m.get(s.treeId)
     if (!x) continue
-    if (s.due <= dueBy) x.due++
     // card 는 로컬이면 Date, 서버에서 받은 행이면 JSON 문자열 → new Date 가 둘 다 받는다
     const at = +new Date((s.card as { lastReviewAt?: Date | string | null }).lastReviewAt ?? 0)
     if (at > (x.studiedAt ?? 0)) x.studiedAt = at
@@ -96,9 +95,9 @@ export function summarizeTrees(trees: Tree[], srs: SrsLite[], nodeTreeIds: ID[],
 }
 
 /** 목록 화면용. 쿼리 3회(trees, srs 전체, nodes treeId 인덱스 키만) — 트리별 루프 쿼리 없음 */
-export async function listTreeMeta(dueBy = Infinity): Promise<TreeMeta[]> {
+export async function listTreeMeta(): Promise<TreeMeta[]> {
   const [trees, srs, keys] = await Promise.all([db.trees.toArray(), db.srs.toArray(), db.nodes.orderBy('treeId').keys()])
-  return summarizeTrees(trees, srs, keys as ID[], dueBy)
+  return summarizeTrees(trees, srs, keys as ID[])
 }
 
 /** 소프트 삭제 제외, updatedAt 내림차순. 최근 사용 정렬은 listTreeMeta(목록 화면)만 — 여기서 srs 를 읽지 않는다 */

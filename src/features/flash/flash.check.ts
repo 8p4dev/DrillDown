@@ -1,6 +1,6 @@
 // 실행: npx tsx src/features/flash/flash.check.ts
 import type { NodeSrs, TreeNode } from '../../core/types'
-import { byOverdue, conceptsIn, minimapNodes, missedConcepts, parentQueue, plainNote, PROGRESS_TTL, readProgress, requeueMissed, weakQueue } from './flash'
+import { conceptsIn, minimapNodes, missedConcepts, plainNote, PROGRESS_TTL, readProgress, requeueMissed, weakQueue } from './flash'
 
 const ok = (c: unknown, msg: string) => { if (!c) throw new Error(msg) }
 const eq = (a: unknown, b: unknown, msg: string) => ok(JSON.stringify(a) === JSON.stringify(b), `${msg}: expected ${JSON.stringify(b)}, got ${JSON.stringify(a)}`)
@@ -15,12 +15,6 @@ const nodes = [n('c1', 'c', 0), n('r', null, 0), n('c', 'r', 2), n('a', 'r', 0),
 
 eq(conceptsIn(nodes, 'r'), ['r', 'a', 'a1', 'c'], '범위 개념: 전위·리프 제외')
 eq(conceptsIn(nodes, 'a'), ['a', 'a1'], '범위 개념: 서브트리만')
-
-const due = (nodeId: string) => ({ nodeId }) as NodeSrs
-eq(parentQueue(nodes, [due('c1'), due('a2'), due('a1'), due('r'), due('zz')]), ['r', 'a', 'c'], '부모 큐: 전위 순서·중복 제거·루트는 자신·없는 노드 무시')
-
-const d = (n: number) => ({ due: n }) as NodeSrs
-eq(byOverdue([{ id: 'x', due: [d(5), d(9)] }, { id: 'y', due: [d(7), d(2)] }]).map((r) => r.id), ['y', 'x'], '복습 목록: 가장 오래 밀린 트리부터')
 
 ok(minimapNodes([{ ...n('x', null, 0), collapsed: true, offset: { x: 5, y: 5 } }]).every((m) => !m.collapsed && !m.offset), '미니맵은 접힘·offset 무시')
 eq(plainNote('- 하나 ==y:형광== 끝\n둘 ==p:a==b==b:c== '), '- 하나 형광 끝\n둘 abc', '형광펜 마커 제거')
