@@ -65,8 +65,11 @@ test('확대·축소와 확대 상태에서의 드래그·패닝', async ({ page
   const after = await page.locator(`.node-row[data-node-id="${id}"]`).evaluate((el) => (el as HTMLElement).offsetTop)
   expect(Math.abs(after - before - 100)).toBeLessThanOrEqual(2)
 
-  // 화면 맞춤: 전체가 보이도록 100% 이하
-  await page.getByRole('button', { name: '화면 맞춤' }).click()
+  // R8 자동 맞춤: 보이는 카드 집합이 바뀌면(가지 접기) 전체가 보이도록 배율이 바뀐다(≤100%). 새로고침 직후는 저장된 83% 복원
+  await expect(out).toHaveText('83%')
+  await card(page, /^해고$/).click()
+  await page.getByRole('tree').press('h')
+  await expect(out).not.toHaveText('83%')
   expect(parseInt((await out.textContent())!)).toBeLessThanOrEqual(100)
 })
 
