@@ -49,4 +49,13 @@
 1. WY → 2. WH → 3. WE. 각 머지 뒤 typecheck·lint·check·build. 마지막에 `npm run e2e` 1회 + 스크래치 Playwright: Enter 연속 추가 중 배율·스크롤 불변 → Esc 뒤 맞춤(F1), 390 토스트와 버튼 좌표(F2), precache 수치(F3), unlisted 평가 뒤 캐시 유지(F4 는 check 단언). 끝나면 `main` 을 `origin`(github.com/8p4dev/DrillDown) 에 푸시하고 프리뷰 서버(5173, `.preview-data`) 를 새 빌드로 재기동.
 
 ## 7. 진행 기록
-- (대기)
+- 2026-11-12 plan 커밋 `aa96323`. Run `run_7cbe4c3df568`(앞 Run 이어서). 디스패치(새 워크트리, base main, claude): WY `ctx_7a98a3a0a619` agent-WY-followup · WH `ctx_00826f12eea6` agent-WH-followup · WE `ctx_6db7112a8240` agent-WE-followup.
+- 프리뷰 서버(5173, `.preview-data`) 를 `ce4d5d6` 빌드로 재기동(같은 Orca 터미널). 후속 머지 뒤 한 번 더 재기동 예정.
+- 머지: WY `399c8ab` → `d285c40`, WH `881ed72` → `ce219d8`, WE `a67a03c` → `6d10600`. 각각 typecheck·lint 0·check·build 통과. 최종 precache 68 entries 611.58 KiB(640 → 611).
+- `npm run e2e` 22/22 통과(28.4s).
+- 통합 확인(스크래치 Playwright msedge, 서버 4365): F1 Enter 3회 연속 추가 중 배율·scrollTop 불변(30%), Esc 뒤 맞춤(테스트 트리가 배율 하한 30% 라 값 변화 없음 — WE 실측 43→33% 로 확인됨) / F2 390 삭제 토스트 중 개요 버튼 725~769px vs 토스트 782~825px 비겹침 / F3 공개 트리 목록 청크가 온라인에서 정상 로드, `dist/sw.js` 에 SharedPage·GalleryPage 0건 / F4 는 sync.check 단언.
+- 계획 대비 변경: WH 가 `**/share-*.css` 대신 `**/share-????????.css`(해시 8자) 로 좁힘 — 오프라인 화면이 쓰는 `share-list-*.css` 를 precache 에 남기기 위해. WE 는 F2 를 (b) `.side` 아래 여백 3rem 으로.
+
+## 8. 결과 요약
+- 완료: 남은 위험 ①~④ 전부 해소. 미완료 없음.
+- 남은 것(기능 아님): 꽉 찬 트리에서 편집 중 새 카드가 캔버스 밖에 생기면 카드의 기존 '보이게 스크롤'만 돈다(맞춤은 Esc 뒤). 오프라인 첫 진입에서 공유 보기·공개 트리 목록을 열면 ErrorBoundary '새로 고침'(관리자 화면과 같음). precache 여유 28 KiB.
