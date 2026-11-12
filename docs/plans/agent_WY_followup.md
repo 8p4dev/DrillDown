@@ -20,13 +20,18 @@
 
 ## 단계
 
-- [ ] 0. `npm ci`, plan·코드 읽기, 이 문서
-- [ ] 1. `share.ts` `rateTree`: `if (t.visibility === 'public') clearGalleryCache()`
-- [ ] 2. `sync.check.ts`: unlisted 전환 → 캐시 채움 → 평가 → 같은 T0 재조회가 같은 객체; public 복귀 → 평가 → 다른 객체·새 ratingAvg
-- [ ] 3. `npm run typecheck`·`lint`(경고 0)·`check`·`build`
+- [x] 0. `npm ci`, plan·코드 읽기, 이 문서
+- [x] 1. `share.ts` `rateTree`: `if (t.visibility === 'public') clearGalleryCache()`
+- [x] 2. `sync.check.ts`: unlisted 전환 → 캐시 채움 → 평가 → 같은 T0 재조회가 같은 객체; public 복귀 → 평가 → 다른 객체·새 ratingAvg
+- [x] 3. `npm run typecheck`·`lint`(경고 0)·`check`·`build`
 - [ ] 4. 커밋, worker_done
 
 ## 검증 방법
 
 - 1~2: `node server/check.ts`(check 스크립트 마지막 항목). 가드를 빼면 unlisted 단언(같은 참조)이 실패하고, 가드를 `!== 'public'` 로 뒤집으면 public 단언이 실패하는지 각각 한 번 확인.
 - 3: 네 명령 모두 종료 코드 0, lint 경고 0.
+
+## 결과
+
+- `node server/check.ts`: 통과. 가드를 빼면 337행(unlisted 재조회 같은 참조) 실패, 가드를 뒤집으면 332행(public 평가 뒤 새 값) 실패 — 단언이 가드 양쪽을 모두 잡는다.
+- typecheck·lint(경고 0)·check·build 모두 0. precache 640.00 KiB 는 변화 없음(F3 는 WH 담당).

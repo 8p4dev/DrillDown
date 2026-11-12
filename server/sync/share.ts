@@ -92,11 +92,11 @@ export function ratingOf(db: DB, t: { id: string; owner_id: string }, viewer?: V
   return { avg: round1(agg.avg), count: agg.cnt, mine, canRate: !!viewer && viewer.id !== t.owner_id }
 }
 
-/** PUT /api/t/:slug/rating — upsert(1인 1표, 수정 가능). 본인 트리는 403. 갤러리 캐시를 비워 ratingAvg 가 바로 반영되게 */
+/** PUT /api/t/:slug/rating — upsert(1인 1표, 수정 가능). 본인 트리는 403. public 트리면 갤러리 캐시를 비워 ratingAvg 가 바로 반영되게(unlisted 는 목록에 없음) */
 export function rateTree(db: DB, userId: string, t: ShareRow, stars: number): Rating {
   if (t.owner_id === userId) fail(403, 'own_tree', '내 트리는 평가할 수 없습니다')
   db.prepare('INSERT INTO ratings(user_id, tree_id, stars, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT(user_id, tree_id) DO UPDATE SET stars = excluded.stars, updated_at = excluded.updated_at').run(userId, t.id, stars, Date.now())
-  clearGalleryCache()
+  if (t.visibility === 'public') clearGalleryCache()
   return ratingOf(db, t, { id: userId, role: 'user' })
 }
 
