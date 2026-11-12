@@ -240,7 +240,7 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
   }, [editId])
 
   // ---- 확대·축소: 버튼, 휠, 핀치, 탐색 모드 키 - = 0 (graph/useZoom, 계약 C2) ----
-  const { zoom, zoomRef, setZoom, zoomTo, zoomBy, centerOn } = useZoom(outlineRef, sameRoot && saved.zoom ? saved.zoom : 1, loaded)
+  const { zoom, zoomRef, setZoom, zoomTo, zoomBy, fit, centerOn } = useZoom(outlineRef, sameRoot && saved.zoom ? saved.zoom : 1, loaded)
 
   // ---- 자동 맞춤(R8): 보이는 카드 집합(또는 방향)이 바뀌어 배치가 끝날 때마다 전체가 보이는 배율(≤100%, 하한 clampZoom)로 맞추고 선택을 가운데에.
   // 입력·드래그·너비 변경은 집합이 그대로라 GraphView 가 onSettled 를 부르지 않는다 ----
@@ -255,6 +255,8 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
   const centerAfter = useRef<ID | null>(null) // 검색·실행 취소로 새로 그려지는 카드: 맞춤 뒤 이 카드를 가운데로
   const fitPending = useRef<ID | null>(null) // 맞춤 뒤 가운데 맞출 카드('' = 선택). 레이아웃 이펙트 안에선 flushSync(fit) 를 못 써 배율을 먼저 놓고 다음 커밋에서 스크롤한다
   const settled = useRef(false) // 첫 배치 전에는 보기 상태를 저장하지 않는다(복원 전 0 으로 덮지 않게)
+  const fitLater = useRef(false) // F1: 편집 중(카드 제목·카드 내용·패널 실시간)에 집합이 바뀌면(Enter 로 형제 추가 등) 맞춤을 보류했다가 편집이 끝날 때 1회
+  const editing = () => editRef.current !== null || noteEditId !== null || liveBase.current !== null
   /** GraphView 가 실측 크기로 배치를 마칠 때마다 호출 (FALLBACK 크기로는 호출되지 않음). w·h = 그래프 배치 크기 */
   function onSettled(w: number, h: number) {
     const box = outlineRef.current
@@ -264,6 +266,10 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
     if (r) {
       restorePending.current = null // 첫 진입: 저장된 스크롤만 복원
       return box.scrollTo(r.x, r.y)
+    }
+    if (editing()) {
+      fitLater.current = true // 입력 중에 배율·스크롤이 튀지 않게. 검색창은 편집이 아니다(A3)
+      return
     }
     box.scrollIntoView({ block: 'nearest' }) // 모바일: 패널 쪽으로 내려가 있었으면 캔버스로 돌아온다
     fitPending.current = centerAfter.current ?? ''
@@ -299,6 +305,13 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
     fitPending.current = null
     centerOn(id || selRef.current)
   })
+  // F1: 보류된 맞춤 — 편집이 끝난 커밋 뒤(useEffect 라 fit 의 flushSync 가 된다). 그 시점의 실제 .graph 크기로 맞춰 입력 중 커진 카드도 반영
+  function fitIfLater() {
+    if (!fitLater.current || editing()) return
+    fitLater.current = false
+    fit(selRef.current)
+  }
+  useEffect(fitIfLater, [editId, noteEditId]) // oxlint-disable-line react-hooks/exhaustive-deps -- ref 와 훅 함수만 읽는다
   useEffect(() => saveDir(dir), [dir]) // 방향 전환 뒤 맞춤은 GraphView 가 onSettled 로 다시 부른다
   // U18: 선택·배율·깊이가 바뀔 때, 스크롤이 멈출 때, 떠날 때 저장
   const saveNow = () => {
@@ -375,6 +388,7 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
   function endLive() {
     const base = liveBase.current
     liveBase.current = null
+    fitIfLater() // 패널 편집 중 원격 동기화 등으로 집합이 바뀌었으면 지금 맞춘다(F1)
     if (!base || base === nodesRef.current) return
     undoRef.current = [...undoRef.current.slice(-(UNDO_LIMIT - 1)), { ns: base, label: '편집' }]
     redoRef.current = []

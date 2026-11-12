@@ -262,6 +262,8 @@ mark.hl-b { background: #6cc8ff66; }
   .widths { margin-left: 0; }
   .io-actions { display: grid; grid-template-columns: 1fr 1fr; }
   .io-actions button:last-child:nth-child(odd) { grid-column: 1 / -1; }
+  /* F2: 패널 아래 글자 버튼이 하단 토스트(되돌리기 10초, index.css .toasts: 아래 1.25rem + 높이 ≈3rem) 밑에 깔리지 않게. main 의 아래 패딩(2rem + safe-b)과 합해 5rem */
+  .side { padding-bottom: 3rem; }
 }
 @media (pointer: coarse) {
   .editor .toolbar button { width: var(--tap); height: var(--tap); }
