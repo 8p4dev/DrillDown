@@ -330,6 +330,18 @@ assert.equal(gallery(db, 'recent', 1, T0).items[0].ratingAvg, 2.7) // 캐시 적
 rateTree(db, C, tsRow, 5) // (5+2+5)/3 = 4
 gi = gallery(db, 'recent', 1, T0).items[0]
 assert.deepEqual([gi.ratingAvg, gi.ratingCount], [4, 3])
+// F4: unlisted 트리 평가는 목록에 없으므로 캐시를 비우지 않는다(같은 now 재조회 → 같은 객체). public 으로 돌아오면 비운다
+setVisibility(db, S, ts, 'unlisted'); clearGalleryCache()
+const gUnl = gallery(db, 'recent', 1, T0)
+rateTree(db, A, shareRow(s4), 1) // (1+2+5)/3 = 2.7, 캐시 유지
+assert.equal(gallery(db, 'recent', 1, T0), gUnl)
+setVisibility(db, S, ts, 'public'); clearGalleryCache()
+const gPub = gallery(db, 'recent', 1, T0)
+assert.equal(gPub.items[0].ratingAvg, 2.7)
+rateTree(db, A, shareRow(s4), 5) // (5+2+5)/3 = 4, 캐시 비움
+const gPub2 = gallery(db, 'recent', 1, T0)
+assert.notEqual(gPub2, gPub)
+assert.equal(gPub2.items[0].ratingAvg, 4)
 
 // ---- 탈퇴 유예: softDelete → 410, restoreTreesOfUser 는 탈퇴 전 삭제 트리를 되살리지 않음 ----
 const W = id(); addUser(W)
