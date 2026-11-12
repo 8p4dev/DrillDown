@@ -19,7 +19,9 @@ export default defineConfig({
       },
       workbox: {
         // 01 §3.8: 관리자 청크·웹폰트는 precache 밖(폰트 런타임 캐시 전략은 다음 단계). /api·/t/ 는 서버가 서빙
-        globIgnores: ['**/AdminPage-*.js', '**/admin-*.css', '**/AdminPage-*.css', '**/fonts/**'],
+        // F3: 공유 보기(SharedPage, /t/<slug> 는 서버 서빙)·공개 트리 목록(GalleryPage, /api/gallery 없이는 빈 화면)·둘의 share.css 도 밖 — 온라인 전용 화면.
+        //     share-????????.css 는 해시만 받아 share-list.css(공유 시트 등 오프라인 화면이 씀)는 남긴다
+        globIgnores: ['**/AdminPage-*.js', '**/admin-*.css', '**/AdminPage-*.css', '**/fonts/**', '**/SharedPage-*.js', '**/GalleryPage-*.js', '**/share-????????.css'],
         navigateFallbackDenylist: [/^\/api/, /^\/t\//],
       },
     }),
