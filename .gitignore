@@ -34,3 +34,4 @@ config/admins.json
 .research-data/
 .p0-data/
 .p1-data/
+.shots-data/
