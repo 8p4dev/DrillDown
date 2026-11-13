@@ -50,6 +50,18 @@ async function countTrees(): Promise<number> {
   return (await listTrees()).length
 }
 
+/** 나머지 화면 청크를 유휴 시간에 미리 받는다. Suspense 자식이라 첫 화면 청크가 도착한 뒤에만 마운트돼 첫 화면과 대역폭을 다투지 않는다.
+ *  데이터 절약 모드·2g 급 연결(Chrome Android 만 값을 줌)이면 생략 */
+function Prefetch() {
+  useEffect(() => {
+    const c = (navigator as { connection?: { saveData?: boolean; effectiveType?: string } }).connection
+    if (c?.saveData || /2g/.test(c?.effectiveType ?? '')) return
+    const idle = window.requestIdleCallback ?? ((f: () => void) => setTimeout(f, 300))
+    idle(() => Object.values(load).forEach((f) => void f()))
+  }, [])
+  return null
+}
+
 /** 앱 전체 오류 경계 — 렌더 예외와 lazy 청크 실패(배포 직후 404)를 잡고 '새로 고침' 하나만 보여 준다 */
 class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
   state = { failed: false }
@@ -86,10 +98,6 @@ export default function App() {
     return () => { on = false }
   }, [r])
   useEffect(() => {
-    const idle = window.requestIdleCallback ?? ((f: () => void) => setTimeout(f, 300))
-    idle(() => Object.values(load).forEach((f) => void f()))
-  }, [])
-  useEffect(() => {
     if (me?.user.role === 'admin') void loadAdmin()
   }, [me])
   return (
@@ -120,6 +128,7 @@ export default function App() {
           {r.name === 'gallery' && <GalleryPage />}
           {r.name === 'privacy' && <PrivacyPage />}
           {r.name === 'shared' && <SharedPage key={r.slug} slug={r.slug} mode={r.mode} rootId={r.rootId} />}
+          <Prefetch />
         </Suspense>
         </ErrorBoundary>
       </main>

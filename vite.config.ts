@@ -7,6 +7,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      injectRegister: 'inline', // 동기 <script src> 1건이 파서를 막아 body 생성을 늦춘다
       includeManifestIcons: false, // PNG 아이콘은 설치 때만 필요 — precache 예산(≤640 KiB) 밖
       // 색은 01 §3.7: 설치 스플래시용 라이트 bg 고정. 아이콘은 favicon.svg 를 래스터화한 PNG(스크래치 Playwright, H4) — precache 밖(기본 glob 은 js/css/html)
       manifest: {

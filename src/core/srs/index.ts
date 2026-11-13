@@ -1,10 +1,12 @@
 import { DefaultScheduler, Rating, type Grade } from 'ts-fsrs'
+import { migrateFSRS7Parameters } from 'ts-fsrs/models/fsrs-7'
 import { db, track } from '../db'
 import { childIndex } from '../path'
 import type { GradeSource, ID, NodeSrs, Structure, TreeNode } from '../types'
 
 // FSRS-7 기본 설정 + fuzz. 계약 함수가 동기라서 모듈 로드 시 1회 생성한다.
-const scheduler = await DefaultScheduler({ enableFuzz: true }) // U33: 같은 날 평가한 항목의 기한을 흩는다
+// weights 는 기본값 그대로(DefaultScheduler 내부 마이그레이션과 결과 동일). 모델 모듈을 정적으로 참조하는 게 목적: DefaultScheduler 가 안에서 동적 import 하는 fsrs-7 이 같은 청크에 묶여 편집 진입 때 라운드트립 1회가 사라진다
+const scheduler = await DefaultScheduler({ enableFuzz: true, weights: migrateFSRS7Parameters() }) // U33: 같은 날 평가한 항목의 기한을 흩는다
 type Card = ReturnType<typeof scheduler.newCard>
 
 /** 서버에서 받은 행은 card 의 날짜가 JSON 문자열이다 → ts-fsrs 에 넘기기 전에 Date 로 되돌린다 */
