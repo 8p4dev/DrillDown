@@ -64,6 +64,6 @@ AUTH_FAKE http+비루프백 기동 거부 · XFF 무시 · auto_correct_days 총
 
 재검토가 추가로 바로잡은 것(4836a97·이후 커밋): 빈 `HOST=` 가 모든 인터페이스에 바인딩되던 문제(`e.HOST || '127.0.0.1'`), 처리방침 ⑧ `theme` 쿠키 문구(실제는 localStorage), 런북 HOST·보존 주기·CSP 재시작 안내, `content.check` 허용 태그를 정확 매칭으로(접두 lookahead 가 `<div onclick=` 을 통과시킴), `security.spec` 에 CSP 거부 콘솔 감지(CSP 아래서는 dialog 가 안 떠 이스케이프 회귀를 못 잡음).
 
-검증: typecheck · lint · `npm run check`(보안 단언 약 30건 추가) · build · E2E 26개(기존 25 + `security.spec`) 통과. 단언 3종을 일부러 깨뜨려 실패하는 것도 확인했다(V2).
+검증: typecheck · lint · `npm run check`(보안 단언 약 30건 추가) · build · E2E 25개(기존 24 + `security.spec`) 통과. 단언 3종을 일부러 깨뜨려 실패하는 것도 확인했다(V2).
 
 남은 운영 숙제: Pi 배포 뒤 `ls -l /var/lib/drilldown/backups`(700/600) 확인, `.env` 에서 `AUTH_FAKE` 줄 제거·`PUBLIC_ORIGIN` https 확인, 빌드를 다른 기기로 옮기기(런북 §1).
