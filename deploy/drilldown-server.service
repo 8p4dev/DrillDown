@@ -11,6 +11,8 @@ User=drilldown
 Group=drilldown
 WorkingDirectory=/opt/drilldown
 EnvironmentFile=/etc/drilldown/env
+# 가짜 로그인은 env 파일에 남아 있어도 끈다 — 뒤의 Environment= 가 이긴다(s1 H1·s4 H1)
+Environment=AUTH_FAKE=0
 Environment=NODE_ENV=production DATA_DIR=/var/lib/drilldown ADMINS_FILE=/etc/drilldown/admins.json
 # 관리자 화면 [지금 백업] 이 server/account/backup.ts 를 자식 프로세스로 띄운다 — rclone 설정 경로(backup.service 와 같은 값)
 Environment=RCLONE_CONFIG=/etc/drilldown/rclone.conf

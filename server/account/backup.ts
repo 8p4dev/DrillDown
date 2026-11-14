@@ -2,7 +2,7 @@
 // sqlite backup() → data/backups/app-YYYYMMDD.db (14개 보관) → age·rclone 이 PATH 에 있고 환경 변수가 있으면 암호화·업로드 → data/backup.json
 // 환경 변수(이 파일 전용): BACKUP_AGE_RECIPIENT (age 공개키 age1… 또는 파일 경로), BACKUP_RCLONE_REMOTE (예 b2:drilldown-backup)
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { backup } from 'node:sqlite'
 import { openDb, type DB } from '../db.ts'
@@ -17,11 +17,13 @@ export async function runBackup(db: DB, now = new Date()): Promise<BackupResult>
   const r: BackupResult = { at: now.getTime(), bytes: 0, ok: false, uploaded: false }
   try {
     const dir = join(env.dataDir, 'backups')
-    mkdirSync(dir, { recursive: true })
+    // 로컬 사본은 평문(age 는 외부 전송본에만) — 디렉터리 700·파일 600 으로 다른 계정이 못 읽게(s4 M1). Windows 는 chmod 가 no-op
+    mkdirSync(dir, { recursive: true, mode: 0o700 })
     const ymd = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`
     const file = join(dir, `app-${ymd}.db`)
     rmSync(file, { force: true })
     await backup(db, file)
+    chmodSync(file, 0o600)
     r.bytes = statSync(file).size
     for (const f of readdirSync(dir).filter((x) => /^app-\d{8}\.db$/.test(x)).sort().slice(0, -KEEP)) rmSync(join(dir, f))
 

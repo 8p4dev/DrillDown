@@ -2,7 +2,7 @@
 // env 는 check.ts 가 이미 읽었으므로 필드를 직접 덮어쓴다(라우트는 요청 시점에 env 를 읽는다).
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { openDb } from '../db.ts'
@@ -15,7 +15,7 @@ import { exchangeCode, setOAuthFetch } from './oauth.ts'
 import { hooks } from './ops.ts'
 import { shortUa } from './session.ts'
 
-const saved = { authFake: env.authFake, dataDir: env.dataDir, adminsFile: env.adminsFile, google: env.google, kakao: env.kakao, origin: env.origin }
+const saved = { authFake: env.authFake, dataDir: env.dataDir, adminsFile: env.adminsFile, google: env.google, kakao: env.kakao, origin: env.origin, host: env.host }
 const tmp = mkdtempSync(join(tmpdir(), 'sa-check-'))
 writeFileSync(join(tmp, 'admins.json'), JSON.stringify(['google:g-admin']))
 Object.assign(env as unknown as Record<string, unknown>, {
@@ -79,6 +79,9 @@ assert.equal(r.status, 200); assert.equal((await json<{ user: { id: string } }>(
 r = await req('/api/auth/logout', { body: {}, cookie: a1 })
 assert.equal(r.status, 204); assert.match(cookieOf(r, 'sid'), /^sid=$/)
 assert.equal((await me(a1)).status, 401)
+// s1 L1: 쿠키 없이 25회 로그인해도 세션은 사용자당 최신 20개만
+for (let i = 0; i < 25; i++) await login('user', 'many')
+assert.equal((db.prepare("SELECT COUNT(*) n FROM sessions WHERE user_id = (SELECT id FROM users WHERE provider_sub = 'fake-many')").get() as { n: number }).n, 20)
 
 // ---- 탈퇴 → 401 → 재로그인 복구 ----
 const b1 = await login('user', 'bob')
@@ -86,6 +89,10 @@ const bobId = (await json<{ user: { id: string } }>(await me(b1))).user.id
 // CSRF: 교차 출처 POST 403, 다른 Origin 403
 assert.equal((await req('/api/me/delete', { body: {}, cookie: b1, headers: { 'sec-fetch-site': 'cross-site' } })).status, 403)
 assert.equal((await req('/api/me/delete', { body: {}, cookie: b1, headers: { origin: 'https://evil.example' } })).status, 403)
+// s1 M1: X-Forwarded-For 는 무시(cf-connecting-ip 만) — 회전시켜도 한 버킷이라 auth 10/분 뒤 429
+const xff: number[] = []
+for (let i = 0; i < 13; i++) xff.push((await app.request('/api/auth/google/start', { headers: { 'x-forwarded-for': `10.0.0.${i}` } })).status)
+assert.equal(xff.filter((s) => s === 429).length, 3, xff.join())
 r = await req('/api/me/delete', { body: {}, cookie: b1 })
 assert.equal(r.status, 204)
 assert.equal((await me(b1)).status, 401)
@@ -359,7 +366,7 @@ r = await req('/api/admin/takedowns', { cookie: adm })
 const tds = (await json<{ items: { id: string; state: string; claimant_contact: string; tree: { id: string } | null; appealed_at: number | null }[] }>(r)).items
 assert.equal(tds.length, 3); assert.equal(tds.find((k) => k.id === tdId)!.claimant_contact, 'holder@example.com'); assert.equal(tds.find((k) => k.id === tdId)!.tree!.id, 't-td')
 assert.equal((await req(`/api/admin/takedowns/${tdId}`, { body: { action: 'resume' }, cookie: adm })).status, 200) // hidden → resume 허용
-await req(`/api/admin/trees/t-td/hide`, { body: {}, cookie: adm }) // 다시 숨겨 통보 흐름 검사
+db.prepare("UPDATE trees SET hidden_by_admin_at = ?, hidden_until = ? WHERE id = 't-td'").run(T0, T0 + 30 * DAY) // 게시중단 숨김 상태로 되돌려 통보 흐름 검사(관리자 /hide 는 "다른 사유" 숨김이라 resume 이 풀지 않는다, s2-02)
 db.prepare("UPDATE takedowns SET state = 'hidden', resolved_at = NULL WHERE id = ?").run(tdId)
 assert.equal((await req('/api/trees/t-td/appeal', { body: { text: '제가 쓴 요약입니다' }, cookie: c2 })).status, 201) // 소유자 재개 요구 = 소명
 assert.ok((await json<{ items: { id: string; appealed_at: number | null }[] }>(await req('/api/admin/takedowns', { cookie: adm }))).items.find((k) => k.id === tdId)!.appealed_at! > 0)
@@ -398,11 +405,22 @@ assert.equal((await req(`/api/admin/takedowns/${kb1}`, { body: { action: 'confir
 assert.equal(hidden('t-h1b').u, null) // 확정 = 만료 없음
 assert.equal((await req(`/api/admin/takedowns/${kb2}`, { body: { action: 'reject' }, cookie: adm })).status, 200)
 assert.ok(hidden('t-h1b').h! > 0) // kb1 확정이 남아 있다
+// s2-02: 게시중단이 숨긴 뒤 관리자가 별도 사유로 다시 숨김 → 기각해도 숨김 유지(최근 tree.hide 감사가 이 요청이 아님). 게시중단만이면 기각 = 해제
+ins.run('t-h1d', carol[0].id, 'D', T0, T0, null); ins.run('t-h1e', carol[0].id, 'E', T0, T0, null)
+db.prepare("UPDATE trees SET slug = CASE id WHEN 't-h1d' THEN 'Hfou5tree11' ELSE 'Hfiv5tree11' END WHERE id IN ('t-h1d','t-h1e')").run()
+const kd = (await json<{ id: string }>(await req('/api/takedown', { body: { ...td, url: 'Hfou5tree11' }, ip: 'td-d' }))).id
+assert.ok(hidden('t-h1d').u! >= T0 + 30 * DAY) // 이 요청이 임시 숨김
+await req('/api/admin/trees/t-h1d/hide', { body: { reason: '스팸' }, cookie: adm })
+assert.equal((await req(`/api/admin/takedowns/${kd}`, { body: { action: 'reject' }, cookie: adm })).status, 200)
+assert.ok(hidden('t-h1d').h! > 0 && hidden('t-h1d').u === null) // 관리자 확정 숨김 그대로
+const ke = (await json<{ id: string }>(await req('/api/takedown', { body: { ...td, url: 'Hfiv5tree11' }, ip: 'td-e' }))).id
+assert.equal((await req(`/api/admin/takedowns/${ke}`, { body: { action: 'reject' }, cookie: adm })).status, 200)
+assert.deepEqual(hidden('t-h1e'), { h: null, u: null })
 await req('/api/takedown', { body: { ...td, url: 'Hthr5tree11' }, ip: 'td-c' })
 legalDaily(db, T0 + 31 * DAY)
 assert.deepEqual(hidden('t-h1c'), { h: null, u: null }) // 큐를 안 보면 30일 뒤 자동 복원
 assert.ok(hidden('t-h1b').h! > 0)
-db.prepare("DELETE FROM trees WHERE id IN ('t-h1a','t-h1b','t-h1c')").run()
+db.prepare("DELETE FROM trees WHERE id IN ('t-h1a','t-h1b','t-h1c','t-h1d','t-h1e')").run()
 
 // 정보주체 요청(#25): 수동 입력, due = +10일, 완료 → audit dsr.<kind>, 90일 뒤 삭제
 assert.equal((await req('/api/admin/requests', { body: { kind: 'bogus' }, cookie: adm })).status, 400)
@@ -423,6 +441,16 @@ assert.equal((await json<{ items: unknown[] }>(await req('/api/admin/requests?st
 await req(`/api/admin/requests/${rq2.id}`, { body: { action: 'rejected' }, cookie: adm })
 legalDaily(db, T0 + 91 * DAY)
 assert.equal((db.prepare('SELECT COUNT(*) n FROM requests').get() as { n: number }).n, 0)
+// s4 M2: 미처리 건도 180일이 지나거나 대상 트리가 사라지면(고아) 삭제 — 요구자 연락처가 영구 잔존하지 않는다. 최근 미처리는 유지
+ins.run('t-keep', carol[0].id, 'K', T0, T0, null)
+const insTd = db.prepare("INSERT INTO takedowns(id,slug,tree_id,claimant_name,claimant_contact,claim,state,received_at) VALUES(?,'Keep5tree11',?,'n','c@x','x','hidden',?)")
+insTd.run('td-stale', 't-keep', T0 - 181 * DAY); insTd.run('td-orphan', 'gone-tree', T0); insTd.run('td-fresh', 't-keep', T0)
+const insRq = db.prepare("INSERT INTO requests(id,kind,channel,received_at,due_at,target_type,target_id) VALUES(?,'access','email',?,?,?,?)")
+insRq.run('rq-stale', T0 - 181 * DAY, T0, null, null); insRq.run('rq-orphan', T0, T0, 'tree', 'gone-tree'); insRq.run('rq-fresh', T0, T0, 'tree', 't-keep')
+legalDaily(db, T0)
+assert.deepEqual(db.prepare("SELECT id FROM takedowns WHERE id LIKE 'td-%' ORDER BY id").all().map((x) => x.id), ['td-fresh'])
+assert.deepEqual(db.prepare("SELECT id FROM requests WHERE id LIKE 'rq-%' ORDER BY id").all().map((x) => x.id), ['rq-fresh'])
+db.prepare("DELETE FROM takedowns WHERE id = 'td-fresh'").run(); db.prepare("DELETE FROM requests WHERE id = 'rq-fresh'").run(); db.prepare("DELETE FROM trees WHERE id = 't-keep'").run()
 await req('/api/admin/settings', { method: 'PUT', body: { auto_hide_reports: 3 }, cookie: adm })
 db.prepare("DELETE FROM reports WHERE tree_id IN ('t-auto','t-td')").run(); db.prepare("DELETE FROM trees WHERE id IN ('t-auto','t-td')").run()
 
@@ -559,10 +587,21 @@ assert.equal((await me(adm4)).status, 401)
 assert.equal((db.prepare('SELECT COUNT(*) n FROM sessions').get() as { n: number }).n, 0)
 assert.ok(db.prepare("SELECT 1 FROM audit_log WHERE action = 'system.sessions_revoke_all'").get())
 
-// ---- r1 M5: AUTH_FAKE 를 https origin 으로 켜면 기동 거부 ----
+// ---- s4 M1: 로컬 백업 사본은 디렉터리 700·파일 600(리눅스. Windows 는 chmod 가 no-op 라 모드 비교 생략) ----
+const { runBackup } = await import('./backup.ts')
+const br = await runBackup(db)
+assert.equal(br.ok, true, br.error); assert.ok(br.bytes > 0)
+const bdir = join(tmp, 'backups'), bfile = join(bdir, readdirSync(bdir).find((f) => /^app-\d{8}\.db$/.test(f))!)
+if (process.platform !== 'win32') { assert.equal(statSync(bdir).mode & 0o777, 0o700); assert.equal(statSync(bfile).mode & 0o777, 0o600) }
+
+// ---- r1 M5: AUTH_FAKE 를 https origin 으로 켜면 기동 거부. s1 H1: http 라도 루프백 밖(HOST=0.0.0.0) 바인딩이면 거부, 127.0.0.1 은 허용 ----
 Object.assign(env as unknown as Record<string, unknown>, { origin: 'https://example.com' })
 await assert.rejects(createApp(db), /AUTH_FAKE/)
-Object.assign(env as unknown as Record<string, unknown>, { origin: saved.origin })
+Object.assign(env as unknown as Record<string, unknown>, { origin: saved.origin, host: '0.0.0.0' })
+await assert.rejects(createApp(db), /AUTH_FAKE/)
+Object.assign(env as unknown as Record<string, unknown>, { host: '127.0.0.1' })
+await createApp(db)
+Object.assign(env as unknown as Record<string, unknown>, { host: saved.host })
 
 // ---- 마이그레이션 경로: 003 까지 적용된 파일 DB(레거시 notice·maintenance.enabled) → 기동 → 004~006 적용 + pre-migrate 백업 → 다음 기동이 백업을 지운다 ----
 const { DatabaseSync } = await import('node:sqlite')
@@ -575,6 +614,7 @@ old.close()
 const mdb = await openDb(migFile)
 assert.equal((mdb.prepare('PRAGMA user_version').get() as { user_version: number }).user_version, 6)
 assert.ok(existsSync(join(tmp, 'pre-migrate-003.db')))
+if (process.platform !== 'win32') assert.equal(statSync(join(tmp, 'pre-migrate-003.db')).mode & 0o777, 0o600) // s4 M1 평문 사본 600
 const ms = getSettings(mdb)
 assert.deepEqual(ms.notices, [{ id: 'n-legacy', text: '옛 공지', audience: 'all' }]); assert.equal(ms.maintenance.manual, true); assert.deepEqual(ms.notice, { text: '옛 공지', enabled: true })
 assert.equal(mdb.prepare('SELECT COUNT(*) n FROM takedowns').get()!.n, 0); assert.equal(mdb.prepare("SELECT COUNT(*) n FROM pragma_table_info('trees') WHERE name IN ('hidden_until','view_count')").get()!.n, 2)

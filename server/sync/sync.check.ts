@@ -79,6 +79,12 @@ assert.equal(r.superseded.srs[0].miss, 1)
 assert.deepEqual(r.superseded.srs[0].autoCorrectDays, ['2026-11-01', '2026-11-02'])
 push(A, { srs: [srs(310, ['2026-11-03'], 0)] })
 assert.equal(get('SELECT auto_correct_days FROM srs WHERE node_id = ?', x)!.auto_correct_days, '["2026-11-01","2026-11-02","2026-11-03"]')
+// s2-01 총량 상한: superseded 경로로 서로 다른 유효 날짜 3,660개씩 20회 밀어도 행은 LIMITS.autoDays 를 넘지 않는다(오래된 날짜를 버려 최신 유지). s2-04 달력 밖 날짜는 400
+const ymd = (i: number) => new Date(Date.UTC(2000, 0, 1) + i * DAY).toISOString().slice(0, 10)
+for (let k = 0; k < 20; k++) push(A, { srs: [srs(1, Array.from({ length: LIMITS.autoDays }, (_, i) => ymd(k * LIMITS.autoDays + i)))] })
+const stored = JSON.parse(get('SELECT auto_correct_days FROM srs WHERE node_id = ?', x)!.auto_correct_days as string) as string[]
+assert.equal(stored.length, LIMITS.autoDays); assert.equal(stored.at(-1), ymd(20 * LIMITS.autoDays - 1))
+for (const d of ['9999-99-99', '2026-13-01', '2026-00-10', '2026-01-32', '2026-1-01']) throws(() => P({ srs: [srs(1, [d])] }), 400, 'invalid')
 // C14 노드 삭제 → srs 톰스톤, 이후 srs put 은 dropped
 push(A, { deleted: { nodes: [{ id: x, treeId: t1, deletedAt: 400 }] } })
 assert.equal(get('SELECT deleted_at FROM srs WHERE node_id = ?', x)!.deleted_at, 400)
@@ -224,6 +230,10 @@ r = push(F, { attempts: [a1, att(4)] })
 assert.deepEqual([r.applied, r.dropped.length], [[a1.id], 1])
 LIMITS.attempts = 20_000
 assert.equal(get('SELECT COUNT(*) AS n FROM attempts WHERE user_id = ?', F)!.n, 2)
+// s2-03: 남의 트리(A 의 t1)를 가리키는 attempt 는 dropped(관리자 지표 오염), 비율 0..1 밖·음수 카운트는 400
+r = push(F, { attempts: [{ ...att(5), treeId: t1 }] })
+assert.equal(r.dropped.length, 1); assert.equal(get('SELECT COUNT(*) AS n FROM attempts WHERE user_id = ?', F)!.n, 2)
+for (const bad of [{ nodeRecall: 1e308 }, { edgeAccuracy: 5 }, { nodeRecall: -0.1 }, { edgeAccuracy: NaN }, { autoGradedCount: -1 }]) throws(() => P({ attempts: [{ ...att(6), ...bad }] }), 400, 'invalid')
 
 // ---- 공개 범위 전이표 (04 §3.3, 11행) ----
 const S = id(); addUser(S)
@@ -421,6 +431,10 @@ assert.ok(html.includes('<meta name="robots" content="noindex">'))
 assert.ok(html.includes('og:image') && html.includes('/og.png') && html.includes('twitter:card') && html.includes('rel="canonical"'))
 assert.equal((html.match(/<title>/g) ?? []).length, 1)
 assert.ok(!renderShare(shell, { slug: 'abcdefghijk', title: 'x', node_count: 3, visibility: 'public' }).includes('noindex'))
+// s3 회귀 가드: 제목 `"><script>` 가 <title>(요소)·og:title content="…"(속성) 두 컨텍스트 모두 수치 엔티티 — raw <script 0
+const og = renderShare(shell, { slug: 'abcdefghijk', title: '"><script>alert(2)</script>', node_count: 1, visibility: 'public' })
+assert.ok(!og.includes('<script'), og)
+assert.ok(og.includes('<title>&#34;&#62;&#60;script&#62;alert(2)&#60;/script&#62;</title>') && og.includes('<meta property="og:title" content="&#34;&#62;&#60;script&#62;alert(2)&#60;/script&#62;">'), og)
 
 // ---- 라우트: 세션 없이 401, /api/t 상태 코드·캐시 헤더, /t/:slug 셸 ----
 const onErr: ErrorHandler<AppEnv> = (e, c) => (e instanceof HttpError ? c.json({ error: { code: e.code } }, e.status as 400) : c.json({ error: { code: 'internal', m: String(e) } }, 500))

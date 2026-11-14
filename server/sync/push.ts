@@ -122,7 +122,8 @@ export function applyPush(db: DB, userId: string, p: PushPayload, now: number): 
       const cur = getSrs.get(userId, s.nodeId) as SrsRow | undefined
       const at = clamp(s.updatedAt)
       const prevDays = cur ? (JSON.parse(cur.auto_correct_days) as string[]) : []
-      const days = [...new Set([...prevDays, ...s.autoCorrectDays])].sort()
+      // 총량 상한(s2-01): parseSrs 는 1회 입력만 막는다 — 병합 뒤 넘치면 오래된 날짜를 버린다(정렬돼 있어 뒤가 최신)
+      const days = [...new Set([...prevDays, ...s.autoCorrectDays])].sort().slice(-LIMITS.autoDays)
       if (!cur || at > cur.updated_at) {
         db.prepare(`INSERT INTO srs(user_id, node_id, tree_id, card, due, last_grade_source, last_structure, auto_correct_days, pending_recheck, miss, updated_at, deleted_at, seq)
           VALUES (?,?,?,?,?,?,?,?,?,?,?,NULL,?)
@@ -133,17 +134,17 @@ export function applyPush(db: DB, userId: string, p: PushPayload, now: number): 
         r.applied.push(s.nodeId)
       } else {
         // 서버 행이 이김. 들어온 날짜는 합쳐 둔다(사실의 집합)
-        if (days.length !== prevDays.length) db.prepare('UPDATE srs SET auto_correct_days = ?, seq = ? WHERE user_id = ? AND node_id = ?').run(JSON.stringify(days), nextSeq(db, userId), userId, s.nodeId)
+        if (JSON.stringify(days) !== cur.auto_correct_days) db.prepare('UPDATE srs SET auto_correct_days = ?, seq = ? WHERE user_id = ? AND node_id = ?').run(JSON.stringify(days), nextSeq(db, userId), userId, s.nodeId)
         r.superseded.srs.push(srsOut(getSrs.get(userId, s.nodeId) as unknown as SrsRow))
       }
     }
 
-    // ---- attempts: append-only, PK 중복 무시. 사용자당 상한을 넘는 새 행은 dropped(클라이언트가 outbox 에서 뺀다, r1 H2) ----
+    // ---- attempts: append-only, PK 중복 무시. 사용자당 상한을 넘는 새 행은 dropped(클라이언트가 outbox 에서 뺀다, r1 H2). 내 트리가 아니면 dropped(관리자 지표 오염, s2-03) ----
     let have = p.attempts.length ? (db.prepare('SELECT COUNT(*) AS n FROM attempts WHERE user_id = ?').get(userId) as { n: number }).n : 0
     for (const a of p.attempts) {
       const own = db.prepare('SELECT user_id FROM attempts WHERE id = ?').get(a.id) as { user_id: string } | undefined
       if (own && own.user_id !== userId) { taken.add(a.id); continue }
-      if (!own && have >= LIMITS.attempts) { r.dropped.push(a.id); continue }
+      if (!own && (have >= LIMITS.attempts || (getTree.get(a.treeId) as TreeRow | undefined)?.owner_id !== userId)) { r.dropped.push(a.id); continue }
       if (!own) {
         db.prepare('INSERT INTO attempts(id, user_id, tree_id, root_id, started_at, completed_at, node_recall, edge_accuracy, auto_graded_count, self_graded_count, overridden_count) VALUES (?,?,?,?,?,?,?,?,?,?,?)')
           .run(a.id, userId, a.treeId, a.rootId, a.startedAt, a.completedAt, a.nodeRecall, a.edgeAccuracy, a.autoGradedCount, a.selfGradedCount, a.overriddenCount)

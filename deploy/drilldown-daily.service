@@ -8,6 +8,8 @@ User=drilldown
 Group=drilldown
 WorkingDirectory=/opt/drilldown
 EnvironmentFile=/etc/drilldown/env
+# 가짜 로그인은 env 파일에 남아 있어도 끈다 — 뒤의 Environment= 가 이긴다(s1 H1·s4 H1)
+Environment=AUTH_FAKE=0
 Environment=DATA_DIR=/var/lib/drilldown
 ExecStart=/usr/bin/node --no-warnings=ExperimentalWarning server/account/daily.ts
 NoNewPrivileges=yes
