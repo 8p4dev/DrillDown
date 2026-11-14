@@ -13,6 +13,7 @@ const HOLD_MS = 30 * DAY   // 임시조치 상한(망법 §44조의2 ④). 재�
 const RESUME_MS = 7 * DAY   // 재개 예정일 = 권리주장자 통보 후 7일(법정 기한 없음, 운영 규칙)
 const DSR_MS = 10 * DAY     // 정보주체 요청 기한(영 §41·43·44)
 const KEEP_MS = 90 * DAY    // 처리된 요청 보관
+const STALE_MS = 180 * DAY  // 미처리 요청(요구자 연락처 포함)의 보존 상한 — 큐를 안 비워도 영구 잔존하지 않게(s4 M2)
 const SLUG_IN_URL = /(?:^|\/t\/)([1-9A-HJ-NP-Za-km-z]{11})\/?(?:[?#].*)?$/
 const KINDS: DsrKind[] = ['access', 'correct', 'delete', 'suspend', 'minor', 'other']
 
@@ -27,15 +28,15 @@ function legalFor(db: DB, loggedIn: boolean, now: number): LegalMe {
 /** GET /api/me 에 합쳐지는 부분 */
 export const legalMe = (db: DB): LegalMe => legalFor(db, true, Date.now())
 
-/** 일일 작업: 임시조치 만료 → 숨김 해제(소명도 수용 처리), 처리된 게시중단·정보주체 요청 90일 삭제 */
+/** 일일 작업: 임시조치 만료 → 숨김 해제(소명도 수용 처리), 처리된 게시중단·정보주체 요청 90일 삭제, 미처리는 180일 또는 대상 트리 소멸(고아) 시 삭제 */
 export function legalDaily(db: DB, now: number): void {
   for (const { id } of db.prepare('SELECT id FROM trees WHERE hidden_by_admin_at IS NOT NULL AND hidden_until IS NOT NULL AND hidden_until <= ?').all(now) as { id: string }[]) {
     setHidden(db, id, false, now)
     db.prepare("UPDATE appeals SET resolved_at = ?, resolution = 'accepted' WHERE tree_id = ? AND resolved_at IS NULL").run(now, id)
     audit(db, null, 'tree.unhide', 'tree', id, { expired: true })
   }
-  db.prepare('DELETE FROM takedowns WHERE resolved_at < ?').run(now - KEEP_MS)
-  db.prepare('DELETE FROM requests WHERE resolved_at < ?').run(now - KEEP_MS)
+  db.prepare('DELETE FROM takedowns WHERE resolved_at < ? OR (resolved_at IS NULL AND (received_at < ? OR (tree_id IS NOT NULL AND tree_id NOT IN (SELECT id FROM trees))))').run(now - KEEP_MS, now - STALE_MS)
+  db.prepare("DELETE FROM requests WHERE resolved_at < ? OR (resolved_at IS NULL AND (received_at < ? OR (target_type = 'tree' AND target_id NOT IN (SELECT id FROM trees))))").run(now - KEEP_MS, now - STALE_MS)
 }
 
 const TD_SQL = `SELECT k.*, t.title, t.slug AS tree_slug, t.hidden_by_admin_at,
@@ -126,7 +127,9 @@ export function registerLegal(app: Hono<AppEnv>) {
         return
       }
       db.prepare('UPDATE takedowns SET state = ?, resolved_at = ? WHERE id = ?').run(a.to, now, id)
-      const unhide = (action === 'resume' || action === 'reject') && tid && k!.hidden_at && isHidden(db, tid)
+      // 지금 숨김이 "이 요청 때문"일 때만 해제 — 접수 뒤 관리자가 다른 사유로 다시 숨겼으면(최근 tree.hide 감사의 takedown_id 가 다름) 상태만 바꾸고 숨김은 둔다(s2-02)
+      const lastHide = tid ? (db.prepare("SELECT meta FROM audit_log WHERE action = 'tree.hide' AND target_id = ? ORDER BY id DESC LIMIT 1").get(tid) as { meta: string | null } | undefined) : undefined
+      const unhide = (action === 'resume' || action === 'reject') && tid && k!.hidden_at && isHidden(db, tid) && (JSON.parse(lastHide?.meta ?? '{}') as { takedown_id?: string }).takedown_id === id
       if (tid) resolveAppeals(db, tid, unhide ? 'accepted' : 'rejected', now)
       if (unhide) { setHidden(db, tid, false, now); audit(db, me(c), 'tree.unhide', 'tree', tid, { takedown_id: id }) }
       if (action === 'confirm' && tid) db.prepare('UPDATE trees SET hidden_until = NULL WHERE id = ?').run(tid) // 임시조치 → 확정(만료 없음)

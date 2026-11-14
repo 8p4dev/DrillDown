@@ -3,8 +3,8 @@ import type { BlankAttempt, NodeSrs, Tree, TreeNode } from '../../src/core/types
 import { CTRL, fail, UUID } from '../http.ts'
 import { CAP } from '../../src/core/types.ts'
 
-/** card = ts-fsrs Card 직렬화 상한(수백 바이트), attempts = 사용자당 행 상한(넘치면 dropped — r1 H2 디스크 DoS) */
-export const LIMITS = { title: CAP.title, note: CAP.note, aliases: 50, alias: 50, nodesPerTree: CAP.nodesPerTree, treesPerUser: CAP.treesPerUser, rows: 500, bytes: 2 * 1024 * 1024, card: 2048, attempts: 20_000 }
+/** card = ts-fsrs Card 직렬화 상한(수백 바이트), attempts = 사용자당 행 상한(넘치면 dropped — r1 H2 디스크 DoS), autoDays = srs 행의 auto_correct_days 총량(1회 입력·병합 뒤 모두, s2-01) */
+export const LIMITS = { title: CAP.title, note: CAP.note, aliases: 50, alias: 50, nodesPerTree: CAP.nodesPerTree, treesPerUser: CAP.treesPerUser, rows: 500, bytes: 2 * 1024 * 1024, card: 2048, attempts: 20_000, autoDays: 3660 }
 
 export interface TreeRow { id: string; owner_id: string; title: string; visibility: 'private' | 'unlisted' | 'public'; slug: string | null; source_tree_id: string | null; node_count: number; copy_count: number; created_at: number; updated_at: number; deleted_at: number | null; hidden_by_admin_at: number | null; seq: number }
 export interface NodeRow { id: string; tree_id: string; owner_id: string; parent_id: string | null; order: number; title: string; note: string | null; aliases: string; collapsed: number | null; offset: string | null; width: number | null; updated_at: number; deleted_at: number | null; seq: number }
@@ -82,7 +82,7 @@ export function parseSrs(v: unknown, f: string): NodeSrs {
   const o = obj(v, f)
   if (o.card === undefined || o.card === null || typeof o.card !== 'object' || JSON.stringify(o.card).length > LIMITS.card) bad(`${f}.card`)
   const days = arr(o.autoCorrectDays ?? [], `${f}.autoCorrectDays`)
-  if (days.length > 3660) bad(`${f}.autoCorrectDays`)
+  if (days.length > LIMITS.autoDays) bad(`${f}.autoCorrectDays`)
   const lgs = o.lastGradeSource ?? null
   if (lgs !== null && !GRADE.has(lgs as string)) bad(`${f}.lastGradeSource`)
   const ls = o.lastStructure ?? null
@@ -92,7 +92,7 @@ export function parseSrs(v: unknown, f: string): NodeSrs {
   return {
     nodeId: uuid(o.nodeId, `${f}.nodeId`), treeId: uuid(o.treeId, `${f}.treeId`), card: o.card, due: time(o.due, `${f}.due`),
     lastGradeSource: lgs as NodeSrs['lastGradeSource'], lastStructure: ls as NodeSrs['lastStructure'],
-    autoCorrectDays: days.map((d, i) => (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : bad(`${f}.autoCorrectDays[${i}]`))),
+    autoCorrectDays: days.map((d, i) => (typeof d === 'string' && /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(d) ? d : bad(`${f}.autoCorrectDays[${i}]`))),
     pendingRecheck: !!o.pendingRecheck, ...(miss !== undefined ? { miss } : {}), updatedAt: time(o.updatedAt, `${f}.updatedAt`),
   }
 }
@@ -100,10 +100,12 @@ export function parseSrs(v: unknown, f: string): NodeSrs {
 export function parseAttempt(v: unknown, f: string): BlankAttempt {
   const o = obj(v, f)
   const int = (x: unknown, k: string) => (Number.isSafeInteger(x) && (x as number) >= 0 ? (x as number) : bad(`${f}.${k}`))
+  // 비율은 0..1 — 범위 밖(1e308·음수)은 관리자 지표 AVG·median 을 오염시킨다(s2-03)
+  const ratio = (x: unknown, k: string) => (typeof x === 'number' && x >= 0 && x <= 1 ? x : bad(`${f}.${k}`))
   return {
     id: uuid(o.id, `${f}.id`), treeId: uuid(o.treeId, `${f}.treeId`), rootId: uuid(o.rootId, `${f}.rootId`),
     startedAt: time(o.startedAt, `${f}.startedAt`), completedAt: time(o.completedAt, `${f}.completedAt`),
-    nodeRecall: num(o.nodeRecall, `${f}.nodeRecall`), edgeAccuracy: num(o.edgeAccuracy, `${f}.edgeAccuracy`),
+    nodeRecall: ratio(o.nodeRecall, 'nodeRecall'), edgeAccuracy: ratio(o.edgeAccuracy, 'edgeAccuracy'),
     autoGradedCount: int(o.autoGradedCount, 'autoGradedCount'), selfGradedCount: int(o.selfGradedCount, 'selfGradedCount'), overriddenCount: int(o.overriddenCount, 'overriddenCount'),
   }
 }

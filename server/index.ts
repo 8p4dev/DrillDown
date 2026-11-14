@@ -5,6 +5,7 @@ import { serveStatic } from '@hono/node-server/serve-static'
 import { Hono } from 'hono'
 import { bodyLimit } from 'hono/body-limit'
 import { secureHeaders } from 'hono/secure-headers'
+import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { openDb, type DB } from './db.ts'
@@ -17,16 +18,24 @@ import { maskPath, recordError } from './metrics.ts'
 import { dayOf, flushViews } from './account/product.ts'
 
 export async function createApp(db: DB) {
-  // r1 M5: .env.example 이 AUTH_FAKE=1 이라 켠 채 https 로 배포되면 누구나 관리자 — 기동을 거부한다
-  if (env.authFake && env.secure) throw new Error('AUTH_FAKE on https origin')
+  // r1 M5 + s1 H1: AUTH_FAKE 를 켠 채 https origin 이거나 루프백 밖에 바인딩하면(폰 테스트용 HOST=0.0.0.0 + http) 누구나 관리자 — 기동을 거부한다
+  if (env.authFake && (env.secure || !['127.0.0.1', '::1', 'localhost'].includes(env.host))) throw new Error('AUTH_FAKE on https origin or non-loopback host')
   // #49 가용성 대용: 기동 시 오늘 행 restarts +1 (r1 L1 — 첫 요청 미들웨어는 /api/me 보다 늦게 등록돼 세지 못했다)
   db.prepare('INSERT INTO daily_stats(day, restarts) VALUES(?, 1) ON CONFLICT(day) DO UPDATE SET restarts = restarts + 1').run(dayOf(Date.now()))
   // r1 L5: 공유 조회 수는 메모리에 모아 5분마다 반영(요청당 fsync 금지)
   setInterval(() => flushViews(db), 5 * 60_000).unref()
   const app = new Hono<AppEnv>()
 
-  // F9 보안 헤더. CSP 는 인라인 테마 스크립트·Vite 산출물 해시 관리가 필요해 뺀다(plan §1.6). COEP 는 hono 기본값이 꺼짐(외부 아바타 이미지)
-  app.use(secureHeaders())
+  // F9 보안 헤더 + CSP(s3-1, dangerouslySetInnerHTML 4곳의 2차 방어선). 인라인 <script>(테마·PWA register)는 기동 시 dist/index.html 에서 sha256 해시를 뽑아 허용 —
+  // renderShare 는 <title>·<head> 끝만 바꿔 해시가 그대로다. 브라우저는 HTML 전처리로 CR LF → LF 한 뒤 해시하므로(CRLF 체크아웃) 같이 정규화한다. dist 가 없으면(check) 해시 없이.
+  // HSTS 는 https origin 일 때만(s3-2). COEP 는 hono 기본값이 꺼짐(외부 아바타 이미지)
+  const hashes = (() => {
+    try { return [...readFileSync(join(env.distDir, 'index.html'), 'utf8').matchAll(/<script(?![^>]*\ssrc=)[^>]*>([\s\S]*?)<\/script>/g)].map((m) => `'sha256-${createHash('sha256').update(m[1].replace(/\r\n?/g, '\n')).digest('base64')}'`) } catch { return [] }
+  })()
+  app.use(secureHeaders({
+    contentSecurityPolicy: { defaultSrc: ["'self'"], scriptSrc: ["'self'", ...hashes], styleSrc: ["'self'", "'unsafe-inline'"], imgSrc: ["'self'", 'https:', 'data:'], connectSrc: ["'self'"], frameAncestors: ["'none'"], baseUri: ["'self'"], objectSrc: ["'none'"], formAction: ["'self'"] },
+    strictTransportSecurity: env.secure,
+  }))
   // 요청 로그: ts method path status ms 만 (IP·UA·쿼리스트링 금지, 03 §3.7). 공유 slug 는 :slug 로 가린다(F10)
   app.use(async (c, next) => {
     const t = performance.now()
@@ -54,7 +63,9 @@ export async function createApp(db: DB) {
       const origin = c.req.header('origin')
       if (origin && origin !== env.origin && origin !== new URL(c.req.url).origin) throw new HttpError(403, 'forbidden', '허용되지 않은 출처입니다')
       const ct = c.req.header('content-type') ?? ''
-      if ((c.req.header('content-length') ?? '0') !== '0' && !ct.startsWith('application/json')) throw new HttpError(415, 'unsupported_media', 'JSON 만 받습니다')
+      // 본문이 있으면(Content-Length≠0 또는 chunked) JSON 만. 브라우저는 본문 없는 POST 에 Content-Length: 0 을, DELETE 에는 아무것도 안 붙인다(s1 Info)
+      const hasBody = c.req.header('transfer-encoding') != null || (c.req.header('content-length') ?? '0') !== '0'
+      if (hasBody && !ct.startsWith('application/json')) throw new HttpError(415, 'unsupported_media', 'JSON 만 받습니다')
     }
     await next()
   })

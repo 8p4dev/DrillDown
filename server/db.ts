@@ -1,6 +1,6 @@
 // SQLite 연결 + 마이그레이션 — 오케스트레이터 소유 (orchestration_server.md §3.2). 규칙: 03 §3.8 "스키마 마이그레이션 규칙".
 // server/migrations/NNN_<name>.sql 을 PRAGMA user_version 기준으로 순서대로 한 트랜잭션씩. 실행 전 pre-migrate 백업 1개.
-import { mkdirSync, readdirSync, readFileSync, rmSync, existsSync } from 'node:fs'
+import { chmodSync, mkdirSync, readdirSync, readFileSync, rmSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { DatabaseSync, backup } from 'node:sqlite'
 import { env } from './env.ts'
@@ -27,7 +27,11 @@ async function migrate(db: DB, file: string) {
     for (const f of readdirSync(env.dataDir).filter((x) => x.startsWith('pre-migrate-'))) rmSync(join(env.dataDir, f))
     return
   }
-  if (file !== ':memory:' && cur > 0) await backup(db, join(env.dataDir, `pre-migrate-${String(cur).padStart(3, '0')}.db`))
+  if (file !== ':memory:' && cur > 0) {
+    const pre = join(env.dataDir, `pre-migrate-${String(cur).padStart(3, '0')}.db`)
+    await backup(db, pre)
+    chmodSync(pre, 0o600) // 평문 사본(s4 M1). Windows 는 no-op
+  }
   for (const f of todo) {
     const n = Number(f.slice(0, 3))
     db.exec('BEGIN')

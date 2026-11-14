@@ -82,6 +82,8 @@ export function signIn(c: Context<AppEnv>, a: { provider: OAuthProvider | 'fake'
   const old = c.get('user')
   if (old) db.prepare('DELETE FROM sessions WHERE id = ?').run(old.sessionId)
   createSession(c, db, id, role, now)
+  // 쿠키 없이 반복 로그인하면 세션 행이 무한히 쌓인다(s1 L1) — 사용자당 최신 20개만
+  db.prepare('DELETE FROM sessions WHERE user_id = ? AND id NOT IN (SELECT id FROM sessions WHERE user_id = ? ORDER BY created_at DESC LIMIT 20)').run(id, id)
   return c.redirect('/' + a.returnTo)
 }
 
