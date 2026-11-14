@@ -9,7 +9,7 @@ import { DAY } from '../http.ts'
 import { createApp } from '../index.ts'
 import { gallery } from '../sync/share.ts'
 import { runDaily } from './daily.ts'
-import { dayOf, productMetrics } from './product.ts'
+import { dayOf, flushViews, productMetrics } from './product.ts'
 
 const saved = { authFake: env.authFake, dataDir: env.dataDir }
 const tmp = mkdtempSync(join(tmpdir(), 'pc-check-'))
@@ -46,11 +46,13 @@ assert.ok(/^[1-9A-HJ-NP-Za-km-z]{11}$/.test('Seed1Tree11'))
 db.prepare("UPDATE trees SET slug = 'Seed1Tree11' WHERE id = 't-seed'").run()
 db.prepare("UPDATE trees SET slug = 'User1Tree11' WHERE id = 't-user'").run()
 
-// ---- #42 조회 수: /api/t/:slug +1, /t/:slug +1, 크롤러 UA 제외 ----
+// ---- #42 조회 수: /api/t/:slug +1, /t/:slug +1, 크롤러 UA 제외. 메모리에 모았다가 flushViews(5분 주기·재시작 직전)가 반영한다(r1 L5) ----
 assert.equal((await req('/api/t/User1Tree11')).status, 200)
 assert.equal((await req('/api/t/User1Tree11', { ua: 'facebookexternalhit/1.1' })).status, 200) // 크롤러는 세지 않는다
 const hasDist = existsSync(join(env.distDir, 'index.html')) // /t/:slug 는 dist 셸이 필요 — 빌드 전이면 건너뜀
 if (hasDist) { assert.equal((await req('/t/User1Tree11')).status, 200); assert.equal((await req('/t/User1Tree11', { ua: 'kakaotalk-scrap/1.0' })).status, 200) }
+assert.equal(n("SELECT view_count n FROM trees WHERE id = 't-user'"), 0) // 요청당 SQLite 쓰기 없음
+flushViews(db)
 assert.equal(n("SELECT view_count n FROM trees WHERE id = 't-user'"), hasDist ? 2 : 1)
 
 // ---- #45 featured: 설정 전 갤러리 순서(최신) → 추천 고정 후 시드가 1쪽 상단 + featured 표식 ----

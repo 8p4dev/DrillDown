@@ -4,13 +4,14 @@ import { spawn } from 'node:child_process'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import type { Context, Hono } from 'hono'
-import type { OpsStats } from '../../src/core/api.ts'
+import type { AdminStats, OpsStats } from '../../src/core/api.ts'
 import { tx, type DB } from '../db.ts'
 import { env } from '../env.ts'
-import { body, clientIp, fail, hit, type AppEnv } from '../http.ts'
+import { body, clientIp, CTRL, fail, hit, UUID, type AppEnv } from '../http.ts'
 import { clientErrors, counts, recordClientError, STARTED_AT } from '../metrics.ts'
 import { restoreTreesOfUser } from '../sync/owner.ts'
-import { audit, CTRL, optText, UUID } from './admin.ts'
+import { audit, optText } from './admin.ts'
+import { flushViews } from './product.ts'
 
 const ROOT = resolve(import.meta.dirname, '../..')
 /** deploy/drilldown-server.service 의 MemoryMax=512M — 서버는 유닛 값을 모르니 상수(수동 동기) */
@@ -30,6 +31,14 @@ export const hooks = {
 
 const size = (f: string) => { try { return statSync(f).size } catch { return 0 } }
 const mtime = (f: string) => { try { return statSync(f).mtimeMs } catch { return 0 } }
+const readJson = <T>(file: string, dflt: T): T => { try { return JSON.parse(readFileSync(join(env.dataDir, file), 'utf8')) as T } catch { return dflt } }
+/** 계약 C — GET /api/admin/ops/jobs: 실행 중 플래그 + backup.json·daily.json (stats 보다 가벼운 폴링용). stats 의 backup·daily 도 이것.
+ *  at=0 = 아직 한 번도 안 돌았다(실패와 구분). configured = 외부 업로드 설정 유무(backup.ts 와 같은 환경 변수) */
+export const jobs = () => ({
+  running: { ...running },
+  backup: { ...readJson<Omit<AdminStats['backup'], 'configured'>>('backup.json', { at: 0, bytes: 0, ok: false }), configured: !!(process.env.BACKUP_AGE_RECIPIENT && process.env.BACKUP_RCLONE_REMOTE) },
+  daily: readJson<AdminStats['daily']>('daily.json', { at: 0, ok: false, purged_users: 0, purged_sessions: 0, purged_tombstones: 0 }),
+})
 /** .git/HEAD → 커밋 12자(exec 없이 파일만). worktree(.git 파일)·packed-refs 도 처리. 없으면 null */
 function gitHead(): string | null {
   try {
@@ -140,7 +149,8 @@ export function registerOps(app: Hono<AppEnv>) {
     try { const j = JSON.parse(readFileSync(env.adminsFile, 'utf8')) as unknown; if (Array.isArray(j)) list = j.filter((x): x is string => typeof x === 'string') } catch { /* 없음·깨짐 → 빈 목록 */ }
     return c.json({ file: env.adminsFile, list, me: `${u.provider}:${u.provider_sub}` })
   })
-  /** 수동 백업·일일 작업: 자식 프로세스 1개, 동시 실행 409. 끝나면 stats 의 jobs 가 false 로 돌아오고 backup.json/daily.json 이 새로 읽힌다 */
+  app.get('/api/admin/ops/jobs', (c) => c.json(jobs()))
+  /** 수동 백업·일일 작업: 자식 프로세스 1개, 동시 실행 409. 끝나면 jobs 의 running 이 false 로 돌아오고 backup.json/daily.json 이 새로 읽힌다 */
   app.post('/api/admin/ops/run/:job', (c) => {
     const job = c.req.param('job') as Job
     if (!(job in JOBS)) fail(404, 'not_found', '없는 작업입니다')
@@ -156,8 +166,11 @@ export function registerOps(app: Hono<AppEnv>) {
     audit(db, me(c), 'system.checkpoint', 'settings', null, r)
     return c.json(r)
   })
-  /** 재시작 = 비정상 종료(1) → systemd Restart=on-failure 가 5초 뒤 되살린다(exit 0 은 안 뜬다). 응답이 나간 뒤 종료 */
+  /** 재시작 = 비정상 종료(1) → systemd Restart=on-failure 가 5초 뒤 되살린다(exit 0 은 안 뜬다). 응답이 나간 뒤 종료.
+   *  자식(백업·일일)이 돌고 있으면 409 — KillMode=control-group 이라 함께 죽는다(r1 L2) */
   app.post('/api/admin/ops/restart', (c) => {
+    if (running.backup || running.daily) fail(409, 'running', '작업이 끝난 뒤 재시작하세요')
+    flushViews(c.get('db'))
     audit(c.get('db'), me(c), 'system.restart', 'settings', null)
     setTimeout(() => hooks.exit(1), 300)
     return c.body(null, 204)

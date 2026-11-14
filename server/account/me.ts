@@ -4,8 +4,8 @@ import type { Context, Hono } from 'hono'
 import type { Me, Session, User } from '../../src/core/api.ts'
 import { tx, type DB } from '../db.ts'
 import { env } from '../env.ts'
-import { body, clientIp, fail, hit, limit, requireUser, type AppEnv } from '../http.ts'
-import { audit, CTRL, getSettings, purgeUserNow, softDeleteUser } from './admin.ts'
+import { body, clientIp, CTRL, fail, hit, limit, requireUser, type AppEnv } from '../http.ts'
+import { audit, getSettings, purgeUserNow, softDeleteUser } from './admin.ts'
 import { legalMe } from './legal.ts'
 import { productMe } from './product.ts'
 import { clearSid } from './session.ts'
@@ -65,7 +65,6 @@ export function registerMe(app: Hono<AppEnv>) {
     return c.json({})
   })
 
-  app.post('/api/me/delete', requireUser, async (c, next) => { hit(c, `medel:${uid(c)}`, 3, 3_600_000); await next() })
   app.use('/api/me/*', requireUser, limit('me', 300, 60_000))
   app.use('/api/me', requireUser, limit('me', 300, 60_000))
 
@@ -73,7 +72,7 @@ export function registerMe(app: Hono<AppEnv>) {
     const db = c.get('db')
     const s = getSettings(db)
     const me: Me = { user: userOf(db, uid(c)), notice: s.notice.enabled && s.notice.text ? { text: s.notice.text } : null, maintenance: s.maintenance.enabled, hidden_trees: hiddenTreesOf(db, uid(c)),
-      legal: legalMe(db, uid(c)), product: productMe(db, uid(c)) }
+      legal: legalMe(db), product: productMe(db) }
     return c.json(me)
   })
 
@@ -121,6 +120,7 @@ export function registerMe(app: Hono<AppEnv>) {
   })
 
   app.post('/api/me/delete', (c) => {
+    hit(c, `medel:${uid(c)}`, 3, 3_600_000)
     const db = c.get('db')
     tx(db, () => {
       softDeleteUser(db, uid(c), Date.now())

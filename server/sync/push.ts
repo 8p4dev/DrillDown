@@ -138,12 +138,17 @@ export function applyPush(db: DB, userId: string, p: PushPayload, now: number): 
       }
     }
 
-    // ---- attempts: append-only, PK 중복 무시 ----
+    // ---- attempts: append-only, PK 중복 무시. 사용자당 상한을 넘는 새 행은 dropped(클라이언트가 outbox 에서 뺀다, r1 H2) ----
+    let have = p.attempts.length ? (db.prepare('SELECT COUNT(*) AS n FROM attempts WHERE user_id = ?').get(userId) as { n: number }).n : 0
     for (const a of p.attempts) {
       const own = db.prepare('SELECT user_id FROM attempts WHERE id = ?').get(a.id) as { user_id: string } | undefined
       if (own && own.user_id !== userId) { taken.add(a.id); continue }
-      if (!own) db.prepare('INSERT INTO attempts(id, user_id, tree_id, root_id, started_at, completed_at, node_recall, edge_accuracy, auto_graded_count, self_graded_count, overridden_count) VALUES (?,?,?,?,?,?,?,?,?,?,?)')
-        .run(a.id, userId, a.treeId, a.rootId, a.startedAt, a.completedAt, a.nodeRecall, a.edgeAccuracy, a.autoGradedCount, a.selfGradedCount, a.overriddenCount)
+      if (!own && have >= LIMITS.attempts) { r.dropped.push(a.id); continue }
+      if (!own) {
+        db.prepare('INSERT INTO attempts(id, user_id, tree_id, root_id, started_at, completed_at, node_recall, edge_accuracy, auto_graded_count, self_graded_count, overridden_count) VALUES (?,?,?,?,?,?,?,?,?,?,?)')
+          .run(a.id, userId, a.treeId, a.rootId, a.startedAt, a.completedAt, a.nodeRecall, a.edgeAccuracy, a.autoGradedCount, a.selfGradedCount, a.overriddenCount)
+        have++
+      }
       r.applied.push(a.id)
     }
 

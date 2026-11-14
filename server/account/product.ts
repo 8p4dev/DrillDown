@@ -8,9 +8,9 @@ import { curve, migrateFSRS7Parameters } from 'ts-fsrs/models/fsrs-7'
 import type { DailyStat, Feedback, MyFeedback, ProductFlags, ProductMe, ProductMetrics, ProductSettings, ProductStats, ProductTree, ReportAgg, ReportReason } from '../../src/core/api.ts'
 import { tx, type DB } from '../db.ts'
 import { env } from '../env.ts'
-import { body, clientIp, DAY, fail, hit, type AppEnv } from '../http.ts'
+import { body, clientIp, DAY, fail, hit, UUID, type AppEnv } from '../http.ts'
 import { clearGalleryCache, SLUG_RE } from '../sync/share.ts'
-import { audit, optText, UUID } from './admin.ts'
+import { audit, optText } from './admin.ts'
 import { shortUa } from './session.ts'
 
 const H = 3_600_000
@@ -33,9 +33,7 @@ export function requireFlag(db: DB, k: keyof ProductFlags, status: 403 | 404 = 4
   if (!productSettings(db).flags[k]) fail(status, status === 404 ? 'not_found' : 'disabled', status === 404 ? '없는 경로입니다' : '지금은 운영 정책으로 잠시 꺼져 있는 기능입니다')
 }
 /** GET /api/me 에 합쳐지는 부분 */
-export function productMe(db: DB, _userId: string): ProductMe {
-  return { flags: productSettings(db).flags }
-}
+export const productMe = (db: DB): ProductMe => ({ flags: productSettings(db).flags })
 /** GET /api/admin/stats 의 product 부분 — 가벼운 것만 */
 export function productStats(db: DB): ProductStats {
   return { feedback_open: num(db, 'SELECT COUNT(*) n FROM feedback WHERE resolved_at IS NULL') }
@@ -51,6 +49,15 @@ function saveCounters() {
   try { mkdirSync(env.dataDir, { recursive: true }); writeFileSync(join(env.dataDir, CFILE), JSON.stringify(counters)); savedHits = counters.gallery_hits } catch (e) { console.error('product counters', (e as Error).message) }
 }
 export const countGalleryHit = () => { counters.gallery_hits++ }
+// ---- #42 공유 조회 수(trees.view_count): 요청마다 UPDATE 하면 synchronous=FULL 이라 fsync 1회 → 메모리에 모아 5분(createApp 의 setInterval)·재시작 직전에 반영(r1 L5) ----
+const views = new Map<string, number>()
+export const countView = (treeId: string) => { views.set(treeId, (views.get(treeId) ?? 0) + 1) }
+export function flushViews(db: DB) {
+  if (!views.size) return
+  const up = db.prepare('UPDATE trees SET view_count = view_count + ? WHERE id = ?')
+  tx(db, () => { for (const [id, n] of views) up.run(n, id) })
+  views.clear()
+}
 
 // ---- 일일 작업(04:00): 어제 행 upsert(restarts 는 기동 시 +1 한 값을 둔다) + 처리된 피드백 90일 삭제 ----
 export function productDaily(db: DB, now: number): void {
@@ -176,12 +183,6 @@ export function registerProduct(app: Hono<AppEnv>) {
   const me = (c: Context<AppEnv>) => c.get('user')!.id
   loadCounters()
   setInterval(saveCounters, 5 * 60_000).unref()
-  // #49 가용성 대용: 기동 뒤 첫 요청에서 오늘 행 restarts +1 (registerProduct 는 db 를 못 받으므로 요청 때 1회)
-  let booted = false
-  app.use('/api/*', async (c, next) => {
-    if (!booted) { booted = true; c.get('db').prepare('INSERT INTO daily_stats(day, restarts) VALUES(?, 1) ON CONFLICT(day) DO UPDATE SET restarts = restarts + 1').run(dayOf(Date.now())) }
-    await next()
-  })
 
   // #43 피드백 — 비로그인 IP 5/시, 로그인 20/시(메모리 버킷, IP 비저장)
   app.post('/api/feedback', async (c) => {

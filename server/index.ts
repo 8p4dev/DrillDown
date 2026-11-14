@@ -13,9 +13,16 @@ import { errorBody, HttpError, type AppEnv } from './http.ts'
 import { registerAccount, sessionMiddleware, maintenanceMiddleware } from './account/index.ts'
 import { registerSync, registerSharePages } from './sync/index.ts'
 import { LIMITS } from './sync/map.ts'
-import { recordError } from './metrics.ts'
+import { maskPath, recordError } from './metrics.ts'
+import { dayOf, flushViews } from './account/product.ts'
 
 export async function createApp(db: DB) {
+  // r1 M5: .env.example 이 AUTH_FAKE=1 이라 켠 채 https 로 배포되면 누구나 관리자 — 기동을 거부한다
+  if (env.authFake && env.secure) throw new Error('AUTH_FAKE on https origin')
+  // #49 가용성 대용: 기동 시 오늘 행 restarts +1 (r1 L1 — 첫 요청 미들웨어는 /api/me 보다 늦게 등록돼 세지 못했다)
+  db.prepare('INSERT INTO daily_stats(day, restarts) VALUES(?, 1) ON CONFLICT(day) DO UPDATE SET restarts = restarts + 1').run(dayOf(Date.now()))
+  // r1 L5: 공유 조회 수는 메모리에 모아 5분마다 반영(요청당 fsync 금지)
+  setInterval(() => flushViews(db), 5 * 60_000).unref()
   const app = new Hono<AppEnv>()
 
   // F9 보안 헤더. CSP 는 인라인 테마 스크립트·Vite 산출물 해시 관리가 필요해 뺀다(plan §1.6). COEP 는 hono 기본값이 꺼짐(외부 아바타 이미지)
@@ -25,7 +32,7 @@ export async function createApp(db: DB) {
     const t = performance.now()
     await next()
     if (c.req.path.startsWith('/api/') || c.req.path.startsWith('/t/'))
-      console.log(`${new Date().toISOString()} ${c.req.method} ${c.req.path.replace(/^(\/api)?\/t\/[^/]+/, '$1/t/:slug')} ${c.res.status} ${Math.round(performance.now() - t)}`)
+      console.log(`${new Date().toISOString()} ${c.req.method} ${maskPath(c.req.path)} ${c.res.status} ${Math.round(performance.now() - t)}`)
   })
   app.onError((e, c) => {
     if (e instanceof HttpError) return c.json(errorBody(e.code, e.message, e.field), e.status as 400)

@@ -4,7 +4,7 @@ import { randomUUID as id } from 'node:crypto'
 import { Hono, type ErrorHandler } from 'hono'
 import { openDb, type DB } from '../db.ts'
 import { DAY, GRACE_MS, HttpError, type AppEnv } from '../http.ts'
-import { parsePush } from './map.ts'
+import { LIMITS, parsePush } from './map.ts'
 import { listTreesForAdmin, purgeTombstones, purgeUser, restoreTree, restoreTreesOfUser, setHidden, softDeleteTreesOfUser, treeCountOf, treeIdBySlug, treeStats, treesOfUser } from './owner.ts'
 import { pullSince } from './pull.ts'
 import { applyPush } from './push.ts'
@@ -118,6 +118,8 @@ assert.throws(() => P({ nodes: [node(id(), t1, 1, { aliases: ['x'.repeat(51)] })
 assert.throws(() => P({ nodes: [node('not-a-uuid', t1, 1)] }), (e: HttpError) => e.field === 'nodes[0].id')
 assert.throws(() => P({ nodes: [node(id(), t1, 1, { width: 4 })] }), (e: HttpError) => e.field === 'nodes[0].width')
 assert.throws(() => P({ srs: [{ ...srs(1, []), lastGradeSource: 'bogus' }] }), (e: HttpError) => e.field === 'srs[0].lastGradeSource')
+assert.throws(() => P({ srs: [{ ...srs(1, []), card: { junk: 'x'.repeat(LIMITS.card) } }] }), (e: HttpError) => e.field === 'srs[0].card') // r1 H2: 카드 직렬화 상한(디스크 DoS)
+P({ srs: [{ ...srs(1, []), card: { stability: 1.5, stabilityFast: 1.2, difficulty: 5, lastReviewAt: '2026-11-14T00:00:00.000Z', state: 2, reps: 3, lapses: 0, elapsedDays: 1, scheduledDays: 2 } }] }) // ts-fsrs Card 크기는 통과
 throws(() => P({ nodes: Array.from({ length: 501 }, () => node(id(), t1, 1)) }), 400, 'payload_too_large')
 P({ nodes: [node(id(), t1, 1, { note: '줄1\n\t줄2' })] }) // note 의 줄바꿈·탭은 허용
 
@@ -212,6 +214,16 @@ push(F, { nodes: [node(cf, tf, 140, { parentId: rf })] })
 assert.equal(Number(get('SELECT seq FROM trees WHERE id = ?', tf)!.seq), sameSeq)
 push(F, { deleted: { nodes: [{ id: rf, treeId: tf, deletedAt: 150 }] } }) // 살아 있는 루트가 없으면 제목 유지
 assert.equal(get('SELECT title FROM trees WHERE id = ?', tf)!.title, '새루트')
+// r1 H2 attempts 사용자당 상한: 넘치는 새 행은 dropped(클라이언트가 outbox 에서 뺀다), 이미 있는 행은 applied
+const att = (at: number) => ({ id: id(), treeId: tf, rootId: rf, startedAt: at, completedAt: at, nodeRecall: 1, edgeAccuracy: 1, autoGradedCount: 1, selfGradedCount: 0, overriddenCount: 0 })
+const [a1, a2, a3] = [att(1), att(2), att(3)]
+LIMITS.attempts = 2
+r = push(F, { attempts: [a1, a2, a3] })
+assert.deepEqual([r.applied, r.dropped], [[a1.id, a2.id], [a3.id]])
+r = push(F, { attempts: [a1, att(4)] })
+assert.deepEqual([r.applied, r.dropped.length], [[a1.id], 1])
+LIMITS.attempts = 20_000
+assert.equal(get('SELECT COUNT(*) AS n FROM attempts WHERE user_id = ?', F)!.n, 2)
 
 // ---- 공개 범위 전이표 (04 §3.3, 11행) ----
 const S = id(); addUser(S)
@@ -422,11 +434,12 @@ assert.equal((await app.request('/api/trees')).status, 401)
 const ok = await app.request(`/api/t/${s4}`)
 assert.equal(ok.status, 200)
 assert.equal(ok.headers.get('cache-control'), 'private, no-store')
-const body = (await ok.json()) as { id: string; slug: string; nodes: unknown[]; owner: { nickname: string; avatar_url: null }; node_count: number }
+const body = (await ok.json()) as { id: string; slug: string; nodes: unknown[]; owner: { nickname: string; avatar_url: null }; node_count: number; flags: unknown }
 assert.equal(body.id, ts)
 assert.equal(body.slug, s4)
 assert.equal(body.nodes.length, 3)
 assert.equal(body.owner.avatar_url, null)
+assert.deepEqual(body.flags, { report: true, rating: true }) // 계약 B: 신고·별점 스위치 동봉
 assert.equal((await app.request(`/api/t/${newSlug()}`)).status, 404)
 setHidden(db, ts, true, 9)
 const hid = await app.request(`/api/t/${s4}`)
@@ -459,6 +472,12 @@ const own = (await (await ownApp.request('/api/trees')).json()) as { trees: { id
 assert.ok(own.trees.length > 0 && own.trees.every((t) => get('SELECT owner_id FROM trees WHERE id = ?', t.id)!.owner_id === S))
 assert.ok(!own.trees.some((t) => zt.includes(t.id)))
 assert.deepEqual([own.trees.find((t) => t.id === ts)?.copyCount, own.trees.find((t) => t.id === ts)?.hiddenByAdmin], [1, false])
+// 계약 A: push 본문 userId 가 세션 사용자와 다르면 409 user_mismatch. 같거나 없으면(옛 클라이언트) 통과
+const pushAs = (a: Hono<AppEnv>, b: unknown) => a.request('/api/sync', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) })
+const mm = await pushAs(ownApp, { userId: A })
+assert.equal(mm.status, 409); assert.equal(((await mm.json()) as { error: { code: string } }).error.code, 'user_mismatch')
+assert.equal((await pushAs(ownApp, { userId: S })).status, 200)
+assert.equal((await pushAs(ownApp, {})).status, 200)
 // 별점 라우트(계약 C3): 비로그인 401 · stars 검증 400 · 본인 403 own_tree · 정상 200 Rating · 재평가 200 · 없는 slug 404 · 숨김 403
 const appA = new Hono<AppEnv>()
 appA.onError(onErr)
