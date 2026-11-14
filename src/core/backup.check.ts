@@ -28,4 +28,13 @@ ok(copy.copied === 1 && copy.trees[0].id === 'new1' && copy.trees[0].visibility 
 const root = copy.nodes.find((n) => n.parentId === null)!, child = copy.nodes.find((n) => n.parentId !== null)!
 ok(root.id === 'new2' && child.parentId === 'new2' && child.treeId === 'new1', 'collision: node ids and parentId remapped')
 ok(copy.srs.length === 1 && copy.srs[0].nodeId === child.id && copy.srs[0].treeId === 'new1' && copy.srs[0].updatedAt === NOW, 'collision: srs follows node')
+// 보안(S3): __proto__·constructor 키가 든 백업을 parseBackup→planImport 로 통과시켜도 Object.prototype 이 오염되지 않는다
+// (리터럴 `__proto__:` 는 프로토타입 설정이라 계산 키로 own property 를 만든다 — JSON.parse 결과와 같은 모양)
+const P = { ['__proto__']: { polluted: 1 }, constructor: { prototype: { polluted: 1 } } }
+const evil = JSON.stringify({ ...P, trees: [{ ...tree, ...P }], nodes: [{ ...node('r', null), ...P }], srs: [{ nodeId: 'r', treeId: 't1', ...P }] })
+ok(evil.includes('"__proto__"'), 'evil backup carries __proto__ keys')
+const ev = parseBackup(evil, 0)
+planImport(ev, new Set(['t1']), NOW, () => `p${++seq}`)
+planImport(ev, new Set(), NOW)
+ok(!('polluted' in {}) && !('polluted' in Object.prototype) && ({} as { polluted?: number }).polluted === undefined, 'prototype not polluted by __proto__/constructor keys')
 console.log('backup.check ok')

@@ -10,8 +10,14 @@
    ```sh
    sudo useradd --system --home /var/lib/drilldown --shell /usr/sbin/nologin drilldown
    sudo mkdir -p /var/lib/drilldown /etc/drilldown && sudo chown drilldown: /var/lib/drilldown
-   sudo git clone <repo> /opt/drilldown && cd /opt/drilldown && sudo npm ci && sudo npm run build
+   sudo git clone <repo> /opt/drilldown && sudo chown -R drilldown: /opt/drilldown
    ```
+   **빌드는 Pi 에서 하지 않는다**(dev 의존성 460여 개·postinstall 이 운영 호스트에서 돌지 않게, S4 L1). 빌드 기기(노트북)에서:
+   ```sh
+   git clone <repo> && cd <repo> && npm ci && npm run build        # dist/ 생성
+   rsync -a --delete dist/ drilldown@<pi>:/opt/drilldown/dist/
+   ```
+   Pi 에서는 `drilldown` 사용자로 런타임 의존성만: `sudo -u drilldown npm ci --omit=dev` (`sudo npm` 금지 — root 로 postinstall 이 돈다). 서버는 `dist/` 를 정적으로 서빙할 뿐 빌드 도구가 필요 없다.
 4. `/etc/drilldown/env` (권한 600, owner root — systemd 가 읽어 넘긴다). `.env.example` 기준 + 백업 변수:
    ```
    PUBLIC_ORIGIN=https://<도메인>
@@ -32,7 +38,11 @@
    curl -s localhost:3000/api/health   # {"ok":true}
    ```
 8. Tunnel·Access: `deploy/cloudflared.md`.
-9. `AUTH_FAKE=1` 인 채 `PUBLIC_ORIGIN` 이 https 면 서버가 기동을 거부한다(`AUTH_FAKE on https origin`) — `journalctl -u drilldown-server` 에 이 줄이 보이면 env 에서 `AUTH_FAKE=0` 으로 고치고 재시작. 로컬 http 에서 기동 로그에 `AUTH_FAKE` 가 보이면 가짜 로그인이 열린 상태다.
+9. 기동 전 env 체크(S1 H1·S4 H1 — 이 둘이 틀리면 Access 밖 경로 한 줄로 누구나 관리자가 된다):
+   - [ ] `/etc/drilldown/env` 에 `AUTH_FAKE` 줄이 **없거나 `AUTH_FAKE=0`** 이다(`grep AUTH_FAKE /etc/drilldown/env`). 유닛 셋에 `Environment=AUTH_FAKE=0` 이 EnvironmentFile 뒤에 있어 env 파일 값을 덮는다.
+   - [ ] `PUBLIC_ORIGIN=https://<도메인>` 이 **반드시** 있다(비우면 `http://localhost:3000` 으로 잡혀 쿠키 `Secure` 가 빠지고 OAuth redirect 가 어긋난다).
+   - [ ] `HOST` 는 비우거나 `127.0.0.1`(터널만 들어온다).
+   서버는 `AUTH_FAKE=1` 이면서 origin 이 https 이거나 바인딩이 루프백(127.0.0.1·::1·localhost)이 아니면 기동을 거부한다 — `journalctl -u drilldown-server` 에 `AUTH_FAKE` 줄이 보이면 env 를 고치고 재시작. 로컬 http 개발 기동 로그에 `AUTH_FAKE` 가 보이면 가짜 로그인이 열린 상태다.
 
 ## 2. OAuth 앱 등록 체크리스트
 
@@ -60,19 +70,24 @@
 
 | 주기 | 작업 |
 |---|---|
-| 매일 03:00 | `drilldown-backup` — `data/backups/app-YYYYMMDD.db`(14개) → `age` → `rclone copyto <remote>/app-YYYYMMDD.db.age`. 결과 `backup.json` → 대시보드 "마지막 백업" |
+| 매일 03:00 | `drilldown-backup` — `data/backups/app-YYYYMMDD.db`(14개, 평문·모드 600·디렉터리 700) → `age` → `rclone copyto <remote>/app-YYYYMMDD.db.age`(암호문은 외부본만, 로컬엔 남지 않음). 결과 `backup.json` → 대시보드 "마지막 백업" |
 | 매일 04:00 | `drilldown-daily` — 만료 세션, 탈퇴 7일 purge(소명·피드백 글 포함), 톰스톤, 처리 신고·소명·게시중단·정보주체 요청 90일, 임시조치(30일) 만료 복원, daily_stats, 감사 로그 1년(맨 뒤), WAL checkpoint. 결과 `daily.json`. 게시중단 접수로 숨긴 트리는 30일 임시조치라 큐에서 **확정**하지 않으면 자동 복원된다 |
 | 매월 | `npm audit`, OS 업데이트 확인, **복원 리허설**(아래 4를 노트북에서 끝까지) |
-| 업데이트 | `git pull && npm ci && npm run build` → 재시작은 **관리자 → 시스템 → 서버 → [서버 재시작]**(exit 1 → systemd 가 5초 뒤 되살림) 또는 `sudo systemctl restart drilldown-server`. 빌드 뒤 재시작을 잊으면 같은 패널에 "재시작 필요" 가 빨갛게 뜬다(커밋·빌드 해시도 거기서 확인). 마이그레이션은 기동 시 자동, 직전에 `pre-migrate-NNN.db` 1개 보관 |
+| 업데이트 | 빌드 기기에서 `git pull && npm ci && npm run build` → `rsync -a --delete dist/ drilldown@<pi>:/opt/drilldown/dist/`; 서버 코드가 바뀌었으면 Pi 에서 `cd /opt/drilldown && sudo -u drilldown git pull && sudo -u drilldown npm ci --omit=dev`(§1-3) → 재시작은 **관리자 → 시스템 → 서버 → [서버 재시작]**(exit 1 → systemd 가 5초 뒤 되살림) 또는 `sudo systemctl restart drilldown-server`. 빌드 뒤 재시작을 잊으면 같은 패널에 "재시작 필요" 가 빨갛게 뜬다(커밋·빌드 해시도 거기서 확인). 마이그레이션은 기동 시 자동, 직전에 `pre-migrate-NNN.db` 1개 보관 |
 
 수동 실행: **관리자 → 시스템 → 서버 → [지금 백업] / [일일 작업 실행]**(타이머와 같은 스크립트를 자식 프로세스로 띄움, 끝나면 대시보드 카드가 갱신되고 오류 문구가 카드에 보인다). 서버 유닛에 `RCLONE_CONFIG=/etc/drilldown/rclone.conf` 가 있어야 외부 업로드까지 된다(`deploy/drilldown-server.service`). SSH 대안: `sudo systemctl start drilldown-daily`, 상세 로그는 `journalctl -u drilldown-daily`. WAL 이 커졌으면 같은 패널 [WAL checkpoint]. 로컬 백업 14개가 실제로 있는지는 시스템 → 복원 표에서 본다(다운로드는 없음).
 
 ## 4. 복원 런북 (03 §3.8 1~10, 목표 60분)
 
 1. 복호화 키: `age` 비밀키는 운영자 2인이 각자 오프라인 보관. 서버에는 공개키만(`/etc/drilldown/backup.pub`). 리허설 기기에 임시 복사하고 끝나면 지운다.
-2. 새 기기(Pi·Linux x64/ARM64·임시 VPS)에 위 1의 2~3 수행(`npm ci && npm run build`).
-3. 백업 내려받기: `rclone copy <remote>/app-YYYYMMDD.db.age ./restore/` (가장 최근 날짜. `backup()` 결과라 WAL 이 합쳐진 단일 파일 — 옛 서버의 `-wal`·`-shm` 은 복사하지 않는다).
-4. `age -d -i key.txt restore/app-YYYYMMDD.db.age > /var/lib/drilldown/app.db` → `sqlite3 /var/lib/drilldown/app.db 'PRAGMA integrity_check'` = `ok`. `chown drilldown:`.
+2. 새 기기(Pi·Linux x64/ARM64·임시 VPS)에 위 1의 2~3 수행(`dist/` 는 빌드 기기에서 가져오고 Pi 는 `npm ci --omit=dev` 만).
+3. 백업 원본은 두 종류다(리허설은 **둘 다** 끝까지):
+   - **외부 암호문**(Pi 가 죽었을 때): `rclone copy <remote>/app-YYYYMMDD.db.age ./restore/` (가장 최근 날짜. `backup()` 결과라 WAL 이 합쳐진 단일 파일 — 옛 서버의 `-wal`·`-shm` 은 복사하지 않는다).
+   - **로컬 평문 사본**(Pi 는 살았고 DB 만 망가졌을 때): `/var/lib/drilldown/backups/app-YYYYMMDD.db`(14개, 평문, 모드 600 — `age -d` 불필요). 복사한 뒤 원본 모드가 600·소유자 drilldown 인지 `ls -l` 로 확인한다.
+4. 복호화·검증:
+   - 외부: `age -d -i key.txt restore/app-YYYYMMDD.db.age > /var/lib/drilldown/app.db`
+   - 로컬: `cp /var/lib/drilldown/backups/app-YYYYMMDD.db /var/lib/drilldown/app.db`
+   두 경로 모두 `sqlite3 /var/lib/drilldown/app.db 'PRAGMA integrity_check'` = `ok` 를 확인한다(실험적 `node:sqlite` 의 `backup()` 이 조용히 깨지지 않았는지 보는 유일한 지점, S4 L2). `chown drilldown:` + `chmod 600`.
 5. `PRAGMA user_version` 확인 — 코드의 `server/migrations/` 보다 낮으면 기동 시 자동 마이그레이션.
 6. `/etc/drilldown/env`·`admins.json`·`rclone.conf` 복원 — 비밀값은 백업에 **없다**. 암호 관리자에서.
 7. `sudo systemctl start drilldown-server` → `curl localhost:3000/api/health` = `{"ok":true}`.
