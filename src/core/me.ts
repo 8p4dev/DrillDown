@@ -15,6 +15,7 @@ let ready = false
 let merge: MergePlan | null = null
 let justLoggedIn = false
 let sessions: Session[] = []
+let maintenance = false // 비로그인도 503 을 맞으면 배너(03 §3.4 점검 모드)
 let providers: Providers | null = null
 const subs = new Set<() => void>()
 const emit = () => subs.forEach((f) => f())
@@ -28,6 +29,7 @@ const ss = { get: (k: string) => { try { return sessionStorage.getItem(k) } catc
 function setMe(next: Me | null) {
   const prevId = me?.user.id
   me = next
+  maintenance = !!next?.maintenance
   ready = true
   const id = next?.user.id
   if (id && ss.get(PENDING)) {
@@ -56,6 +58,8 @@ export const useMe = (): Me | null => use(() => me)
 export const getMe = () => me
 /** 첫 /api/me 응답을 받았는가 — 로그인 필요 화면이 "확인 중"에 #/login 으로 튀지 않게 */
 export const useMeReady = () => use(() => ready)
+/** 점검 중(로그인 여부 무관). /api/me 의 maintenance 또는 아무 요청의 503 maintenance */
+export const useMaintenance = () => use(() => maintenance)
 /** 로그인 왕복 직후 2초 동안 true (아바타 rise + "로그인됨", 01 §3.6 #18) */
 export const useJustLoggedIn = () => use(() => justLoggedIn)
 export const useMergePlan = () => use(() => merge)
@@ -162,7 +166,7 @@ export function dismissMerge() {
 // ---- 공통 오류: 503 점검 → 배너, 429 → 토스트 1회 ----
 let limitedAt = 0
 setApiErrorHook((e, path) => {
-  if (e.status === 503 && e.code === 'maintenance' && me && !me.maintenance) { me = { ...me, maintenance: true }; emit() }
+  if (e.status === 503 && e.code === 'maintenance' && !maintenance) { maintenance = true; if (me) me = { ...me, maintenance: true }; emit() }
   // /api/sync 의 429 는 엔진이 Retry-After 로 조용히 재시도한다(P1 U08) — 토스트 제외
   if (e.status === 429 && !path.startsWith('/api/sync') && Date.now() - limitedAt > 10_000) { limitedAt = Date.now(); toast('요청이 많아요 · 잠시 후 다시 시도해 주세요') }
 })

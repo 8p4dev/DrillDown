@@ -6,6 +6,7 @@ import type { Context, Hono } from 'hono'
 import type { AdminStats, AdminUser, AuditRow, Report, Settings } from '../../src/core/api.ts'
 import { tx, type DB } from '../db.ts'
 import { env } from '../env.ts'
+import { errors } from '../metrics.ts'
 import { body, clientIp, DAY, fail, hit, limit, requireAdmin, type AppEnv } from '../http.ts'
 import { listTreesForAdmin, purgeUser, restoreTree, setHidden, softDeleteTreesOfUser, treeCountOf, treeIdBySlug, treeStats, treesOfUser } from '../sync/owner.ts'
 
@@ -79,9 +80,12 @@ export function stats(db: DB, now = Date.now()): AdminStats {
       signups_14d: signups14d(db, now),
     },
     trees: treeStats(db),
-    backup: readJson('backup.json', { at: 0, bytes: 0, ok: false, error: 'none' }),
+    // at=0 = 아직 한 번도 안 돌았다(실패와 구분). configured = 외부 업로드 설정 유무(backup.ts 와 같은 환경 변수)
+    backup: { ...readJson('backup.json', { at: 0, bytes: 0, ok: false }), configured: !!(process.env.BACKUP_AGE_RECIPIENT && process.env.BACKUP_RCLONE_REMOTE) },
     daily: readJson('daily.json', { at: 0, ok: false, purged_users: 0, purged_sessions: 0, purged_tombstones: 0 }),
     disk,
+    errors: errors(),
+    flags: { auth_fake: env.authFake },
     uptime_s: Math.floor(process.uptime()),
     rss: process.memoryUsage().rss,
   }
@@ -218,10 +222,10 @@ export function registerAdmin(app: Hono<AppEnv>) {
     return tree ? c.json({ tree }) : fail(410, 'purged', '7일이 지나 복구할 수 없습니다')
   })
 
-  const REPORT_SQL = `SELECT r.id, r.tree_id, COALESCE(t.title, '') title, r.reason, r.note, r.created_at, r.resolved_at, r.resolution
+  const REPORT_SQL = `SELECT r.id, r.tree_id, COALESCE(t.title, '') title, t.slug, t.hidden_by_admin_at, r.reason, r.note, r.created_at, r.resolved_at, r.resolution
     FROM reports r LEFT JOIN trees t ON t.id = r.tree_id`
-  type RRow = Omit<Report, 'tree'> & { tree_id: string; title: string }
-  const report = ({ tree_id, title, ...r }: RRow): Report => ({ ...r, tree: { id: tree_id, title } })
+  type RRow = Omit<Report, 'tree'> & { tree_id: string; title: string; slug: string | null; hidden_by_admin_at: number | null }
+  const report = ({ tree_id, title, slug, hidden_by_admin_at, ...r }: RRow): Report => ({ ...r, tree: { id: tree_id, title, slug, hidden_by_admin_at } })
 
   app.get('/api/admin/reports', (c) => {
     const s = c.req.query('status') ?? 'open'
@@ -281,7 +285,7 @@ export function registerAdmin(app: Hono<AppEnv>) {
   app.get('/api/admin/audit', (c) => {
     const cur = Number(c.req.query('cursor'))
     const n = lim(c.req.query('limit'))
-    const rows = c.get('db').prepare(`SELECT * FROM audit_log ${cur > 0 ? 'WHERE id < ?' : ''} ORDER BY id DESC LIMIT ?`)
+    const rows = c.get('db').prepare(`SELECT a.*, u.nickname actor FROM audit_log a LEFT JOIN users u ON u.id = a.actor_id ${cur > 0 ? 'WHERE a.id < ?' : ''} ORDER BY a.id DESC LIMIT ?`)
       .all(...(cur > 0 ? [cur, n + 1] : [n + 1])) as (Omit<AuditRow, 'meta'> & { meta: string | null })[]
     const items = rows.slice(0, n).map((r) => ({ ...r, meta: r.meta ? JSON.parse(r.meta) : null }))
     return c.json({ items, next: rows.length > n ? String(items[n - 1].id) : null })

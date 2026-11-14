@@ -143,6 +143,10 @@ const st = await json<{ users: { total: number; today: number; signups_14d: numb
 assert.equal(st.users.signups_14d.length, 14)
 assert.equal(st.users.signups_14d[13], st.users.today)
 assert.ok(st.users.total >= 5 && st.rss > 0 && typeof st.uptime_s === 'number')
+// 대시보드 확장: 5xx 카운터(메모리)·AUTH_FAKE 플래그·백업 "아직 없음"(at=0)·외부 업로드 설정 여부
+const st2 = st as unknown as { errors: { count: number; recent: unknown[] }; flags: { auth_fake: boolean }; backup: { at: number; configured: boolean } }
+assert.equal(typeof st2.errors.count, 'number'); assert.ok(Array.isArray(st2.errors.recent))
+assert.equal(st2.flags.auth_fake, true); assert.equal(st2.backup.at, 0); assert.equal(typeof st2.backup.configured, 'boolean')
 assert.deepEqual(Object.keys(st.trees).sort(), ['hidden', 'pending_delete', 'public', 'total'])
 r = await req('/api/admin/users?q=car', { cookie: adm })
 const carol = (await json<{ items: { id: string; nickname: string; tree_count: number }[] }>(r)).items
@@ -205,6 +209,14 @@ assert.equal(r.status, 429); assert.ok(Number(r.headers.get('retry-after')) > 0)
 assert.equal((db.prepare('SELECT COUNT(*) n FROM reports').get() as { n: number }).n, 0)
 r = await req('/api/admin/reports', { cookie: adm })
 assert.deepEqual(await json(r), { items: [] })
+// 신고 응답에 트리 slug·숨김 상태 — 관리자 신고 큐의 "보기" 링크·"숨김 중" 표시
+ins.run('t-rep', carol[0].id, '신고됨', Date.now(), Date.now(), null)
+db.prepare("UPDATE trees SET slug = 'rep-slug' WHERE id = 't-rep'").run()
+db.prepare("INSERT INTO reports(id,tree_id,reason,created_at) VALUES(?,'t-rep','spam',?)").run(crypto.randomUUID(), Date.now())
+r = await req('/api/admin/reports', { cookie: adm })
+const rep = (await json<{ items: { tree: { slug: string | null; hidden_by_admin_at: number | null } }[] }>(r)).items
+assert.equal(rep.length, 1); assert.equal(rep[0].tree.slug, 'rep-slug'); assert.equal(rep[0].tree.hidden_by_admin_at, null)
+db.prepare('DELETE FROM reports').run(); db.prepare("DELETE FROM trees WHERE id = 't-rep'").run()
 assert.equal((await req('/api/admin/trees/abc/restore', { body: {}, cookie: adm })).status, 410) // SH 스텁: purge 됨
 
 // ---- 카카오 연결 끊기 웹훅 ----

@@ -6,21 +6,26 @@ import { haptic } from '../features/feel'
 export function TwoStep(p: {
   label: ReactNode; confirmLabel: ReactNode; onConfirm: () => void
   className?: string; disabled?: boolean; pauseWhileFocused?: RefObject<HTMLElement | null>
+  /** 확인 없이 풀렸을 때(3초·Esc·포커스 이탈) — 호출자가 사유 입력칸 등을 접는다 */
+  onDisarm?: () => void
   /** aria-live 문장의 동사(기본: label 이 문자열이면 그 글자). 예: "탈퇴" → "한 번 더 누르면 탈퇴" */
   verb?: string
 }) {
   const [armed, setArmed] = useState(false)
   const timer = useRef(0)
   const pause = p.pauseWhileFocused
+  const disarm = useRef(p.onDisarm) // 콜백 identity 가 바뀌어도 타이머를 다시 걸지 않게 ref 로
+  useEffect(() => { disarm.current = p.onDisarm })
+  const cancel = () => { setArmed(false); disarm.current?.() }
 
   useEffect(() => {
     if (!armed) return
-    const start = () => { clearTimeout(timer.current); timer.current = window.setTimeout(() => setArmed(false), 3000) }
+    const start = () => { clearTimeout(timer.current); timer.current = window.setTimeout(cancel, 3000) }
     const stop = () => clearTimeout(timer.current)
     const el = pause?.current
     if (el?.contains(document.activeElement)) stop()
     else start()
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setArmed(false) }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') cancel() }
     el?.addEventListener('focusin', stop)
     el?.addEventListener('focusout', start)
     document.addEventListener('keydown', onKey)
@@ -43,7 +48,7 @@ export function TwoStep(p: {
         }}
         onBlur={(e) => {
           const next = e.relatedTarget
-          if (armed && !(next instanceof Node && pause?.current?.contains(next))) setArmed(false)
+          if (armed && !(next instanceof Node && pause?.current?.contains(next))) cancel()
         }}
       >
         <span className="ts-labels">

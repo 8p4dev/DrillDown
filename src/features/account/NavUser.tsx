@@ -2,7 +2,7 @@
 // 로그인 시 아바타 32px(+ 닉네임 ≥761) → #/account. 아바타 모서리 동기화 점(오프라인·오류일 때만, 탭=목록). 로그인 왕복 직후 rise + "로그인됨"(01 §3.6 #18).
 // 병합 대화(MergeDialog)는 me.ts 가 보관한 sync.onLogin 의 MergePlan 으로 띄운다(03 §3.3): (0,0) 무음 / (0,S) 토스트 / (L>0) 대화 / otherAccount 면 계정 전환.
 import { lazy, Suspense, useEffect } from 'react'
-import { applyMerge, dismissMerge, useJustLoggedIn, useMe, useMergePlan, type MergeChoice } from '../../core/me'
+import { applyMerge, dismissMerge, useJustLoggedIn, useMe, useMeReady, useMergePlan, type MergeChoice } from '../../core/me'
 import { useSyncState } from '../../core/sync'
 import { href } from '../../router'
 import { I } from '../../ui/icons'
@@ -19,8 +19,9 @@ export default function NavUser() {
   const plan = useMergePlan()
   const justLoggedIn = useJustLoggedIn()
   const id = me?.user.id
+  const ready = useMeReady()
 
-  useEffect(() => { if (!id) hint('login', '로그인하면 저장돼요') }, [id])
+  useEffect(() => { if (ready && !id) hint('login', '로그인하면 저장돼요') }, [ready, id]) // 확인 전(null)에는 띄우지 않는다
   useEffect(() => { if (justLoggedIn && toastedFor !== id) { toastedFor = id; toast('로그인됨') } }, [justLoggedIn, id])
   const dialog = !!plan && (plan.local > 0 || !!plan.otherAccount)
   useEffect(() => {

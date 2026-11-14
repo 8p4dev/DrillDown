@@ -1,11 +1,12 @@
 // 관리자 #/admin(/users|trees|system) — 03 §3.4 화면 표·권한, 02 §3.1 관리자 와이어(PC 표 + sticky 헤더, ≤760 카드), 01 §3.5 관리자 행·§3.6 #22.
-// 데이터는 전부 /api/admin/*(03 §3.6). 목록은 cursor "더 보기". 비관리자·API 404 는 #/ 로. 파괴 동작(정지·삭제·숨김)은 TwoStep + 사유 입력(I14, 포커스 중 타이머 정지).
+// 데이터는 전부 /api/admin/*(03 §3.6). 목록은 cursor "더 보기". 비관리자·API 404 는 #/ 로. 파괴 동작(정지·삭제·숨김·점검)은 TwoStep + 사유 입력(I14, 포커스 중 타이머 정지).
+// 입력칸 클래스는 .admin-search — 에디터의 전역 .search{position:absolute} 와 겹치면 안 된다(docs/research/admin/w1_gap.md B1).
 import { useEffect, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react'
 import { api, ApiError, type AdminStats, type AdminTree, type AdminUser, type AuditRow, type Page, type Report, type ReportReason, type Settings } from '../../core/api'
 import { refreshMe, useMe, useMeReady } from '../../core/me'
 import { href, type AdminTab } from '../../router'
 import { I } from '../../ui/icons'
-import { ban, database, eye, eyeOff, hardDrive, megaphone, search, undo2 } from '../../ui/icons.all'
+import { ban, database, externalLink, eye, eyeOff, hardDrive, megaphone, search, undo2 } from '../../ui/icons.all'
 import { Icon } from '../../ui/Icon'
 import { TwoStep } from '../../ui/TwoStep'
 import { ProviderLogo } from '../account/providers'
@@ -19,11 +20,14 @@ const date = (t: number) => { const d = new Date(t); return `${p2(d.getMonth() +
 const when = (t: number) => { const d = new Date(t); return `${date(t)} ${p2(d.getHours())}:${p2(d.getMinutes())}` }
 const bytes = (b: number) => (b >= 1e9 ? `${(b / 1e9).toFixed(1)} GB` : `${(b / 1e6).toFixed(1)} MB`)
 const dur = (s: number) => `${Math.floor(s / 86400)}일 ${Math.floor((s % 86400) / 3600)}시간`
+const H26 = 26 * 3600_000 // 하루 1회 작업이 "오늘 안 돌았다" 기준
 
-// ---- 데이터: GET 1회 / cursor 페이지. 404(권한 없음 숨김) → #/ ----
+// ---- 데이터: GET 1회 / cursor 페이지. 404(권한 없음 숨김) → #/ . 오류는 서버 메시지·필드 그대로(WCAG 3.3.1) ----
 const guard = (e: unknown) => {
   if (e instanceof ApiError && e.status === 404) location.hash = href.trees()
-  else toast(e instanceof ApiError && e.status === 0 ? '오프라인이에요' : '실패했어요 · 다시 시도해 주세요')
+  else if (e instanceof ApiError && e.status === 0) toast('오프라인이에요')
+  else if (e instanceof ApiError) toast(`${e.message}${e.field ? ` (${e.field})` : ''}`)
+  else toast('실패했어요 · 다시 시도해 주세요')
 }
 function useGet<T>(path: string, tick = 0): [T | null, Dispatch<SetStateAction<T | null>>] {
   const [v, set] = useState<T | null>(null)
@@ -46,7 +50,9 @@ function usePaged<T>(path: string, tick = 0) {
 }
 const More = ({ next, more }: { next: string | null; more: () => void }) =>
   next ? <button type="button" className="more" onClick={more}>더 보기</button> : null
+const Loading = () => <p className="muted" aria-busy="true">불러오는 중…</p>
 const post = <T,>(path: string, body: unknown = {}) => api<T>(path, { method: 'POST', body })
+const treeLink = (slug: string | null) => slug && <a href={`/t/${slug}`} target="_blank" rel="noreferrer" aria-label="트리 보기(새 탭)"><Icon d={externalLink} /> 보기</a>
 
 export default function AdminPage({ tab }: { tab: AdminTab }) {
   const me = useMe()
@@ -81,28 +87,40 @@ const Card = ({ icon, label, value, sub }: { icon: string; label: string; value:
 function Dashboard() {
   const [s] = useGet<AdminStats>('/api/admin/stats')
   const [now] = useState(() => Date.now())
-  if (!s) return null
+  if (!s) return <Loading />
   const used = s.disk.total ? 1 - s.disk.free / s.disk.total : 0
   const max = Math.max(1, ...s.users.signups_14d)
+  // 백업: 로컬 파일 ok 만으로는 부족 — 외부 업로드가 설정돼 있으면 올라갔어야 초록. 26시간 넘게 안 돌았어도 빨강. at=0 은 "아직" (실패와 구분)
+  const b = s.backup, d = s.daily
+  const bStale = b.at > 0 && now - b.at > H26, dStale = d.at > 0 && now - d.at > H26
+  const bOk = b.ok && !bStale && (b.uploaded || !b.configured)
+  const last = s.errors.recent[0]
   return (
     <>
+      {s.flags.auth_fake && <div className="warn" role="alert"><Icon d={I.circleAlert} /> AUTH_FAKE 가 켜져 있어요 — 누구나 관리자로 로그인할 수 있습니다. 운영에서는 꺼야 합니다</div>}
       <div className="stat-grid">
         <Card icon={I.user} label="가입자" value={s.users.total} sub={`오늘 ${s.users.today} · 7일 ${s.users.d7}`} />
         <Card icon={I.calendarCheck} label="활성" value={s.users.active7} sub={`30일 ${s.users.active30}`} />
         <Card icon={I.listTree} label="트리" value={s.trees.total} sub={<><Icon d={I.globe} /> 공개 {s.trees.public} · 숨김 {s.trees.hidden}</>} />
         <Card icon={hardDrive} label="디스크" value={`${Math.round(used * 100)}%`} sub={`여유 ${bytes(s.disk.free)}`} />
-        <Card icon={database} label="백업" value={s.backup.at ? when(s.backup.at) : '—'} sub={<><span className="dot" data-ok={s.backup.ok} /> {bytes(s.backup.bytes)}</>} />
-        <Card icon={I.refreshCw} label="일일 작업" value={s.daily.at ? when(s.daily.at) : '—'} sub={<><span className="dot" data-ok={s.daily.ok} /> 세션 {s.daily.purged_sessions} · 톰스톤 {s.daily.purged_tombstones}</>} />
+        <Card icon={database} label="백업" value={b.at ? when(b.at) : '아직 없음'}
+          sub={b.at ? <><span className="dot" data-ok={bOk} /> {bytes(b.bytes)} · {b.uploaded ? '외부 업로드됨' : b.configured ? '외부 업로드 안 됨' : '로컬만'}{bStale && ' · 26시간 초과'}{b.error && <><br />{b.error}</>}</> : '백업 타이머가 아직 돌지 않았어요'} />
+        <Card icon={I.refreshCw} label="일일 작업" value={d.at ? when(d.at) : '아직 없음'}
+          sub={d.at ? <><span className="dot" data-ok={d.ok && !dStale} /> 세션 {d.purged_sessions} · 톰스톤 {d.purged_tombstones} · 탈퇴 {d.purged_users}{dStale && ' · 26시간 초과'}{d.error && <><br />{d.error}</>}</> : '일일 타이머가 아직 돌지 않았어요'} />
         <Card icon={I.check} label="가동" value={dur(s.uptime_s)} sub={`RSS ${bytes(s.rss)}`} />
         <Card icon={ban} label="정지 · 탈퇴 대기" value={`${s.users.suspended} · ${s.users.pending_delete}`} />
+        <Card icon={I.circleAlert} label="서버 오류 (재시작 이후)" value={s.errors.count} sub={last ? `${when(last.ts)} ${last.method} ${last.path}` : '없음'} />
       </div>
+      {s.errors.recent.length > 0 && (
+        <details className="errors">
+          <summary>최근 오류 {s.errors.recent.length}건</summary>
+          <ul>{s.errors.recent.map((e, i) => <li key={i}>{when(e.ts)} {e.method} {e.path} · {e.name}</li>)}</ul>
+        </details>
+      )}
       <figure className="signups">
-        <figcaption>14일 가입</figcaption>
-        <div className="bars">
-          {s.users.signups_14d.map((n, i) => {
-            const d = date(now - (13 - i) * 86400_000)
-            return <span key={i} className="bar" style={{ height: `${Math.max(4, (n / max) * 100)}%` }} data-tip={`${d} · ${n}명`} tabIndex={0} aria-label={`${d} ${n}명`} />
-          })}
+        <figcaption>14일 가입 · {date(now - 13 * 86400_000)} ~ {date(now)}<span className="sr-only"> · 일별 {s.users.signups_14d.join(', ')}명</span></figcaption>
+        <div className="bars" aria-hidden="true">
+          {s.users.signups_14d.map((n, i) => <span key={i} className="bar" style={{ height: `${Math.max(4, (n / max) * 100)}%` }} data-tip={`${date(now - (13 - i) * 86400_000)} · ${n}명`} />)}
         </div>
       </figure>
     </>
@@ -119,7 +137,7 @@ function Users({ meId }: { meId: string }) {
   const update: Update = (id, p) => patch((xs) => (p ? xs.map((u) => (u.id === id ? { ...u, ...p } : u)) : xs.filter((u) => u.id !== id)))
   return (
     <>
-      <label className="search">
+      <label className="admin-search">
         <Icon d={search} /><input type="search" aria-label="사용자 검색" placeholder="닉네임 · UUID · provider:sub" maxLength={40} value={q} onChange={(e) => setQ(e.target.value)} />
       </label>
       <table>
@@ -128,6 +146,7 @@ function Users({ meId }: { meId: string }) {
           {rows.map((u) => <UserRow key={u.id} u={u} self={u.id === meId} update={update} />)}
         </tbody>
       </table>
+      {!loaded && <Loading />}
       {loaded && rows.length === 0 && <p className="muted">결과 없음</p>}
       <More next={next} more={more} />
     </>
@@ -135,9 +154,11 @@ function Users({ meId }: { meId: string }) {
 }
 function UserRow({ u, self, update }: { u: AdminUser; self: boolean; update: Update }) {
   const reason = useRef<HTMLInputElement>(null)
+  const purgeBox = useRef<HTMLLabelElement>(null) // "즉시" 체크박스 — TwoStep 의 포커스 범위에 넣어 체크해도 풀리지 않게
   const [arming, setArming] = useState<'suspend' | 'delete' | null>(null)
   const [purge, setPurge] = useState(false)
   const status = u.deleted_at ? ['탈퇴 대기', false] as const : u.suspended_at ? ['정지', false] as const : u.role === 'admin' ? ['관리자', true] as const : ['정상', true] as const
+  const disarm = () => { setArming(null); setPurge(false) }
   const take = () => { const v = reason.current?.value.trim(); setArming(null); return v || undefined }
   const act = (a: 'suspend' | 'unsuspend', why?: string) =>
     void post<{ user: AdminUser }>(`/api/admin/users/${u.id}/${a}`, why ? { reason: why } : {})
@@ -149,23 +170,23 @@ function UserRow({ u, self, update }: { u: AdminUser; self: boolean; update: Upd
   }
   return (
     <tr>
-      <td data-l="닉네임" className="name"><ProviderLogo provider={u.provider} size={14} /> {u.nickname}</td>
+      <td data-l="닉네임" className="name" title={u.id}><ProviderLogo provider={u.provider} size={14} /> {u.nickname}</td>
       <td data-l="제공자">{u.provider}</td>
       <td data-l="가입" className="tnum">{date(u.created_at)}</td>
       <td data-l="마지막 접속" className="tnum">{date(u.last_seen_at)}</td>
       <td data-l="트리" className="tnum">{u.tree_count}</td>
       <td data-l="상태"><span className="dot" data-ok={status[1]} /> {status[0]}</td>
       <td className="act">
-        {arming === 'suspend' && !u.suspended_at && <input ref={reason} className="reason" aria-label="정지 사유" placeholder="사유(선택)" maxLength={200} />}
-        {arming === 'delete' && <label className="toggle"><input type="checkbox" checked={purge} onChange={(e) => setPurge(e.target.checked)} /> 즉시</label>}
+        {arming === 'suspend' && !u.suspended_at && <input ref={reason} className="reason" aria-label="정지 사유" placeholder="사유(선택 · 개인정보 금지)" maxLength={200} />}
+        {arming === 'delete' && <label ref={purgeBox} className="toggle"><input type="checkbox" checked={purge} onChange={(e) => setPurge(e.target.checked)} /> 즉시</label>}
         <span onClickCapture={() => setArming('suspend')}>
           {u.suspended_at
-            ? <TwoStep label="해제" confirmLabel="정말 해제" onConfirm={() => { setArming(null); act('unsuspend') }} />
-            : <TwoStep label="정지" confirmLabel="정말 정지" disabled={self || !!u.deleted_at} pauseWhileFocused={reason}
+            ? <TwoStep label="해제" confirmLabel="정말 해제" onConfirm={() => { setArming(null); act('unsuspend') }} onDisarm={disarm} />
+            : <TwoStep label="정지" confirmLabel="정말 정지" disabled={self || !!u.deleted_at} pauseWhileFocused={reason} onDisarm={disarm}
                 onConfirm={() => act('suspend', take())} />}
         </span>
-        <span onClickCapture={() => setArming('delete')}>
-          <TwoStep label="삭제" confirmLabel="정말 삭제" disabled={self} onConfirm={del} />
+        <span onClickCapture={() => setArming('delete')} data-tip={self ? '본인 계정은 계정 화면에서 탈퇴' : undefined}>
+          <TwoStep label="삭제" confirmLabel="정말 삭제" disabled={self} pauseWhileFocused={purgeBox} onDisarm={disarm} onConfirm={del} />
         </span>
       </td>
     </tr>
@@ -174,37 +195,54 @@ function UserRow({ u, self, update }: { u: AdminUser; self: boolean; update: Upd
 
 // ---- 공개 트리 ----
 function Trees() {
-  const { items: trees, next, more, patch } = usePaged<AdminTree>('/api/admin/trees')
+  const { items: trees, loaded, next, more, patch } = usePaged<AdminTree>('/api/admin/trees')
   const [reports, setReports] = useGet<{ items: Report[] }>('/api/admin/reports?status=open')
   const live = trees.filter((t) => !t.deleted_at)
   const open = (reports?.items ?? []).filter((r) => !r.resolved_at)
+  // 같은 트리의 신고를 한 묶음으로 — 서버도 숨김 때 그 트리의 열린 신고를 전부 처리한다(admin.ts resolve)
+  const groups = Object.values(open.reduce<Record<string, Report[]>>((m, r) => ((m[r.tree.id] ??= []).push(r), m), {}))
   const deleted = trees.filter((t) => t.deleted_at)
   const put = (t: AdminTree) => patch((xs) => xs.map((x) => (x.id === t.id ? { ...x, ...t } : x)))
   const resolve = (r: Report, resolution: 'hidden' | 'dismissed') =>
     void post<{ report: Report }>(`/api/admin/reports/${r.id}/resolve`, { resolution }).then(() => {
-      setReports((p) => (p ? { items: p.items.filter((x) => x.id !== r.id) } : p))
+      const gone = (x: Report) => (resolution === 'hidden' ? x.tree.id === r.tree.id : x.id === r.id)
+      setReports((p) => (p ? { items: p.items.filter((x) => !gone(x)) } : p))
       patch((xs) => xs.map((t) => (t.id !== r.tree.id ? t
-        : { ...t, open_reports: Math.max(0, t.open_reports - 1), hidden_by_admin_at: resolution === 'hidden' ? Date.now() : t.hidden_by_admin_at })))
+        : { ...t, open_reports: resolution === 'hidden' ? 0 : Math.max(0, t.open_reports - 1), hidden_by_admin_at: resolution === 'hidden' ? Date.now() : t.hidden_by_admin_at })))
+      toast(resolution === 'hidden' ? '숨김' : '기각')
     }, guard)
+  // 복구된 트리는 비공개일 수 있어 공개 표에 섞지 않는다 — 목록에서 빼고, 공개면 다음 로드에 나타난다
   const restore = (t: AdminTree) =>
-    void post<{ tree: AdminTree }>(`/api/admin/trees/${t.id}/restore`).then((r) => { put({ ...r.tree, deleted_at: null }); toast('복구됨') }, guard)
+    void post<{ tree: AdminTree }>(`/api/admin/trees/${t.id}/restore`).then(() => { patch((xs) => xs.filter((x) => x.id !== t.id)); toast('복구됨') }, guard)
   return (
     <>
       <table>
         <thead><tr><th>제목</th><th>소유자</th><th>노드</th><th>갱신</th><th>신고</th><th aria-label="동작" /></tr></thead>
         <tbody>{live.map((t) => <TreeRow key={t.id} t={t} put={put} />)}</tbody>
       </table>
+      {!loaded && <Loading />}
+      {loaded && live.length === 0 && <p className="muted">공개 트리 없음</p>}
       <More next={next} more={more} />
       <h2>신고 {open.length}건</h2>
-      {open.length === 0 ? <p className="muted">열린 신고 없음</p> : (
+      {!reports ? <Loading /> : groups.length === 0 ? <p className="muted">열린 신고 없음</p> : (
         <ul className="reports">
-          {open.map((r) => (
-            <li key={r.id}>
-              <span className="grow"><strong>{r.tree.title}</strong> · {REASON[r.reason]}{r.note && <><br /><span className="muted">{r.note}</span></>}</span>
-              <button type="button" aria-label={`${r.tree.title} 숨김`} onClick={() => resolve(r, 'hidden')}><Icon d={eyeOff} /> 숨김</button>
-              <button type="button" aria-label={`${r.tree.title} 신고 기각`} onClick={() => resolve(r, 'dismissed')}>기각</button>
-            </li>
-          ))}
+          {groups.map((rs) => {
+            const t = rs[0].tree
+            return (
+              <li key={t.id}>
+                <span className="grow">
+                  <strong>{t.title}</strong> {treeLink(t.slug)}{t.hidden_by_admin_at && <> · <Icon d={eyeOff} /> 숨김 중</>}
+                  {rs.map((r) => (
+                    <span key={r.id} className="sub">
+                      {when(r.created_at)} · {REASON[r.reason]}{r.note && ` — ${r.note}`}{' '}
+                      <button type="button" className="link" aria-label={`${t.title} 신고 기각`} onClick={() => resolve(r, 'dismissed')}>기각</button>
+                    </span>
+                  ))}
+                </span>
+                <button type="button" aria-label={`${t.title} 숨김`} onClick={() => resolve(rs[0], 'hidden')}><Icon d={eyeOff} /> 숨김</button>
+              </li>
+            )
+          })}
         </ul>
       )}
       <h2>삭제된 트리 (7일)</h2>
@@ -231,17 +269,17 @@ function TreeRow({ t, put }: { t: AdminTree; put: (t: AdminTree) => void }) {
   }
   return (
     <tr>
-      <td data-l="제목" className="name">{hidden && <Icon d={eyeOff} />} {t.title}</td>
+      <td data-l="제목" className="name" title={hidden ? `${when(t.hidden_by_admin_at!)} 숨김` : undefined}>{hidden && <Icon d={eyeOff} />} {t.title} {treeLink(t.slug)}</td>
       <td data-l="소유자">{t.owner.nickname}</td>
       <td data-l="노드" className="tnum">{t.node_count}</td>
       <td data-l="갱신" className="tnum">{date(t.updated_at)}</td>
       <td data-l="신고" className="tnum">{t.open_reports}</td>
       <td className="act">
-        {arming && !hidden && <input ref={reason} className="reason" aria-label="숨김 사유" placeholder="사유(선택)" maxLength={200} />}
+        {arming && !hidden && <input ref={reason} className="reason" aria-label="숨김 사유" placeholder="사유(선택 · 개인정보 금지)" maxLength={200} />}
         <span onClickCapture={() => setArming(true)}>
           {hidden
             ? <TwoStep label="해제" confirmLabel="정말 해제" onConfirm={() => act('unhide')} />
-            : <TwoStep label="숨김" confirmLabel="정말 숨김" pauseWhileFocused={reason} onConfirm={() => act('hide', reason.current?.value.trim() || undefined)} />}
+            : <TwoStep label="숨김" confirmLabel="정말 숨김" pauseWhileFocused={reason} onDisarm={() => setArming(false)} onConfirm={() => act('hide', reason.current?.value.trim() || undefined)} />}
         </span>
       </td>
     </tr>
@@ -249,11 +287,19 @@ function TreeRow({ t, put }: { t: AdminTree; put: (t: AdminTree) => void }) {
 }
 
 // ---- 시스템 ----
+const ACTION: Record<string, string> = {
+  'user.suspend': '사용자 정지', 'user.unsuspend': '정지 해제', 'user.delete': '사용자 삭제(7일 유예)', 'user.purge': '사용자 삭제(즉시)', 'user.restore': '탈퇴 취소',
+  'user.delete_requested': '탈퇴 요청(본인)', 'tree.hide': '트리 숨김', 'tree.unhide': '숨김 해제', 'tree.restore': '트리 복구', 'report.dismiss': '신고 기각',
+  'settings.notice': '공지 변경', 'settings.maintenance': '점검 모드 변경', 'admin.login': '관리자 로그인',
+}
+const TARGET: Record<string, string> = { user: '사용자', tree: '트리', report: '신고', settings: '설정' }
+const metaText = (m: Record<string, unknown> | null) =>
+  !m ? '' : typeof m.reason === 'string' ? `사유: ${m.reason}` : 'after' in m ? `→ ${JSON.stringify(m.after)}` : JSON.stringify(m).slice(0, 80)
 function System() {
   const [tick, setTick] = useState(0)
   const [res, setRes] = useGet<{ settings: Settings }>('/api/admin/settings')
   const audit = usePaged<AuditRow>('/api/admin/audit?limit=50', tick)
-  if (!res) return null
+  if (!res) return <Loading />
   const saved = (settings: Settings) => { setRes({ settings }); setTick((t) => t + 1); void refreshMe() }
   return <SystemForm settings={res.settings} audit={audit} onSaved={saved} />
 }
@@ -264,31 +310,37 @@ function SystemForm({ settings, audit: { items, next, more }, onSaved }: {
   const [enabled, setEnabled] = useState(settings.notice.enabled)
   const save = (s: Settings, msg?: string) =>
     void api<{ settings: Settings }>('/api/admin/settings', { method: 'PUT', body: s }).then((r) => { onSaved(r.settings); if (msg) toast(msg) }, guard)
+  const maint = settings.maintenance.enabled
   // 최신순(06 QA #22) — 서버가 이미 ts DESC 여도 무해
   const audit = [...items].sort((a, b) => b.ts - a.ts)
   return (
     <>
       <form className="notice-form" onSubmit={(e) => { e.preventDefault(); save({ ...settings, notice: { text: text.trim(), enabled } }, '게시됨') }}>
-        <label className="search">
+        <label className="admin-search">
           <Icon d={megaphone} /><input aria-label="공지" placeholder="공지 한 줄 (80자)" maxLength={80} value={text} onChange={(e) => setText(e.target.value)} />
         </label>
         <label className="toggle"><input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} /> 켜기</label>
         <button type="submit" className="primary"><Icon d={megaphone} /> 게시</button>
       </form>
-      <label className="toggle">
-        <input type="checkbox" checked={settings.maintenance.enabled} onChange={(e) => save({ ...settings, maintenance: { enabled: e.target.checked } })} />
-        점검 모드 (켜면 동기화 중단 배너)
-      </label>
+      {/* 점검 모드: 한 번에 전 사용자 503 이라 2단계 */}
+      <div className="maint-row">
+        <span className="dot" data-ok={!maint} /> 점검 모드 {maint ? '켜짐 — 관리자 외 모든 /api 가 503, 동기화 중단' : '꺼짐'}
+        <TwoStep label={maint ? '점검 끄기' : '점검 켜기'} confirmLabel={maint ? '정말 끄기' : '정말 켜기'} verb={maint ? '점검 종료' : '점검 시작'}
+          onConfirm={() => save({ ...settings, maintenance: { enabled: !maint } }, maint ? '점검 모드 꺼짐' : '점검 모드 켜짐 · 사용자 동기화가 멈춥니다')} />
+      </div>
       <h2>감사 로그</h2>
       <table className="audit">
-        <thead><tr><th>시각</th><th>동작</th><th>대상</th><th>메모</th></tr></thead>
+        <thead><tr><th>시각</th><th>행위자</th><th>동작</th><th>대상</th><th>메모</th></tr></thead>
         <tbody>
           {audit.map((a) => (
             <tr key={a.id}>
               <td data-l="시각" className="tnum">{when(a.ts)}</td>
-              <td data-l="동작">{a.action}</td>
-              <td data-l="대상" className="tnum">{a.target_type ? `${a.target_type} ${a.target_id?.slice(-6) ?? ''}` : '—'}</td>
-              <td data-l="메모" className="muted">{a.meta ? JSON.stringify(a.meta).slice(0, 60) : ''}</td>
+              <td data-l="행위자">{a.actor ?? (a.actor_id ? a.actor_id.slice(0, 8) : '시스템')}</td>
+              <td data-l="동작">{ACTION[a.action] ?? a.action}</td>
+              <td data-l="대상" className="tnum" title={a.target_id ?? undefined}>
+                {a.target_type ? `${TARGET[a.target_type]} ${a.target_type === 'settings' ? a.target_id : a.target_id?.slice(0, 8) ?? ''}` : '—'}
+              </td>
+              <td data-l="메모" className="muted">{metaText(a.meta)}</td>
             </tr>
           ))}
         </tbody>

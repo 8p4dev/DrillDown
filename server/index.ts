@@ -13,6 +13,7 @@ import { errorBody, HttpError, type AppEnv } from './http.ts'
 import { registerAccount, sessionMiddleware, maintenanceMiddleware } from './account/index.ts'
 import { registerSync, registerSharePages } from './sync/index.ts'
 import { LIMITS } from './sync/map.ts'
+import { recordError } from './metrics.ts'
 
 export async function createApp(db: DB) {
   const app = new Hono<AppEnv>()
@@ -29,6 +30,7 @@ export async function createApp(db: DB) {
   app.onError((e, c) => {
     if (e instanceof HttpError) return c.json(errorBody(e.code, e.message, e.field), e.status as 400)
     console.error(e)
+    recordError(e, c.req.method, c.req.path)
     return c.json(errorBody('internal', '서버 오류'), 500)
   })
   // F1 본문 상한: 다 읽기 전에 끊는다(익명 /api/t/:slug/report 포함). 동기화 상한(C8) + JSON 봉투 여유

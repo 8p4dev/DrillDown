@@ -113,9 +113,13 @@ export interface ApiErrorBody {
 export interface AdminStats {
   users: { total: number; today: number; d7: number; active7: number; active30: number; suspended: number; pending_delete: number; signups_14d: number[] }
   trees: { total: number; public: number; hidden: number; pending_delete: number }
-  backup: { at: number; bytes: number; ok: boolean; error?: string }
-  daily: { at: number; ok: boolean; purged_users: number; purged_sessions: number; purged_tombstones: number }
+  /** at=0 = 아직 없음. uploaded = 외부 업로드 완료, configured = 외부 업로드 설정 있음 */
+  backup: { at: number; bytes: number; ok: boolean; uploaded?: boolean; configured: boolean; error?: string }
+  daily: { at: number; ok: boolean; purged_users: number; purged_sessions: number; purged_tombstones: number; error?: string }
   disk: { total: number; free: number }
+  /** 재시작 이후 5xx (메모리, 최근 20건) */
+  errors: { count: number; recent: { ts: number; method: string; path: string; name: string }[] }
+  flags: { auth_fake: boolean }
   uptime_s: number
   rss: number
 }
@@ -141,6 +145,7 @@ export interface AdminUserDetail extends AdminUser {
 export interface AdminTree {
   id: ID
   title: string
+  slug: string | null
   owner: { id: ID; nickname: string }
   node_count: number
   updated_at: number
@@ -153,7 +158,7 @@ export interface AdminTree {
 export type ReportReason = 'copyright' | 'spam' | 'abuse' | 'other'
 export interface Report {
   id: ID
-  tree: { id: ID; title: string }
+  tree: { id: ID; title: string; slug: string | null; hidden_by_admin_at: number | null }
   reason: ReportReason
   note: string | null
   created_at: number
@@ -170,6 +175,8 @@ export interface AuditRow {
   id: number
   ts: number
   actor_id: ID | null
+  /** 행위자 닉네임(조인). null = 시스템 또는 탈퇴 */
+  actor: string | null
   action: string
   target_type: 'user' | 'tree' | 'report' | 'settings' | null
   target_id: ID | null

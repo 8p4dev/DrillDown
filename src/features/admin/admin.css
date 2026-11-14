@@ -21,13 +21,19 @@
 .signups figcaption { font-size: var(--fs-xs); color: var(--muted); margin-bottom: .5rem; }
 .bars { display: flex; align-items: flex-end; gap: 4px; height: 72px; }
 .bar { flex: 1; background: var(--text); border-radius: var(--radius-sm); min-height: 2px; }
-.bar:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 
-/* 검색·공지 입력(상단, 키보드 안전) */
-.search { display: flex; align-items: center; gap: .5rem; max-width: 420px; color: var(--muted); }
-.search input { flex: 1; min-width: 0; border-radius: var(--radius); }
+/* 검색·공지 입력(상단, 키보드 안전). 이름을 .search 로 두면 에디터의 전역 .search{position:absolute} 가 덮어 입력칸이 상단 바 뒤로 사라진다 */
+.admin-search { display: flex; align-items: center; gap: .5rem; max-width: 420px; color: var(--muted); }
+.admin-search input { flex: 1; min-width: 0; border-radius: var(--radius); }
 .notice-form { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
-.notice-form .search { flex: 1; min-width: 220px; }
+.notice-form .admin-search { flex: 1; min-width: 220px; }
+.admin .maint-row { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; font-size: var(--fs-sm); color: var(--text-2); }
+.admin .warn { display: flex; align-items: center; gap: .5rem; padding: .5rem .85rem; border: 1px solid var(--danger); color: var(--danger); border-radius: var(--radius); font-size: var(--fs-sm); font-weight: 600; }
+.admin .errors { font-size: var(--fs-sm); color: var(--text-2); }
+.admin .errors summary { cursor: pointer; color: var(--muted); }
+.admin .errors li { font-family: var(--mono, monospace); font-size: var(--fs-xs); }
+.reports .sub { display: block; color: var(--muted); font-weight: 400; }
+.reports a { color: inherit; }
 .notice-form button { display: inline-flex; align-items: center; gap: .35rem; }
 .admin .toggle { display: inline-flex; align-items: center; gap: .4rem; min-height: var(--tap); font-size: var(--fs-sm); color: var(--text-2); cursor: pointer; }
 

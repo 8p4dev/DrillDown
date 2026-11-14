@@ -1,6 +1,6 @@
 // 공지·점검 배너 — 03 §3.4 시스템 탭(공지 1줄 ≤80자·점검 모드) ↔ useMe().notice/maintenance. 공지 닫기는 세션 동안만(sessionStorage). App.tsx 가 상단 바 아래에 렌더한다.
 import { useState } from 'react'
-import { useMe } from '../../core/me'
+import { useMaintenance, useMe } from '../../core/me'
 import { I } from '../../ui/icons'
 import { Icon } from '../../ui/Icon'
 import './nav-user.css'
@@ -10,13 +10,13 @@ const dismissed = () => { try { return sessionStorage.getItem(K) } catch { retur
 
 export default function Banners() {
   const me = useMe()
+  const maintenance = useMaintenance()
   const [hidden, setHidden] = useState(dismissed())
-  if (!me) return null
-  const notice = me.notice?.text && hidden !== me.notice.text ? me.notice.text : null
+  const notice = me?.notice?.text && hidden !== me.notice.text ? me.notice.text : null
   return (
     <>
-      {me.maintenance && (
-        <div className="banner" data-kind="maintenance" role="status"><Icon d={I.circleAlert} /><span className="banner-text">점검 중 — 동기화 일시 중단</span></div>
+      {maintenance && (
+        <div className="banner" data-kind="maintenance" role="status"><Icon d={I.circleAlert} /><span className="banner-text">점검 중 — {me ? '동기화 일시 중단' : '잠시 후 다시 열어 주세요'}</span></div>
       )}
       {notice && (
         <div className="banner" data-kind="notice" role="status">

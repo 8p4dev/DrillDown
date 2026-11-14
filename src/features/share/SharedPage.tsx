@@ -86,7 +86,7 @@ function countTree(ns: TreeNode[]) {
 }
 
 // 서버 오류 코드 → 한 줄 화면 (04 §3.3·§3.6: 404 / 410 deleted / 403 hidden)
-const FAIL: Record<number, string> = { 404: '링크를 찾을 수 없습니다', 410: '삭제된 트리입니다', 403: '운영 정책으로 숨김', 0: '네트워크에 연결할 수 없습니다' }
+const FAIL: Record<number, string> = { 404: '링크를 찾을 수 없습니다', 410: '삭제된 트리입니다', 403: '운영 정책으로 숨김', 503: '점검 중입니다 · 잠시 후 다시 열어 주세요', 0: '네트워크에 연결할 수 없습니다' }
 type Load = ({ t: SharedTree } | { fail: string }) & { slug: string }
 
 export default function SharedPage({ slug, mode, rootId }: { slug: string; mode: ViewMode; rootId?: string }) {

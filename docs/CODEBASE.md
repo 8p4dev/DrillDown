@@ -163,6 +163,7 @@ app/
 ├─ server/               서버 (Node에서 실행)
 │  ├─ index.ts           서버 조립과 시작
 │  ├─ http.ts            오류 형식, 권한 검사, 요청 수 제한
+│  ├─ metrics.ts         재시작 이후 5xx 카운터·최근 20건 (메모리만, 관리자 대시보드)
 │  ├─ env.ts             환경 변수
 │  ├─ db.ts              SQLite 연결과 마이그레이션
 │  ├─ migrations/        스키마 SQL (001 계정, 002 트리)
@@ -970,14 +971,14 @@ API 목록, 환경 변수, 매일 도는 작업은 [9장](#9-서버-참고표-ap
 
 | 경로 | 하는 일 |
 |---|---|
-| GET `/api/admin/stats` | 통계 (사용자, 트리, 디스크, 백업, 일일 작업 결과) |
+| GET `/api/admin/stats` | 통계 (사용자, 트리, 디스크, 백업(외부 업로드 여부·설정 여부·오류), 일일 작업 결과·오류, 재시작 이후 5xx 요약, AUTH_FAKE 플래그). `backup.at`·`daily.at` 이 0 이면 "아직 안 돌았다" |
 | GET `/api/admin/users`, `/users/<id>` | 사용자 검색과 상세 |
 | POST `/api/admin/users/<id>/suspend`, `/unsuspend`, `/delete` | 정지, 해제, 삭제 |
 | GET `/api/admin/trees` | 공개 트리 목록 |
 | POST `/api/admin/trees/<id>/hide`, `/unhide`, `/restore` | 숨김, 해제, 삭제된 트리 복구 |
-| GET `/api/admin/reports`, POST `/reports/<id>/resolve` | 신고 목록과 처리 |
+| GET `/api/admin/reports`, POST `/reports/<id>/resolve` | 신고 목록(트리 slug·숨김 상태 포함)과 처리. `hidden` 은 같은 트리의 열린 신고를 전부 처리한다 |
 | GET / PUT `/api/admin/settings` | 공지와 점검 모드 |
-| GET `/api/admin/audit` | 감사 로그 (관리자가 한 일의 기록) |
+| GET `/api/admin/audit` | 감사 로그 (관리자가 한 일의 기록). 행위자 닉네임을 조인해 `actor` 로 준다 |
 
 ### 환경 변수
 

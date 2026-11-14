@@ -13,7 +13,7 @@ import { retrySync } from '../../core/sync'
 import type { Tree } from '../../core/types'
 import { href } from '../../router'
 import { I } from '../../ui/icons'
-import { logOut, undo2 } from '../../ui/icons.all'
+import { logOut, shield, undo2 } from '../../ui/icons.all'
 import { Icon } from '../../ui/Icon'
 import { toast } from '../Toast'
 import { Avatar } from '../../ui/Avatar'
@@ -213,6 +213,7 @@ export default function AccountPage() {
         {exportBtn}
         {importBtn}
         <button type="button" className="icon-btn" onClick={() => void signOut()}><Icon d={logOut} /> 로그아웃</button>
+        {u.role === 'admin' && <a className="icon-btn" href={href.admin()}><Icon d={shield} /> 관리자</a>}
       </div>
 
       <section className="danger-zone">
