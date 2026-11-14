@@ -1,16 +1,15 @@
 // OAuth 로그인 (03 §3.2, flows.md §1): Authorization Code + PKCE S256 + state(oauth 쿠키) + userinfo. 리프레시 토큰 저장 안 함.
 // 가짜 로그인(plan A1)도 같은 signIn 으로 끝난다.
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto'
-import { readFileSync } from 'node:fs'
 import type { Context, Hono } from 'hono'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import { tx } from '../db.ts'
 import { env } from '../env.ts'
-import { fail, GRACE_MS, hit, clientIp, type AppEnv } from '../http.ts'
+import { CTRL, fail, GRACE_MS, hit, clientIp, type AppEnv } from '../http.ts'
 import { count } from '../metrics.ts'
 import { purgeUser, restoreTreesOfUser } from '../sync/owner.ts'
-import { audit, CTRL } from './admin.ts'
-import { createSession, rand } from './session.ts'
+import { audit } from './admin.ts'
+import { createSession, isListedAdmin, rand } from './session.ts'
 
 export type OAuthProvider = 'google' | 'kakao'
 const P = {
@@ -45,15 +44,6 @@ export async function fetchProfile(p: OAuthProvider, token: string, f: typeof fe
 let oauthFetch: typeof fetch = fetch
 /** check 전용: 콜백 전체 흐름에 가짜 fetch 주입 */
 export const setOAuthFetch = (f: typeof fetch) => { oauthFetch = f }
-
-function isListedAdmin(p: string, sub: string) {
-  try {
-    const list = JSON.parse(readFileSync(env.adminsFile, 'utf8')) as unknown
-    return Array.isArray(list) && list.includes(`${p}:${sub}`)
-  } catch {
-    return false
-  }
-}
 
 type UserRow = { id: string; use_provider_avatar: number; avatar_url: string | null; suspended_at: number | null; deleted_at: number | null }
 

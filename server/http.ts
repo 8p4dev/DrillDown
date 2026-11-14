@@ -80,7 +80,11 @@ export async function body<T>(c: Context, maxBytes = 16 * 1024): Promise<T> {
   }
 }
 
-export const now = () => Date.now()
+/** 제어문자 금지 검증 (03 §3.6 입력 검증). 제목·별칭·닉네임·사유 공통 */
+// oxlint-disable-next-line no-control-regex
+export const CTRL = /[\u0000-\u001f\u007f-\u009f]/
+export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 export const DAY = 86_400_000
 /** 유예·톰스톤·커서 만료 공통 7일 (00 §4, D16) */
 export const GRACE_MS = 7 * DAY

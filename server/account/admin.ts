@@ -1,17 +1,16 @@
 // 관리자 API·감사 로그·설정·신고 (03 §3.4·§3.6). 비관리자 404(requireAdmin), 120/분.
 import { randomUUID } from 'node:crypto'
-import { readFileSync, statfsSync } from 'node:fs'
-import { join } from 'node:path'
+import { statfsSync } from 'node:fs'
 import type { Context, Hono } from 'hono'
 import type { AdminStats, AdminUser, Appeal, AuditRow, Report, Settings } from '../../src/core/api.ts'
 import { tx, type DB } from '../db.ts'
 import { env } from '../env.ts'
 import { errors } from '../metrics.ts'
-import { registerLegal } from './legal.ts'
-import { opsStats, registerOps } from './ops.ts'
+import { isHidden, registerLegal } from './legal.ts'
+import { jobs, opsStats, registerOps } from './ops.ts'
 import { productStats, registerProduct, requireFlag } from './product.ts'
-import { body, clientIp, DAY, fail, hit, limit, requireAdmin, requireUser, type AppEnv } from '../http.ts'
-import { listTreesForAdmin, purgeUser, restoreTree, setHidden, softDeleteTreesOfUser, treeCountOf, treeIdBySlug, treeStats, treesOfUser } from '../sync/owner.ts'
+import { body, clientIp, CTRL, DAY, fail, hit, limit, requireAdmin, requireUser, UUID, type AppEnv } from '../http.ts'
+import { listTreesForAdmin, purgeUser, restoreTree, setHidden, softDeleteTreesOfUser, treeIdBySlug, treeStats, treesOfUser } from '../sync/owner.ts'
 
 // ---- 공용: 감사 로그·설정·검증 ----
 /** meta 에 개인정보·IP 금지(03 §3.7) */
@@ -37,6 +36,8 @@ export function getSettings(db: DB, now = Date.now()): Settings {
   }
 }
 export const noticeActive = (n: Settings['notices'][number], now: number) => (n.from == null || n.from <= now) && (n.until == null || now < n.until)
+/** 선택 시각(epoch ms): 비우면 null, 양수가 아니면 400 — 공지 기간·점검 예약 공통 */
+const ms = (x: unknown, field: string) => (x == null || x === '' ? null : Number.isFinite(x) && (x as number) > 0 ? (x as number) : fail(400, 'invalid', '시각이 올바르지 않습니다', field))
 /** 공지 1건 검증(≤160자, url 은 http(s) ≤200, 기간은 ms, audience 2종). 틀리면 400 */
 function notice(v: unknown, i: number): Settings['notices'][number] {
   const o = (typeof v === 'object' && v !== null ? v : {}) as Record<string, unknown>
@@ -44,18 +45,13 @@ function notice(v: unknown, i: number): Settings['notices'][number] {
   const text = optText(o.text, 160, f) ?? fail(400, 'invalid', '공지 내용을 적어 주세요', f)
   const url = optText(o.url, 200, f)
   if (url && !/^https?:\/\//.test(url)) fail(400, 'invalid', '링크는 http(s) 주소여야 합니다', f)
-  const ms = (x: unknown) => (x == null || x === '' ? null : Number.isFinite(x) && (x as number) > 0 ? (x as number) : fail(400, 'invalid', '기간이 올바르지 않습니다', f))
-  const from = ms(o.from), until = ms(o.until)
+  const from = ms(o.from, f), until = ms(o.until, f)
   if (from != null && until != null && until <= from) fail(400, 'invalid', '종료가 시작보다 앞입니다', f)
   if (o.audience !== 'all' && o.audience !== 'users') fail(400, 'invalid', '대상을 고르세요', f)
   const id = typeof o.id === 'string' && /^[A-Za-z0-9_-]{1,32}$/.test(o.id) ? o.id : randomUUID().slice(0, 8)
   return { id, text, ...(url ? { url } : {}), from, until, audience: o.audience as 'all' | 'users' }
 }
 
-/** 제어문자 금지 검증 (03 §3.6 입력 검증) */
-// oxlint-disable-next-line no-control-regex
-export const CTRL = /[\u0000-\u001f\u007f-\u009f]/
-export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const TREE_ID = /^[A-Za-z0-9_-]{1,64}$/
 /** 선택 문자열: 길이·제어문자(allowNewline 이면 \n 허용). 없으면 undefined */
 export function optText(v: unknown, max: number, field: string, allowNewline = false): string | undefined {
@@ -65,12 +61,11 @@ export function optText(v: unknown, max: number, field: string, allowNewline = f
   return (v as string).trim() || undefined
 }
 const lim = (q: string | undefined) => Math.min(50, Math.max(1, Math.floor(Number(q)) || 50))
-const readJson = <T>(file: string, dflt: T): T => { try { return JSON.parse(readFileSync(join(env.dataDir, file), 'utf8')) as T } catch { return dflt } }
 
-const USER_COLS = 'id, provider, provider_sub, nickname, role, created_at, last_seen_at, suspended_at, deleted_at' // provider_sub 는 관리자 전용(admins.json 대조, T3 #33)
-const adminUser = (db: DB, u: Omit<AdminUser, 'tree_count'>): AdminUser => ({ ...u, tree_count: treeCountOf(db, u.id) })
+// provider_sub 는 관리자 전용(admins.json 대조, T3 #33). tree_count 는 상관 서브쿼리(r1 L3 — 행마다 쿼리 1개였다)
+const USER_COLS = 'id, provider, provider_sub, nickname, role, created_at, last_seen_at, suspended_at, deleted_at, (SELECT COUNT(*) FROM trees WHERE owner_id = users.id AND deleted_at IS NULL) AS tree_count'
 function userOr404(db: DB, id: string) {
-  const u = UUID.test(id) ? (db.prepare(`SELECT ${USER_COLS} FROM users WHERE id = ?`).get(id) as Omit<AdminUser, 'tree_count'> | undefined) : undefined
+  const u = UUID.test(id) ? (db.prepare(`SELECT ${USER_COLS} FROM users WHERE id = ?`).get(id) as AdminUser | undefined) : undefined
   return u ?? fail(404, 'not_found', '사용자가 없습니다')
 }
 const treeIdOr404 = (id: string) => TREE_ID.test(id) ? id : fail(404, 'not_found', '트리가 없습니다')
@@ -94,6 +89,7 @@ export function stats(db: DB, now = Date.now()): AdminStats {
   const today = new Date(now); today.setHours(0, 0, 0, 0)
   let disk = { total: 0, free: 0 }
   try { const s = statfsSync(env.dataDir); disk = { total: s.blocks * s.bsize, free: s.bavail * s.bsize } } catch { /* 디렉터리 없음 */ }
+  const j = jobs()
   return {
     users: {
       total: n('SELECT COUNT(*) n FROM users WHERE deleted_at IS NULL'),
@@ -106,9 +102,8 @@ export function stats(db: DB, now = Date.now()): AdminStats {
       signups_14d: signups14d(db, now),
     },
     trees: treeStats(db),
-    // at=0 = 아직 한 번도 안 돌았다(실패와 구분). configured = 외부 업로드 설정 유무(backup.ts 와 같은 환경 변수)
-    backup: { ...readJson('backup.json', { at: 0, bytes: 0, ok: false }), configured: !!(process.env.BACKUP_AGE_RECIPIENT && process.env.BACKUP_RCLONE_REMOTE) },
-    daily: readJson('daily.json', { at: 0, ok: false, purged_users: 0, purged_sessions: 0, purged_tombstones: 0 }),
+    backup: j.backup,
+    daily: j.daily,
     disk,
     errors: errors(),
     flags: { auth_fake: env.authFake },
@@ -119,8 +114,9 @@ export function stats(db: DB, now = Date.now()): AdminStats {
   }
 }
 
-const resolveAppeals = (db: DB, treeId: string, resolution: 'accepted' | 'rejected') =>
-  db.prepare('UPDATE appeals SET resolved_at = ?, resolution = ? WHERE tree_id = ? AND resolved_at IS NULL').run(Date.now(), resolution, treeId)
+/** 트리의 열린 소명을 한 번에 처리(숨김 해제 = accepted, 유지 = rejected). legal.ts 도 같이 쓴다 */
+export const resolveAppeals = (db: DB, treeId: string, resolution: 'accepted' | 'rejected', now = Date.now()) =>
+  db.prepare('UPDATE appeals SET resolved_at = ?, resolution = ? WHERE tree_id = ? AND resolved_at IS NULL').run(now, resolution, treeId)
 
 /** 탈퇴(본인·관리자·카카오 웹훅 공통): 7일 유예 시작 */
 export function softDeleteUser(db: DB, id: string, now: number) {
@@ -153,10 +149,11 @@ function registerReport(app: Hono<AppEnv>) {
       const now = Date.now()
       tx(db, () => {
         db.prepare('INSERT INTO reports(id,tree_id,reporter_id,reason,note,created_at) VALUES(?,?,?,?,?,?)').run(id, treeId, u?.id ?? null, b.reason as string, note, now)
-        // T2 #28: 열린 신고가 N건(settings.auto_hide_reports, 0 = 끔)에 닿으면 자동 임시 숨김 30일 — 운영자 부재 대비. 행위자 NULL = 시스템
+        // T2 #28: 서로 다른 로그인 신고자 N명(settings.auto_hide_reports, 0 = 끔)이 열린 신고를 내면 자동 임시 숨김 30일 — 운영자 부재 대비. 행위자 NULL = 시스템.
+        // 익명 신고는 큐에만 쌓인다(IP 1개로 N건 POST 해 아무 트리든 내리는 남용 차단, r1 M3)
         const n = getSettings(db, now).auto_hide_reports
-        const open = n > 0 ? (db.prepare('SELECT COUNT(*) n FROM reports WHERE tree_id = ? AND resolved_at IS NULL').get(treeId) as { n: number }).n : 0
-        if (n > 0 && open >= n && !(db.prepare('SELECT hidden_by_admin_at h FROM trees WHERE id = ?').get(treeId) as { h: number | null }).h) {
+        const open = n > 0 ? (db.prepare('SELECT COUNT(DISTINCT reporter_id) n FROM reports WHERE tree_id = ? AND resolved_at IS NULL AND reporter_id IS NOT NULL').get(treeId) as { n: number }).n : 0
+        if (n > 0 && open >= n && !isHidden(db, treeId)) {
           setHidden(db, treeId, true, now, now + 30 * DAY)
           audit(db, null, 'tree.hide', 'tree', treeId, { reason: `신고 ${open}건 누적 자동 임시 숨김`, auto: true, reports: open, until: now + 30 * DAY })
         }
@@ -211,9 +208,9 @@ export function registerAdmin(app: Hono<AppEnv>) {
     const cur = /^(\d+)_([0-9a-f-]{36})$/i.exec(c.req.query('cursor') ?? '')
     if (cur) { where.push('(created_at < ? OR (created_at = ? AND id < ?))'); p.push(Number(cur[1]), Number(cur[1]), cur[2]) }
     const rows = db.prepare(`SELECT ${USER_COLS} FROM users ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY created_at DESC, id DESC LIMIT ?`)
-      .all(...p, n + 1) as Omit<AdminUser, 'tree_count'>[]
+      .all(...p, n + 1) as unknown as AdminUser[]
     const more = rows.length > n
-    const items = rows.slice(0, n).map((u) => adminUser(db, u))
+    const items = rows.slice(0, n)
     if (q) audit(db, me(c), 'user.search', 'user', null, { hits: items.length }) // 개인정보 접속기록(안전성 확보조치 기준 §8) — 검색어는 남기지 않는다
     return c.json({ items, next: more ? `${items[n - 1].created_at}_${items[n - 1].id}` : null })
   })
@@ -223,7 +220,7 @@ export function registerAdmin(app: Hono<AppEnv>) {
     const u = userOr404(db, c.req.param('id'))
     const sessions = (db.prepare('SELECT COUNT(*) n FROM sessions WHERE user_id = ?').get(u.id) as { n: number }).n
     audit(db, me(c), 'user.view', 'user', u.id)
-    return c.json({ ...adminUser(db, u), sessions, trees: treesOfUser(db, u.id) })
+    return c.json({ ...u, sessions, trees: treesOfUser(db, u.id) })
   })
 
   for (const act of ['suspend', 'unsuspend'] as const)
@@ -237,7 +234,7 @@ export function registerAdmin(app: Hono<AppEnv>) {
         if (act === 'suspend') db.prepare('DELETE FROM sessions WHERE user_id = ?').run(u.id)
         audit(db, me(c), `user.${act}`, 'user', u.id, reason ? { reason } : undefined)
       })
-      return c.json({ user: adminUser(db, userOr404(db, u.id)) })
+      return c.json({ user: userOr404(db, u.id) })
     })
 
   app.post('/api/admin/users/:id/delete', async (c) => {
@@ -261,8 +258,7 @@ export function registerAdmin(app: Hono<AppEnv>) {
     // 기본 목록 첫 페이지에 삭제 유예 트리(7일, deleted_at 포함)를 덧붙인다 — 클라이언트는 deleted_at 으로 "삭제 트리 복구" 목록을 가른다.
     // ponytail: 유예 트리는 최대 100개만(커서 없음). 많아지면 ?deleted=1 로 따로 페이지
     const items = !onlyDeleted && !cursor ? [...r.items, ...listTreesForAdmin(db, { limit: 100, deleted: true }).items] : r.items
-    const open = db.prepare('SELECT COUNT(*) n FROM reports WHERE tree_id = ? AND resolved_at IS NULL')
-    return c.json({ items: items.map((t) => ({ ...t, open_reports: (open.get(t.id) as { n: number }).n })), next: r.next })
+    return c.json({ items, next: r.next })
   })
 
   for (const act of ['hide', 'unhide'] as const)
@@ -315,7 +311,6 @@ export function registerAdmin(app: Hono<AppEnv>) {
       if (res === 'hidden') {
         setHidden(db, r!.tree_id, true, now)
         db.prepare("UPDATE reports SET resolved_at = ?, resolution = 'hidden' WHERE tree_id = ? AND resolved_at IS NULL").run(now, r!.tree_id)
-        db.prepare("UPDATE reports SET resolved_at = ?, resolution = 'hidden' WHERE id = ?").run(now, id)
         audit(db, me(c), 'tree.hide', 'tree', r!.tree_id, { report_id: id })
       } else {
         db.prepare("UPDATE reports SET resolved_at = ?, resolution = 'dismissed' WHERE id = ?").run(now, id)
@@ -365,10 +360,10 @@ export function registerAdmin(app: Hono<AppEnv>) {
     if (b.maintenance !== undefined) {
       const m = b.maintenance
       if (typeof m !== 'object' || m === null || typeof m.manual !== 'boolean') fail(400, 'invalid', '점검 모드 값이 올바르지 않습니다', 'maintenance')
-      const ms = (x: unknown) => (x == null || x === '' ? null : Number.isFinite(x) && (x as number) > 0 ? (x as number) : fail(400, 'invalid', '점검 시각이 올바르지 않습니다', 'maintenance'))
-      const from = ms(m!.from), until = ms(m!.until)
+      const from = ms(m!.from, 'maintenance'), until = ms(m!.until, 'maintenance')
       if (from != null && until != null && until <= from) fail(400, 'invalid', '종료가 시작보다 앞입니다', 'maintenance')
       if (from == null && until != null) fail(400, 'invalid', '시작 시각이 필요합니다', 'maintenance')
+      if (from != null && until == null) fail(400, 'invalid', '종료 시각이 필요합니다 — 무기한이면 수동 점검을 쓰세요', 'maintenance') // r1 L8: 끝없는 503 방지
       next.maintenance = { manual: m!.manual as boolean, from, until }
     }
     if (b.auto_hide_reports !== undefined) {

@@ -5,9 +5,9 @@ import { randomUUID } from 'node:crypto'
 import type { Context, Hono } from 'hono'
 import type { DsrKind, DsrRequest, LegalMe, ReportStatus, Takedown, TakedownState } from '../../src/core/api.ts'
 import { tx, type DB } from '../db.ts'
-import { body, clientIp, DAY, fail, hit, type AppEnv } from '../http.ts'
+import { body, clientIp, DAY, fail, hit, UUID, type AppEnv } from '../http.ts'
 import { setHidden, treeIdBySlug } from '../sync/owner.ts'
-import { audit, getSettings, noticeActive, optText, UUID } from './admin.ts'
+import { audit, getSettings, noticeActive, optText, resolveAppeals } from './admin.ts'
 
 const HOLD_MS = 30 * DAY   // 임시조치 상한(망법 §44조의2 ④). 재개 요구 기한(저작권법 영 §42, 통보일부터 30일)의 D-N 은 화면이 hidden_at 으로 계산
 const RESUME_MS = 7 * DAY   // 재개 예정일 = 권리주장자 통보 후 7일(법정 기한 없음, 운영 규칙)
@@ -25,7 +25,7 @@ function legalFor(db: DB, loggedIn: boolean, now: number): LegalMe {
   return out
 }
 /** GET /api/me 에 합쳐지는 부분 */
-export const legalMe = (db: DB, _userId: string): LegalMe => legalFor(db, true, Date.now())
+export const legalMe = (db: DB): LegalMe => legalFor(db, true, Date.now())
 
 /** 일일 작업: 임시조치 만료 → 숨김 해제(소명도 수용 처리), 처리된 게시중단·정보주체 요청 90일 삭제 */
 export function legalDaily(db: DB, now: number): void {
@@ -44,9 +44,8 @@ const TD_SQL = `SELECT k.*, t.title, t.slug AS tree_slug, t.hidden_by_admin_at,
 type TdRow = Omit<Takedown, 'tree'> & { tree_id: string | null; title: string | null; tree_slug: string | null; hidden_by_admin_at: number | null }
 const takedown = ({ tree_id, title, tree_slug, hidden_by_admin_at, ...k }: TdRow): Takedown =>
   ({ ...k, tree: tree_id ? { id: tree_id, title: title ?? '', slug: tree_slug, hidden_by_admin_at } : null })
-const resolveAppeals = (db: DB, treeId: string, resolution: 'accepted' | 'rejected', now: number) =>
-  db.prepare('UPDATE appeals SET resolved_at = ?, resolution = ? WHERE tree_id = ? AND resolved_at IS NULL').run(now, resolution, treeId)
-const isHidden = (db: DB, treeId: string) => !!(db.prepare('SELECT hidden_by_admin_at h FROM trees WHERE id = ? AND deleted_at IS NULL').get(treeId) as { h: number | null } | undefined)?.h
+/** 살아 있는 트리가 운영 숨김 상태인가(보류·확정 불문). admin.ts 자동 숨김도 같이 쓴다 */
+export const isHidden = (db: DB, treeId: string) => !!(db.prepare('SELECT hidden_by_admin_at h FROM trees WHERE id = ? AND deleted_at IS NULL').get(treeId) as { h: number | null } | undefined)?.h
 
 /** 관리자 동작 → (허용 이전 상태, 다음 상태). resume·reject 는 숨김 해제, confirm·litigation 은 숨김 유지 */
 const TD_ACTIONS: Record<string, { from: TakedownState[]; to: TakedownState }> = {
@@ -67,7 +66,8 @@ export function registerLegal(app: Hono<AppEnv>) {
     return c.json(legalFor(c.get('db'), !!c.get('user'), Date.now()))
   })
 
-  // ---- 공개: 저작권 게시중단 요청(T2 #23). 비로그인 가능, IP 당 3/시(메모리 버킷, IP 저장 없음). 트리가 있으면 즉시 숨김(§103 ②) + 소유자 앱 내 통보(hidden_trees) ----
+  // ---- 공개: 저작권 게시중단 요청(T2 #23). 비로그인 가능, IP 당 3/시(메모리 버킷, IP 저장 없음). 트리가 있으면 즉시 숨김(§103 ②) + 소유자 앱 내 통보(hidden_trees).
+  // 숨김은 30일 임시조치(hidden_until) — 관리자가 confirm 하면 확정, 큐를 안 보면 legalDaily 가 자동 복원한다(익명 POST 1번으로 무기한 내리는 남용 방지, r1 M4) ----
   app.post('/api/takedown', async (c) => {
     hit(c, `takedown:ip:${clientIp(c)}`, 3, 3_600_000)
     const b = await body<{ url?: unknown; name?: unknown; contact?: unknown; claim?: unknown; attest?: unknown }>(c)
@@ -80,13 +80,15 @@ export function registerLegal(app: Hono<AppEnv>) {
     const db = c.get('db'), now = Date.now(), id = randomUUID()
     const treeId = treeIdBySlug(db, slug)
     const live = treeId && !!db.prepare('SELECT 1 FROM trees WHERE id = ? AND deleted_at IS NULL').get(treeId)
+    // hidden_at 은 "이 요청이 숨겼을 때만" — 이미 숨긴 트리(관리자·앞선 게시중단)에 찍으면 reject/resume 이 다른 사유의 숨김을 풀어 버린다(r1 H1)
+    const hid = live && !isHidden(db, treeId)
     tx(db, () => {
-      if (live && !isHidden(db, treeId)) {
-        setHidden(db, treeId, true, now) // 확정 숨김(만료 없음) — 재개는 §103 ③ 절차로만
-        audit(db, null, 'tree.hide', 'tree', treeId, { reason: '저작권 게시중단 요청 접수', takedown_id: id })
+      if (hid) {
+        setHidden(db, treeId, true, now, now + HOLD_MS)
+        audit(db, null, 'tree.hide', 'tree', treeId, { reason: '저작권 게시중단 요청 접수', takedown_id: id, until: now + HOLD_MS })
       }
       db.prepare('INSERT INTO takedowns(id,slug,tree_id,claimant_name,claimant_contact,claim,state,received_at,hidden_at) VALUES(?,?,?,?,?,?,?,?,?)')
-        .run(id, slug, live ? treeId : null, name, contact, claim, live ? 'hidden' : 'received', now, live ? now : null)
+        .run(id, slug, live ? treeId : null, name, contact, claim, live ? 'hidden' : 'received', now, hid ? now : null)
     })
     return c.json({ id }, 201)
   })
@@ -127,6 +129,7 @@ export function registerLegal(app: Hono<AppEnv>) {
       const unhide = (action === 'resume' || action === 'reject') && tid && k!.hidden_at && isHidden(db, tid)
       if (tid) resolveAppeals(db, tid, unhide ? 'accepted' : 'rejected', now)
       if (unhide) { setHidden(db, tid, false, now); audit(db, me(c), 'tree.unhide', 'tree', tid, { takedown_id: id }) }
+      if (action === 'confirm' && tid) db.prepare('UPDATE trees SET hidden_until = NULL WHERE id = ?').run(tid) // 임시조치 → 확정(만료 없음)
       if (action !== 'resume') audit(db, me(c), `takedown.${action}`, 'tree', tid, { takedown_id: id })
     })
     return c.json({ takedown: takedown(db.prepare(`${TD_SQL} WHERE k.id = ?`).get(id) as TdRow) })

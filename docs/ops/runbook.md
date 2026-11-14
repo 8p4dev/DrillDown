@@ -22,7 +22,7 @@
    BACKUP_AGE_RECIPIENT=/etc/drilldown/backup.pub     # age 공개키(파일 또는 age1… 문자열)
    BACKUP_RCLONE_REMOTE=b2:drilldown-backup
    ```
-5. `/etc/drilldown/admins.json`: `["google:<sub>", "kakao:<회원번호>"]` — 매 로그인마다 역할 동기화(빼면 다음 로그인 때 강등). sub 는 **관리자 → 시스템 → 관리자 목록**(내 식별자) 또는 **사용자 탭 → 상세**(식별자 `provider:sub`)에서 복사한다. 파일 편집만 SSH(`/etc` 는 읽기 전용).
+5. `/etc/drilldown/admins.json`: `["google:<sub>", "kakao:<회원번호>"]` — 로그인 때와 관리자 요청마다 대조한다(빼면 다음 관리자 요청에 즉시 강등 + 세션 폐기, 따로 SQL 을 칠 필요 없음). sub 는 **관리자 → 시스템 → 관리자 목록**(내 식별자) 또는 **사용자 탭 → 상세**(식별자 `provider:sub`)에서 복사한다. 파일 편집만 SSH(`/etc` 는 읽기 전용).
 6. `/etc/drilldown/rclone.conf`: B2 **쓰기 전용** 앱 키(목록·삭제 불가). 버킷 수명주기 14일.
 7. 유닛 설치:
    ```sh
@@ -32,7 +32,7 @@
    curl -s localhost:3000/api/health   # {"ok":true}
    ```
 8. Tunnel·Access: `deploy/cloudflared.md`.
-9. 기동 로그에 `AUTH_FAKE` 가 보이면 즉시 끈다(가짜 로그인이 열린 상태).
+9. `AUTH_FAKE=1` 인 채 `PUBLIC_ORIGIN` 이 https 면 서버가 기동을 거부한다(`AUTH_FAKE on https origin`) — `journalctl -u drilldown-server` 에 이 줄이 보이면 env 에서 `AUTH_FAKE=0` 으로 고치고 재시작. 로컬 http 에서 기동 로그에 `AUTH_FAKE` 가 보이면 가짜 로그인이 열린 상태다.
 
 ## 2. OAuth 앱 등록 체크리스트
 
@@ -61,7 +61,7 @@
 | 주기 | 작업 |
 |---|---|
 | 매일 03:00 | `drilldown-backup` — `data/backups/app-YYYYMMDD.db`(14개) → `age` → `rclone copyto <remote>/app-YYYYMMDD.db.age`. 결과 `backup.json` → 대시보드 "마지막 백업" |
-| 매일 04:00 | `drilldown-daily` — 만료 세션, 탈퇴 7일 purge, 톰스톤, 감사 로그 1년, 처리 신고 90일, WAL checkpoint. 결과 `daily.json` |
+| 매일 04:00 | `drilldown-daily` — 만료 세션, 탈퇴 7일 purge(소명·피드백 글 포함), 톰스톤, 처리 신고·소명·게시중단·정보주체 요청 90일, 임시조치(30일) 만료 복원, daily_stats, 감사 로그 1년(맨 뒤), WAL checkpoint. 결과 `daily.json`. 게시중단 접수로 숨긴 트리는 30일 임시조치라 큐에서 **확정**하지 않으면 자동 복원된다 |
 | 매월 | `npm audit`, OS 업데이트 확인, **복원 리허설**(아래 4를 노트북에서 끝까지) |
 | 업데이트 | `git pull && npm ci && npm run build` → 재시작은 **관리자 → 시스템 → 서버 → [서버 재시작]**(exit 1 → systemd 가 5초 뒤 되살림) 또는 `sudo systemctl restart drilldown-server`. 빌드 뒤 재시작을 잊으면 같은 패널에 "재시작 필요" 가 빨갛게 뜬다(커밋·빌드 해시도 거기서 확인). 마이그레이션은 기동 시 자동, 직전에 `pre-migrate-NNN.db` 1개 보관 |
 

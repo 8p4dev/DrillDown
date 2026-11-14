@@ -29,12 +29,13 @@ export function runDaily(db: DB, now = Date.now()): DailyResult {
     }
     // 3. SH 톰스톤
     r.purged_tombstones = purgeTombstones(db, now - GRACE_MS)
-    // 4·5. 감사 로그 1년, 처리된 신고 90일
-    db.prepare('DELETE FROM audit_log WHERE ts < ?').run(now - 365 * DAY)
+    // 5. 처리된 신고·소명 90일, 트리가 purge 된 소명(고아, r1 M2)
     db.prepare('DELETE FROM reports WHERE resolved_at < ?').run(now - 90 * DAY)
-    db.prepare('DELETE FROM appeals WHERE resolved_at < ?').run(now - 90 * DAY)
+    db.prepare('DELETE FROM appeals WHERE resolved_at < ? OR tree_id NOT IN (SELECT id FROM trees)').run(now - 90 * DAY)
     legalDaily(db, now)
     productDaily(db, now)
+    // 4. 감사 로그 1년 — 컷오프는 004 트리거(audit_no_delete)와 같은 식(초 단위, SQL 안에서)이어야 한다. ms 컷오프면 같은 초의 행에서 DELETE 전체가 ABORT 되므로(r1 M1) 맨 뒤에 둔다
+    db.exec("DELETE FROM audit_log WHERE ts <= CAST(strftime('%s', 'now') AS INTEGER) * 1000 - 365 * 86400000")
     // 6.
     db.exec('PRAGMA wal_checkpoint(TRUNCATE); PRAGMA optimize;')
   } catch (e) {

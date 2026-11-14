@@ -1,9 +1,10 @@
 // 서버 행(snake) ↔ 클라이언트 타입(camel) 변환 + 입력 검증 (04 §3.6 필드 대응표·상한, 03 §3.7 입력 검증)
 import type { BlankAttempt, NodeSrs, Tree, TreeNode } from '../../src/core/types.ts'
-import { fail } from '../http.ts'
+import { CTRL, fail, UUID } from '../http.ts'
 import { CAP } from '../../src/core/types.ts'
 
-export const LIMITS = { title: CAP.title, note: CAP.note, aliases: 50, alias: 50, nodesPerTree: CAP.nodesPerTree, treesPerUser: CAP.treesPerUser, rows: 500, bytes: 2 * 1024 * 1024 }
+/** card = ts-fsrs Card 직렬화 상한(수백 바이트), attempts = 사용자당 행 상한(넘치면 dropped — r1 H2 디스크 DoS) */
+export const LIMITS = { title: CAP.title, note: CAP.note, aliases: 50, alias: 50, nodesPerTree: CAP.nodesPerTree, treesPerUser: CAP.treesPerUser, rows: 500, bytes: 2 * 1024 * 1024, card: 2048, attempts: 20_000 }
 
 export interface TreeRow { id: string; owner_id: string; title: string; visibility: 'private' | 'unlisted' | 'public'; slug: string | null; source_tree_id: string | null; node_count: number; copy_count: number; created_at: number; updated_at: number; deleted_at: number | null; hidden_by_admin_at: number | null; seq: number }
 export interface NodeRow { id: string; tree_id: string; owner_id: string; parent_id: string | null; order: number; title: string; note: string | null; aliases: string; collapsed: number | null; offset: string | null; width: number | null; updated_at: number; deleted_at: number | null; seq: number }
@@ -33,10 +34,7 @@ export const srsOut = (r: SrsRow): NodeSrs & { deletedAt?: number } => ({
 })
 
 // ---- 검증: 실패하면 400 invalid + field 위치(nodes[3].title) ----
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-// 제목·별칭엔 제어문자 금지, note 는 \t \n \r 만 허용
-// eslint-disable-next-line no-control-regex -- 제어문자 거부가 목적
-const CTRL = /[\u0000-\u001f\u007f]/
+// 제목·별칭엔 제어문자 금지(CTRL, http.ts), note 는 \t \n \r 만 허용
 // eslint-disable-next-line no-control-regex -- 제어문자 거부가 목적
 const CTRL_NOTE = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/
 const GRADE = new Set(['exact', 'alias', 'fuzzy', 'self_accept', 'self_partial', 'self_reject', 'auto_reject'])
@@ -82,7 +80,7 @@ export function parseNode(v: unknown, f: string): TreeNode {
 
 export function parseSrs(v: unknown, f: string): NodeSrs {
   const o = obj(v, f)
-  if (o.card === undefined || o.card === null || typeof o.card !== 'object') bad(`${f}.card`)
+  if (o.card === undefined || o.card === null || typeof o.card !== 'object' || JSON.stringify(o.card).length > LIMITS.card) bad(`${f}.card`)
   const days = arr(o.autoCorrectDays ?? [], `${f}.autoCorrectDays`)
   if (days.length > 3660) bad(`${f}.autoCorrectDays`)
   const lgs = o.lastGradeSource ?? null

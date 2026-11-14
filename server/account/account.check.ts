@@ -9,12 +9,13 @@ import { openDb } from '../db.ts'
 import { env } from '../env.ts'
 import { DAY } from '../http.ts'
 import { createApp } from '../index.ts'
+import { getSettings } from './admin.ts'
 import { runDaily } from './daily.ts'
 import { exchangeCode, setOAuthFetch } from './oauth.ts'
 import { hooks } from './ops.ts'
 import { shortUa } from './session.ts'
 
-const saved = { authFake: env.authFake, dataDir: env.dataDir, adminsFile: env.adminsFile, google: env.google, kakao: env.kakao }
+const saved = { authFake: env.authFake, dataDir: env.dataDir, adminsFile: env.adminsFile, google: env.google, kakao: env.kakao, origin: env.origin }
 const tmp = mkdtempSync(join(tmpdir(), 'sa-check-'))
 writeFileSync(join(tmp, 'admins.json'), JSON.stringify(['google:g-admin']))
 Object.assign(env as unknown as Record<string, unknown>, {
@@ -129,8 +130,16 @@ assert.equal(r.headers.get('location'), '/#/admin')
 const tf = tokenForm as URLSearchParams | null
 assert.equal(tf?.get('code'), 'CODE'); assert.equal(tf?.get('client_secret'), 'gsecret'); assert.equal(tf?.get('redirect_uri'), `${env.origin}/api/auth/google/callback`)
 assert.equal(createHash('sha256').update(tf!.get('code_verifier')!).digest('base64url'), loc.searchParams.get('code_challenge'))
-const g = await json<{ user: { provider: string; nickname: string; role: string; avatar_url: null } }>(await me(cookieOf(r, 'sid')))
+const gsid = cookieOf(r, 'sid')
+const g = await json<{ user: { provider: string; nickname: string; role: string; avatar_url: null } }>(await me(gsid))
 assert.deepEqual([g.user.provider, g.user.nickname, g.user.role, g.user.avatar_url], ['google', 'Grace Hopper', 'admin', null])
+// r1 L7: admins.json 에서 빼면 다음 관리자 요청에 강등 + 세션 폐기(로그인 시점에만 맞추던 것)
+assert.equal((await req('/api/admin/stats', { cookie: gsid })).status, 200)
+writeFileSync(join(tmp, 'admins.json'), '[]')
+assert.equal((await req('/api/admin/stats', { cookie: gsid })).status, 404)
+assert.equal((db.prepare("SELECT role FROM users WHERE provider_sub = 'g-admin'").get() as { role: string }).role, 'user')
+assert.equal((await me(gsid)).status, 401)
+writeFileSync(join(tmp, 'admins.json'), JSON.stringify(['google:g-admin']))
 
 // ---- 관리자: 비관리자 404, 관리자 200 + 모양 ----
 const u = await login('user', 'carol')
@@ -279,6 +288,7 @@ const an = await json<{ notices: { id: string; url?: string }[]; maintenance_sch
 assert.deepEqual(an.notices.map((n) => n.id), ['now']); assert.equal(an.notices[0].url, 'https://example.com/x'); assert.ok(an.maintenance_scheduled)
 assert.equal((await req('/api/admin/settings', { method: 'PUT', body: { notices: [{ text: 'bad', url: 'javascript:1', audience: 'all' }] }, cookie: adm })).status, 400)
 assert.equal((await req('/api/admin/settings', { method: 'PUT', body: { maintenance: { manual: false, from: T0 + 2 * DAY, until: T0 + DAY } }, cookie: adm })).status, 400)
+assert.equal((await req('/api/admin/settings', { method: 'PUT', body: { maintenance: { manual: false, from: T0 + DAY } }, cookie: adm })).status, 400) // until 없는 예약 = 무기한 503(r1 L8)
 // 점검 예약: 창 안이면 수동 꺼져 있어도 503 + /api/me maintenance true. 창 지나면 통과
 await req('/api/admin/settings', { method: 'PUT', body: { maintenance: { manual: false, from: T0 - 1000, until: T0 + DAY } }, cookie: adm })
 assert.equal((await req('/api/sync', { cookie: d1 })).status, 503)
@@ -288,15 +298,20 @@ assert.notEqual((await req('/api/sync', { cookie: d1 })).status, 503)
 await req('/api/admin/settings', { method: 'PUT', body: { notices: [], maintenance: { manual: false } }, cookie: adm })
 assert.deepEqual((await json<{ notices: unknown[] }>(await req('/api/notices'))).notices, [])
 
-// 자동 숨김(#28): 기준 2 → 2번째 신고에 임시 숨김 30일, 행위자 NULL, 소유자에게 사유. 접수번호로 상태 조회(#26)
+// 자동 숨김(#28): 기준 2 → 서로 다른 로그인 신고자 2명에 임시 숨김 30일, 행위자 NULL, 소유자에게 사유. 익명 신고는 세지 않는다(r1 M3). 접수번호로 상태 조회(#26)
 assert.equal((await req('/api/admin/settings', { method: 'PUT', body: { auto_hide_reports: 21 }, cookie: adm })).status, 400)
 await req('/api/admin/settings', { method: 'PUT', body: { auto_hide_reports: 2 }, cookie: adm })
 ins.run('t-auto', carol[0].id, '자동', T0, T0, null)
 db.prepare("UPDATE trees SET slug = 'Auto5tree11' WHERE id = 't-auto'").run()
 r = await req('/api/t/Auto5tree11/report', { body: { reason: 'spam' }, ip: 'auto-1' })
 const rep1 = (await json<{ id: string }>(r)).id
+assert.equal((await req('/api/t/Auto5tree11/report', { body: { reason: 'spam' }, ip: 'auto-2' })).status, 201)
+assert.equal((await req('/api/t/Auto5tree11/report', { body: { reason: 'spam' }, ip: 'auto-3' })).status, 201)
+assert.equal(hidden('t-auto').h, null) // 익명 3건(IP 3개)으로는 숨기지 않는다
+assert.equal((await req('/api/t/Auto5tree11/report', { body: { reason: 'abuse' }, cookie: d1 })).status, 201)
+assert.equal((await req('/api/t/Auto5tree11/report', { body: { reason: 'abuse' }, cookie: d1 })).status, 201) // 같은 사람 2건 = 1명
 assert.equal(hidden('t-auto').h, null)
-assert.equal((await req('/api/t/Auto5tree11/report', { body: { reason: 'abuse' }, ip: 'auto-2' })).status, 201)
+assert.equal((await req('/api/t/Auto5tree11/report', { body: { reason: 'abuse' }, cookie: b2 })).status, 201)
 assert.ok(hidden('t-auto').h! > 0 && hidden('t-auto').u! >= T0 + 30 * DAY)
 assert.ok(db.prepare("SELECT 1 FROM audit_log WHERE action = 'tree.hide' AND target_id = 't-auto' AND actor_id IS NULL").get())
 assert.match((await json<{ hidden_trees: { id: string; reason: string }[] }>(await me(c2))).hidden_trees.find((t) => t.id === 't-auto')!.reason, /자동/)
@@ -323,7 +338,7 @@ await req('/api/admin/trees/t-auto/unhide', { body: {}, cookie: adm })
 db.prepare("UPDATE reports SET resolved_at = ?, resolution = 'dismissed' WHERE id = ?").run(T0, rep1)
 assert.deepEqual(await json(await req('/api/report/' + rep1, { ip: 'st-1' })).then((x) => [x.state, x.updated_at]), ['dismissed', T0])
 
-// 게시중단(#23): 검증 400, 유효 → 201 + 즉시 숨김(확정) + 소유자 사유, IP 4번째 429, 상태 조회에 연락처 없음, 관리자 흐름 통보→재개
+// 게시중단(#23): 검증 400, 유효 → 201 + 즉시 숨김(30일 임시조치, r1 M4) + 소유자 사유, IP 4번째 429, 상태 조회에 연락처 없음, 관리자 흐름 통보→재개
 ins.run('t-td', carol[0].id, '교재 전사', T0, T0, null)
 db.prepare("UPDATE trees SET slug = 'Take5tree11' WHERE id = 't-td'").run()
 const td = { url: 'http://localhost/t/Take5tree11?m=flash', name: '권리자', contact: 'holder@example.com', claim: '등록 제C-2026-1호\n원본 https://example.com/book', attest: true }
@@ -332,7 +347,7 @@ assert.equal((await err(await req('/api/takedown', { body: { ...td, url: 'https:
 r = await req('/api/takedown', { body: td, ip: 'td-1' })
 assert.equal(r.status, 201)
 const tdId = (await json<{ id: string }>(r)).id
-assert.ok(hidden('t-td').h! > 0); assert.equal(hidden('t-td').u, null)
+assert.ok(hidden('t-td').h! > 0 && hidden('t-td').u! >= T0 + 30 * DAY)
 assert.match((await json<{ hidden_trees: { id: string; reason: string }[] }>(await me(c2))).hidden_trees.find((t) => t.id === 't-td')!.reason, /저작권/)
 assert.equal((await req('/api/takedown', { body: td, ip: 'td-1' })).status, 201) // 같은 트리 두 번째 — 다시 숨기지 않음(감사 1건)
 assert.equal((await req('/api/takedown', { body: { ...td, url: 'None5tree11' }, ip: 'td-1' })).status, 201) // 없는 트리도 접수(received, tree NULL)
@@ -368,6 +383,26 @@ assert.equal((await json<{ takedown: { state: string } }>(await req(`/api/admin/
 legalDaily(db, T0 + 91 * DAY)
 assert.equal(db.prepare('SELECT 1 FROM takedowns WHERE id = ?').get(tdId), undefined)
 assert.equal((await req('/api/report/' + tdId, { ip: 'st-2' })).status, 404)
+// r1 H1: 다른 사유로 숨긴 트리에 게시중단 → 기각해도 숨김 유지 / 같은 트리 2건 중 1건 확정 뒤 다른 건 기각해도 유지. r1 M4: 접수 = 임시조치, confirm 으로 확정, 방치하면 legalDaily 가 복원
+ins.run('t-h1a', carol[0].id, 'A', T0, T0, null); ins.run('t-h1b', carol[0].id, 'B', T0, T0, null); ins.run('t-h1c', carol[0].id, 'C', T0, T0, null)
+db.prepare("UPDATE trees SET slug = CASE id WHEN 't-h1a' THEN 'Hone5tree11' WHEN 't-h1b' THEN 'Htwo5tree11' ELSE 'Hthr5tree11' END WHERE id IN ('t-h1a','t-h1b','t-h1c')").run()
+await req('/api/admin/trees/t-h1a/hide', { body: { reason: '스팸' }, cookie: adm })
+const ka = (await json<{ id: string }>(await req('/api/takedown', { body: { ...td, url: 'Hone5tree11' }, ip: 'td-a' }))).id
+assert.equal((db.prepare('SELECT hidden_at FROM takedowns WHERE id = ?').get(ka) as { hidden_at: number | null }).hidden_at, null) // 이 요청이 숨긴 게 아니다
+assert.equal((await req(`/api/admin/takedowns/${ka}`, { body: { action: 'reject' }, cookie: adm })).status, 200)
+assert.ok(hidden('t-h1a').h! > 0 && hidden('t-h1a').u === null) // 관리자 확정 숨김 그대로
+const kb1 = (await json<{ id: string }>(await req('/api/takedown', { body: { ...td, url: 'Htwo5tree11' }, ip: 'td-b' }))).id
+assert.ok(hidden('t-h1b').u! >= T0 + 30 * DAY)
+const kb2 = (await json<{ id: string }>(await req('/api/takedown', { body: { ...td, url: 'Htwo5tree11' }, ip: 'td-b' }))).id
+assert.equal((await req(`/api/admin/takedowns/${kb1}`, { body: { action: 'confirm' }, cookie: adm })).status, 200)
+assert.equal(hidden('t-h1b').u, null) // 확정 = 만료 없음
+assert.equal((await req(`/api/admin/takedowns/${kb2}`, { body: { action: 'reject' }, cookie: adm })).status, 200)
+assert.ok(hidden('t-h1b').h! > 0) // kb1 확정이 남아 있다
+await req('/api/takedown', { body: { ...td, url: 'Hthr5tree11' }, ip: 'td-c' })
+legalDaily(db, T0 + 31 * DAY)
+assert.deepEqual(hidden('t-h1c'), { h: null, u: null }) // 큐를 안 보면 30일 뒤 자동 복원
+assert.ok(hidden('t-h1b').h! > 0)
+db.prepare("DELETE FROM trees WHERE id IN ('t-h1a','t-h1b','t-h1c')").run()
 
 // 정보주체 요청(#25): 수동 입력, due = +10일, 완료 → audit dsr.<kind>, 90일 뒤 삭제
 assert.equal((await req('/api/admin/requests', { body: { kind: 'bogus' }, cookie: adm })).status, 400)
@@ -407,6 +442,9 @@ assert.ok(ops.sessions.total >= 2 && ops.sessions.admin >= 1 && ops.sessions.exp
 assert.ok(ops.build.started_at > 0 && typeof ops.build.restart_needed === 'boolean'); assert.deepEqual(ops.jobs, { backup: false, daily: false })
 assert.deepEqual([ops.oauth.google.id, ops.oauth.google.secret, ops.oauth.kakao.id], [true, true, false])
 assert.equal(ops.restore_at, null)
+// 계약 C: 가벼운 폴링용 GET /api/admin/ops/jobs = running + backup.json + daily.json
+const jb = await json<{ running: object; backup: { at: number; configured: boolean }; daily: { at: number } }>(await req('/api/admin/ops/jobs', { cookie: adm }))
+assert.deepEqual(jb.running, { backup: false, daily: false }); assert.equal(jb.backup.at, 0); assert.equal(typeof jb.backup.configured, 'boolean'); assert.equal(jb.daily.at, 0)
 await req('/api/admin/ops/note', { body: { kind: 'restore', text: '리허설' }, cookie: adm })
 assert.ok((await json<{ ops: { restore_at: number } }>(await req('/api/admin/stats', { cookie: adm }))).ops.restore_at > 0) // 대시보드 "복원 리허설 N일 전"
 // 클라이언트 오류: 비로그인도 204, 빈 메시지 400, 제어문자 제거·200자, 분당 10건 → 429 가 '429:cerr' 카운터로
@@ -462,6 +500,8 @@ assert.equal((await req('/api/admin/ops/run/backup', { body: {}, cookie: adm }))
 assert.deepEqual(spawned, ['server/account/backup.ts'])
 assert.equal((await req('/api/admin/ops/run/backup', { body: {}, cookie: adm })).status, 409)
 assert.equal((await json<{ ops: { jobs: { backup: boolean } } }>(await req('/api/admin/stats', { cookie: adm }))).ops.jobs.backup, true)
+assert.equal((await json<{ running: { backup: boolean } }>(await req('/api/admin/ops/jobs', { cookie: adm }))).running.backup, true)
+assert.equal((await req('/api/admin/ops/restart', { body: {}, cookie: adm })).status, 409) // 자식 실행 중 재시작 금지(r1 L2)
 finish()
 assert.equal((await req('/api/admin/ops/run/backup', { body: {}, cookie: adm })).status, 202); finish()
 assert.equal((await req('/api/admin/ops/run/daily', { body: {}, cookie: adm })).status, 202); finish()
@@ -491,14 +531,21 @@ assert.ok((db.prepare('SELECT expires_at FROM sessions WHERE id = ?').get(dsid) 
 db.prepare('UPDATE sessions SET created_at = ? WHERE id = ?').run(Date.now() - 25 * 3_600_000, createHash('sha256').update(adm.slice(4)).digest('hex'))
 assert.equal((await req('/api/admin/stats', { cookie: adm })).status, 404)
 
-// ---- 일일 작업: 8일 전 탈퇴 사용자 purge ----
+// ---- 일일 작업: 8일 전 탈퇴 사용자 purge(소명·피드백 자유 글 포함, r1 M2) · 고아 소명 정리 · 감사 삭제 초 경계(r1 M1) ----
 const e1 = await login('user', 'erin')
 const erinId = (await json<{ user: { id: string } }>(await me(e1))).user.id
+assert.equal((await req('/api/feedback', { body: { category: 'bug', text: '연락처 010-0000-0000' }, cookie: e1 })).status, 201)
+db.prepare("INSERT INTO appeals(id,tree_id,user_id,text,created_at) VALUES('ap-erin','t-x',?,'소명',?), ('ap-orphan','gone-tree',?,'고아',?)").run(erinId, Date.now(), bobId, Date.now())
 await req('/api/me/delete', { body: {}, cookie: e1 })
 db.prepare('UPDATE users SET deleted_at = ? WHERE id = ?').run(Date.now() - 8 * DAY, erinId)
+// 트리거(초 단위)와 ms 컷오프 사이의 행 — 옛 코드는 여기서 DELETE 전체가 ABORT 돼 뒤 단계가 통째로 빠졌다
+db.prepare("INSERT INTO audit_log(ts,action) VALUES(?, 'edge')").run(Math.floor(Date.now() / 1000) * 1000 - 365 * DAY + 1)
 const dr = runDaily(db)
-assert.equal(dr.ok, true); assert.ok(dr.purged_users >= 1)
+assert.equal(dr.ok, true, dr.error); assert.ok(dr.purged_users >= 1)
 assert.equal(db.prepare('SELECT 1 FROM users WHERE id = ?').get(erinId), undefined)
+assert.equal((db.prepare('SELECT COUNT(*) n FROM appeals WHERE user_id = ?').get(erinId) as { n: number }).n, 0)
+assert.equal((db.prepare('SELECT COUNT(*) n FROM feedback WHERE user_id = ?').get(erinId) as { n: number }).n, 0)
+assert.equal(db.prepare("SELECT 1 FROM appeals WHERE id = 'ap-orphan'").get(), undefined) // 트리가 없는 소명은 지운다
 assert.ok(db.prepare("SELECT 1 FROM audit_log WHERE action = 'user.purge' AND target_id = ? AND actor_id IS NULL").get(erinId))
 assert.ok(db.prepare('SELECT 1 FROM users WHERE id = ?').get(bobId)) // 복구된 사용자는 남는다
 assert.equal(JSON.parse(readFileSync(join(tmp, 'daily.json'), 'utf8')).at, dr.at)
@@ -511,6 +558,30 @@ assert.ok((await json<{ count: number }>(r)).count >= 1)
 assert.equal((await me(adm4)).status, 401)
 assert.equal((db.prepare('SELECT COUNT(*) n FROM sessions').get() as { n: number }).n, 0)
 assert.ok(db.prepare("SELECT 1 FROM audit_log WHERE action = 'system.sessions_revoke_all'").get())
+
+// ---- r1 M5: AUTH_FAKE 를 https origin 으로 켜면 기동 거부 ----
+Object.assign(env as unknown as Record<string, unknown>, { origin: 'https://example.com' })
+await assert.rejects(createApp(db), /AUTH_FAKE/)
+Object.assign(env as unknown as Record<string, unknown>, { origin: saved.origin })
+
+// ---- 마이그레이션 경로: 003 까지 적용된 파일 DB(레거시 notice·maintenance.enabled) → 기동 → 004~006 적용 + pre-migrate 백업 → 다음 기동이 백업을 지운다 ----
+const { DatabaseSync } = await import('node:sqlite')
+const migFile = join(tmp, 'mig.db')
+const old = new DatabaseSync(migFile)
+for (const f of ['001_account.sql', '002_trees.sql', '003_ratings.sql']) old.exec(readFileSync(join(import.meta.dirname, '../migrations', f), 'utf8'))
+old.exec('PRAGMA user_version = 3')
+old.prepare("INSERT INTO settings(key,value,updated_at) VALUES('notice', ?, 1), ('maintenance', ?, 1)").run(JSON.stringify({ text: '옛 공지', enabled: true }), JSON.stringify({ enabled: true }))
+old.close()
+const mdb = await openDb(migFile)
+assert.equal((mdb.prepare('PRAGMA user_version').get() as { user_version: number }).user_version, 6)
+assert.ok(existsSync(join(tmp, 'pre-migrate-003.db')))
+const ms = getSettings(mdb)
+assert.deepEqual(ms.notices, [{ id: 'n-legacy', text: '옛 공지', audience: 'all' }]); assert.equal(ms.maintenance.manual, true); assert.deepEqual(ms.notice, { text: '옛 공지', enabled: true })
+assert.equal(mdb.prepare('SELECT COUNT(*) n FROM takedowns').get()!.n, 0); assert.equal(mdb.prepare("SELECT COUNT(*) n FROM pragma_table_info('trees') WHERE name IN ('hidden_until','view_count')").get()!.n, 2)
+mdb.close()
+const mdb2 = await openDb(migFile)
+assert.ok(!existsSync(join(tmp, 'pre-migrate-003.db')))
+mdb2.close()
 
 setOAuthFetch(fetch)
 Object.assign(env as unknown as Record<string, unknown>, saved)

@@ -14,10 +14,11 @@ export function softDeleteTreesOfUser(db: DB, ownerId: string, now: number): num
 export function restoreTreesOfUser(db: DB, ownerId: string, since: number): number {
   return Number(db.prepare('UPDATE trees SET deleted_at = NULL WHERE owner_id = ? AND deleted_at >= ?').run(ownerId, since).changes)
 }
-/** 7일 경과 purge: ratings·srs·attempts·nodes·trees·user_seq 물리 삭제 (events 는 서버 미저장). 신고 행은 남기되 신고자 id 만 지운다(F14).
- *  ratings 는 users(id) FK 라 호출자(SA)가 users 행을 지우기 전인 여기서 먼저 지운다. 이 사용자 트리에 달린 남의 별점은 trees ON DELETE CASCADE */
+/** 7일 경과 purge: ratings·srs·attempts·nodes·trees·user_seq·appeals·feedback 물리 삭제 (events 는 서버 미저장). 신고 행은 남기되 신고자 id 만 지운다(F14).
+ *  ratings 는 users(id) FK 라 호출자(SA)가 users 행을 지우기 전인 여기서 먼저 지운다. 이 사용자 트리에 달린 남의 별점은 trees ON DELETE CASCADE.
+ *  appeals·feedback 은 자유 글(≤500자)이라 user_id 와 함께 남기면 안 된다(r1 M2) */
 export function purgeUser(db: DB, ownerId: string): void {
-  for (const sql of ['DELETE FROM ratings WHERE user_id = ?', 'DELETE FROM srs WHERE user_id = ?', 'DELETE FROM attempts WHERE user_id = ?', 'DELETE FROM nodes WHERE owner_id = ?', 'DELETE FROM trees WHERE owner_id = ?', 'DELETE FROM user_seq WHERE user_id = ?', 'UPDATE reports SET reporter_id = NULL WHERE reporter_id = ?'])
+  for (const sql of ['DELETE FROM ratings WHERE user_id = ?', 'DELETE FROM srs WHERE user_id = ?', 'DELETE FROM attempts WHERE user_id = ?', 'DELETE FROM nodes WHERE owner_id = ?', 'DELETE FROM trees WHERE owner_id = ?', 'DELETE FROM user_seq WHERE user_id = ?', 'UPDATE reports SET reporter_id = NULL WHERE reporter_id = ?', 'DELETE FROM appeals WHERE user_id = ?', 'DELETE FROM feedback WHERE user_id = ?'])
     db.prepare(sql).run(ownerId)
 }
 
@@ -76,9 +77,9 @@ export function treeStats(db: DB): { total: number; public: number; hidden: numb
       COALESCE(SUM(deleted_at IS NOT NULL), 0) AS pending_delete FROM trees`).get() as { total: number; public: number; hidden: number; pending_delete: number }
 }
 
-/** 관리자 공개 트리 목록(visibility='public' 또는 삭제 7일 이내). 소유자 닉네임은 users 조인. open_reports 는 SA 가 reports 로 채운다.
+/** 관리자 공개 트리 목록(visibility='public' 또는 삭제 7일 이내). 소유자 닉네임은 users 조인, open_reports 는 상관 서브쿼리(r1 L3).
  *  커서 = "<정렬키>_<id>" (정렬키: 기본 updated_at, deleted=true 면 deleted_at, 내림차순) */
-export function listTreesForAdmin(db: DB, opts: { cursor?: string; limit: number; deleted?: boolean }): { items: { id: string; title: string; slug: string | null; owner: { id: string; nickname: string }; node_count: number; updated_at: number; hidden_by_admin_at: number | null; hidden_until: number | null; deleted_at: number | null }[]; next: string | null } {
+export function listTreesForAdmin(db: DB, opts: { cursor?: string; limit: number; deleted?: boolean }): { items: { id: string; title: string; slug: string | null; owner: { id: string; nickname: string }; node_count: number; updated_at: number; hidden_by_admin_at: number | null; hidden_until: number | null; deleted_at: number | null; open_reports: number }[]; next: string | null } {
   const key = opts.deleted ? 't.deleted_at' : 't.updated_at'
   const where = opts.deleted ? 't.deleted_at IS NOT NULL AND t.deleted_at >= ?' : "t.visibility = 'public' AND t.deleted_at IS NULL AND ? IS NOT NULL"
   const args: (string | number)[] = [opts.deleted ? Date.now() - GRACE_MS : 0]
@@ -86,11 +87,12 @@ export function listTreesForAdmin(db: DB, opts: { cursor?: string; limit: number
   const m = opts.cursor ? /^(\d+)_(.+)$/.exec(opts.cursor) : null
   if (m) { cur = ` AND (${key} < ? OR (${key} = ? AND t.id < ?))`; args.push(Number(m[1]), Number(m[1]), m[2]) }
   const limit = Math.max(1, Math.min(100, Math.floor(opts.limit) || 20))
-  const rows = db.prepare(`SELECT t.id, t.title, t.slug, t.owner_id, u.nickname, t.node_count, t.updated_at, t.hidden_by_admin_at, t.hidden_until, t.deleted_at, ${key} AS k
-    FROM trees t JOIN users u ON u.id = t.owner_id WHERE ${where}${cur} ORDER BY ${key} DESC, t.id DESC LIMIT ?`).all(...args, limit + 1) as { id: string; title: string; slug: string | null; owner_id: string; nickname: string; node_count: number; updated_at: number; hidden_by_admin_at: number | null; hidden_until: number | null; deleted_at: number | null; k: number }[]
+  const rows = db.prepare(`SELECT t.id, t.title, t.slug, t.owner_id, u.nickname, t.node_count, t.updated_at, t.hidden_by_admin_at, t.hidden_until, t.deleted_at, ${key} AS k,
+      (SELECT COUNT(*) FROM reports r WHERE r.tree_id = t.id AND r.resolved_at IS NULL) AS open_reports
+    FROM trees t JOIN users u ON u.id = t.owner_id WHERE ${where}${cur} ORDER BY ${key} DESC, t.id DESC LIMIT ?`).all(...args, limit + 1) as { id: string; title: string; slug: string | null; owner_id: string; nickname: string; node_count: number; updated_at: number; hidden_by_admin_at: number | null; hidden_until: number | null; deleted_at: number | null; k: number; open_reports: number }[]
   const page = rows.slice(0, limit)
   return {
-    items: page.map((r) => ({ id: r.id, title: r.title, slug: r.slug, owner: { id: r.owner_id, nickname: r.nickname }, node_count: r.node_count, updated_at: r.updated_at, hidden_by_admin_at: r.hidden_by_admin_at, hidden_until: r.hidden_until, deleted_at: r.deleted_at })),
+    items: page.map((r) => ({ id: r.id, title: r.title, slug: r.slug, owner: { id: r.owner_id, nickname: r.nickname }, node_count: r.node_count, updated_at: r.updated_at, hidden_by_admin_at: r.hidden_by_admin_at, hidden_until: r.hidden_until, deleted_at: r.deleted_at, open_reports: r.open_reports })),
     next: rows.length > limit ? `${page[page.length - 1].k}_${page[page.length - 1].id}` : null,
   }
 }
