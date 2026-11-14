@@ -7,6 +7,7 @@ import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import { tx } from '../db.ts'
 import { env } from '../env.ts'
 import { fail, GRACE_MS, hit, clientIp, type AppEnv } from '../http.ts'
+import { count } from '../metrics.ts'
 import { purgeUser, restoreTreesOfUser } from '../sync/owner.ts'
 import { audit, CTRL } from './admin.ts'
 import { createSession, rand } from './session.ts'
@@ -136,14 +137,15 @@ export function registerOAuth(app: Hono<AppEnv>) {
     try { ck = raw ? (JSON.parse(Buffer.from(raw, 'base64url').toString()) as OAuthCookie) : null } catch { /* 깨진 쿠키 = 불일치 */ }
     const state = c.req.query('state') ?? '', code = c.req.query('code') ?? ''
     if (!ck || ck.p !== p || typeof ck.s !== 'string' || !eq(ck.s, state) || !code || !(Date.now() - ck.t < 600_000)) {
-      console.warn('oauth_state_mismatch')
+      console.warn('oauth_state_mismatch'); count(`oauth.${p}.state`)
       return c.redirect('/#/login?e=state')
     }
     let prof
     try {
       prof = await fetchProfile(p, await exchangeCode(p, code, ck.v, oauthFetch), oauthFetch)
     } catch (e) {
-      console.warn(`oauth_${(e as Error).message === 'userinfo' ? 'userinfo' : 'token'}_failed`)
+      const step = (e as Error).message === 'userinfo' ? 'userinfo' : 'token'
+      console.warn(`oauth_${step}_failed`); count(`oauth.${p}.${step}`)
       return c.redirect('/#/login?e=state')
     }
     return signIn(c, { provider: p, ...prof, returnTo: safeReturn(ck.r) })

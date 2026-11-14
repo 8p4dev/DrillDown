@@ -22,7 +22,7 @@
    BACKUP_AGE_RECIPIENT=/etc/drilldown/backup.pub     # age 공개키(파일 또는 age1… 문자열)
    BACKUP_RCLONE_REMOTE=b2:drilldown-backup
    ```
-5. `/etc/drilldown/admins.json`: `["google:<sub>", "kakao:<회원번호>"]` — 매 로그인마다 역할 동기화(빼면 다음 로그인 때 강등). sub 는 처음 로그인 뒤 관리자 화면 대신 `sqlite3 app.db "select provider, provider_sub from users"` 로 확인.
+5. `/etc/drilldown/admins.json`: `["google:<sub>", "kakao:<회원번호>"]` — 매 로그인마다 역할 동기화(빼면 다음 로그인 때 강등). sub 는 **관리자 → 시스템 → 관리자 목록**(내 식별자) 또는 **사용자 탭 → 상세**(식별자 `provider:sub`)에서 복사한다. 파일 편집만 SSH(`/etc` 는 읽기 전용).
 6. `/etc/drilldown/rclone.conf`: B2 **쓰기 전용** 앱 키(목록·삭제 불가). 버킷 수명주기 14일.
 7. 유닛 설치:
    ```sh
@@ -63,9 +63,9 @@
 | 매일 03:00 | `drilldown-backup` — `data/backups/app-YYYYMMDD.db`(14개) → `age` → `rclone copyto <remote>/app-YYYYMMDD.db.age`. 결과 `backup.json` → 대시보드 "마지막 백업" |
 | 매일 04:00 | `drilldown-daily` — 만료 세션, 탈퇴 7일 purge, 톰스톤, 감사 로그 1년, 처리 신고 90일, WAL checkpoint. 결과 `daily.json` |
 | 매월 | `npm audit`, OS 업데이트 확인, **복원 리허설**(아래 4를 노트북에서 끝까지) |
-| 업데이트 | `git pull && npm ci && npm run build && sudo systemctl restart drilldown-server` (마이그레이션은 기동 시 자동, 직전에 `pre-migrate-NNN.db` 1개 보관) |
+| 업데이트 | `git pull && npm ci && npm run build` → 재시작은 **관리자 → 시스템 → 서버 → [서버 재시작]**(exit 1 → systemd 가 5초 뒤 되살림) 또는 `sudo systemctl restart drilldown-server`. 빌드 뒤 재시작을 잊으면 같은 패널에 "재시작 필요" 가 빨갛게 뜬다(커밋·빌드 해시도 거기서 확인). 마이그레이션은 기동 시 자동, 직전에 `pre-migrate-NNN.db` 1개 보관 |
 
-수동 실행: `sudo -u drilldown env $(sudo cat /etc/drilldown/env | xargs) DATA_DIR=/var/lib/drilldown node server/account/daily.ts` 또는 `sudo systemctl start drilldown-daily`. 실패는 `journalctl -u drilldown-daily`.
+수동 실행: **관리자 → 시스템 → 서버 → [지금 백업] / [일일 작업 실행]**(타이머와 같은 스크립트를 자식 프로세스로 띄움, 끝나면 대시보드 카드가 갱신되고 오류 문구가 카드에 보인다). 서버 유닛에 `RCLONE_CONFIG=/etc/drilldown/rclone.conf` 가 있어야 외부 업로드까지 된다(`deploy/drilldown-server.service`). SSH 대안: `sudo systemctl start drilldown-daily`, 상세 로그는 `journalctl -u drilldown-daily`. WAL 이 커졌으면 같은 패널 [WAL checkpoint]. 로컬 백업 14개가 실제로 있는지는 시스템 → 복원 표에서 본다(다운로드는 없음).
 
 ## 4. 복원 런북 (03 §3.8 1~10, 목표 60분)
 
@@ -78,16 +78,16 @@
 7. `sudo systemctl start drilldown-server` → `curl localhost:3000/api/health` = `{"ok":true}`.
 8. Tunnel: 자격 증명 `/etc/cloudflared/<id>.json` 복원 → `cloudflared tunnel run drilldown`. 옛 Pi 가 살아 있으면 먼저 거기서 `systemctl stop cloudflared`(커넥터 2개 동시 연결 방지). 같은 터널 이름이면 DNS·Access 변경 없음.
 9. 확인: 외부에서 `https://<도메인>/api/health`, 관리자 로그인 → 대시보드 `backup.at`·`users.total` 이 백업 시점과 일치, 공유 링크 1개 열기.
-10. 관리자 → 시스템 → 공지 "HH:MM 이후 서버 저장분은 다음 동기화 때 다시 올라갑니다" 켜기 → 24시간 뒤 끔. 감사 로그에 남긴다: `sqlite3 app.db "INSERT INTO audit_log(ts,action,target_type) VALUES(strftime('%s','now')*1000,'system.restore','settings')"`.
+10. 관리자 → 시스템 → 공지 "HH:MM 이후 서버 저장분은 다음 동기화 때 다시 올라갑니다" 켜기 → 24시간 뒤 끔. 감사 로그는 **시스템 → 사건 대응 → 운영 기록(종류 "복원")** 으로 남긴다 — 대시보드 "복원 리허설 N일 전" 이 이 기록을 본다(45일 넘으면 빨강). 리허설도 같은 방법으로 기록.
 
 ## 5. 개인정보 유출 대응 (03 §3.7)
 
 신고 기준: 1천 명 이상, 민감·고유식별정보, 또는 **외부 불법 접근(해킹)은 규모 무관** → 인지 후 **72시간 내** 개인정보보호위원회(또는 KISA) 신고 + 정보주체 통지. 우리 DB 에는 이메일·실명·IP 가 없지만 해킹이면 1명이라도 대상이다.
 
 1. **차단**(즉시): `sudo systemctl stop cloudflared` (외부 차단) → 관리자 화면 접근이 되면 점검 모드 ON. 의심 키 폐기: OAuth 시크릿 재발급(Google·Kakao), Kakao Admin 키 재발급, B2 키 폐기, `cloudflared` 터널 자격 증명 재발급.
-2. **세션 무효화**: `sqlite3 app.db 'DELETE FROM sessions'` (세션은 해시라 재사용은 어렵지만 전부 끊는다).
+2. **세션 무효화**: **관리자 → 시스템 → 사건 대응 → [전 세션 폐기]**(관리자 본인도 로그아웃, 감사 `system.sessions_revoke_all`). 특정 계정만이면 사용자 탭 → 상세 → [세션 전부 폐기]. SSH 대안: `sqlite3 app.db 'DELETE FROM sessions'`.
 3. **증거 보존**: `app.db` 사본, `journalctl -u drilldown-server --since <시각>` 저장, Cloudflare 대시보드 로그(24h 보관) 캡처. 원본은 건드리지 않는다.
-4. **범위 파악**: 노출 가능 항목 = `provider_sub`·닉네임·제공자 프로필 URL(옵트인)·학습 트리·신고 메모. 영향 사용자 수 = `SELECT COUNT(*) FROM users`.
+4. **범위 파악**: 노출 가능 항목 = `provider_sub`·닉네임·제공자 프로필 URL(옵트인)·학습 트리·신고 메모. 영향 사용자 수·세션 수는 대시보드 카드(가입자·세션). 의심 기간의 관리자 동작은 시스템 → 감사 로그 필터(동작·대상·기간) → CSV 로 보존.
 5. **신고·통지**(72시간 내): 유출 항목·시점·경위·대응·피해 최소화 방법·담당 부서 연락처(`PRIVACY_CONTACT`). 통지는 서비스 공지(`settings.notice`) + 처리방침 연락처.
-6. **복구**: 패치 후 4 복원 런북(필요하면 침해 전 백업으로) → 재개. `audit_log` 에 `system.incident` 기록.
+6. **복구**: 패치 후 4 복원 런북(필요하면 침해 전 백업으로) → 재개. 사건은 시스템 → 운영 기록(종류 "사건") 으로 `system.incident` 를 남긴다.
 7. **사후**: 원인·조치를 `docs/ops/incidents/YYYY-MM-DD.md` 에 남긴다.

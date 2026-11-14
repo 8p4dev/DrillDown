@@ -11,6 +11,7 @@ import { DAY } from '../http.ts'
 import { createApp } from '../index.ts'
 import { runDaily } from './daily.ts'
 import { exchangeCode, setOAuthFetch } from './oauth.ts'
+import { hooks } from './ops.ts'
 import { shortUa } from './session.ts'
 
 const saved = { authFake: env.authFake, dataDir: env.dataDir, adminsFile: env.adminsFile, google: env.google, kakao: env.kakao }
@@ -266,6 +267,85 @@ assert.throws(() => db.prepare("UPDATE audit_log SET action = 'x' WHERE id = (SE
 assert.throws(() => db.prepare('DELETE FROM audit_log WHERE id = (SELECT MAX(id) FROM audit_log)').run(), /append-only/)
 db.prepare("INSERT INTO audit_log(ts,action) VALUES(?, 'old')").run(Date.now() - 400 * DAY)
 assert.equal(Number(db.prepare("DELETE FROM audit_log WHERE action = 'old'").run().changes), 1) // 1년 지난 행은 지워진다(일일 작업)
+
+// ---- 운영(3단계, ops.ts): stats.ops 모양 · 클라이언트 오류 · 감사 필터/CSV · 사용자 세션 폐기/탈퇴 취소 · 다른 관리자 차단 · 수동 실행(가짜 spawn) · checkpoint · 재시작(가짜 exit) · 관리자 목록 ----
+const ops = (await json<{ ops: { db: { file: number; wal: number; page_count: number; backups: unknown[] }; rss_max: number; sessions: { total: number; expired: number; admin: number }; counters: Record<string, number>; client_errors: { count: number; recent: unknown[] }; build: { started_at: number; restart_needed: boolean }; jobs: { backup: boolean; daily: boolean }; oauth: { google: { id: boolean; secret: boolean }; kakao: { id: boolean } }; restore_at: number | null } }>(await req('/api/admin/stats', { cookie: adm }))).ops
+assert.equal(ops.db.file, 0); assert.ok(ops.db.page_count > 0); assert.deepEqual(ops.db.backups, []); assert.equal(ops.rss_max, 512 * 1024 * 1024)
+assert.ok(ops.sessions.total >= 2 && ops.sessions.admin >= 1 && ops.sessions.expired === 0)
+assert.ok(ops.build.started_at > 0 && typeof ops.build.restart_needed === 'boolean'); assert.deepEqual(ops.jobs, { backup: false, daily: false })
+assert.deepEqual([ops.oauth.google.id, ops.oauth.google.secret, ops.oauth.kakao.id], [true, true, false])
+assert.equal(ops.restore_at, null)
+await req('/api/admin/ops/note', { body: { kind: 'restore', text: '리허설' }, cookie: adm })
+assert.ok((await json<{ ops: { restore_at: number } }>(await req('/api/admin/stats', { cookie: adm }))).ops.restore_at > 0) // 대시보드 "복원 리허설 N일 전"
+// 클라이언트 오류: 비로그인도 204, 빈 메시지 400, 제어문자 제거·200자, 분당 10건 → 429 가 '429:cerr' 카운터로
+assert.equal((await req('/api/client-error', { body: { message: '' }, ip: 'cerr-1' })).status, 400)
+for (let i = 0; i < 9; i++) assert.equal((await req('/api/client-error', { body: { message: `TypeError: x\u0007is not a function ${'y'.repeat(300)}`, version: 'index-abc.js' }, ip: 'cerr-1' })).status, 204)
+assert.equal((await req('/api/client-error', { body: { message: 'again' }, ip: 'cerr-1' })).status, 429)
+await req('/api/sync?since=0', { cookie: d1 }) // sync.pull 카운터
+const ops2 = (await json<{ ops: { counters: Record<string, number>; client_errors: { count: number; recent: { message: string; version: string }[] } } }>(await req('/api/admin/stats', { cookie: adm }))).ops
+assert.equal(ops2.client_errors.count, 9); assert.equal(ops2.client_errors.recent.length, 9)
+assert.equal(Array.from(ops2.client_errors.recent[0].message).length, 200); assert.ok(!ops2.client_errors.recent[0].message.includes('\u0007')); assert.equal(ops2.client_errors.recent[0].version, 'index-abc.js')
+assert.equal(ops2.counters['429:cerr'], 1); assert.ok(ops2.counters['sync.pull'] >= 1)
+// 감사 필터: action 접두 · target_id · 기간 · CSV
+let au = (await json<{ items: { action: string; target_id: string }[] }>(await req('/api/admin/audit?action=user.', { cookie: adm }))).items
+assert.ok(au.length > 0 && au.every((x) => x.action.startsWith('user.')))
+au = (await json<{ items: { action: string; target_id: string }[] }>(await req(`/api/admin/audit?target_id=${carol[0].id}`, { cookie: adm }))).items
+assert.ok(au.length > 0 && au.every((x) => x.target_id === carol[0].id))
+assert.deepEqual((await json<{ items: unknown[] }>(await req(`/api/admin/audit?to=${Date.now() - DAY}`, { cookie: adm }))).items, []) // 어제까지 = 없음
+assert.ok((await json<{ items: unknown[] }>(await req(`/api/admin/audit?from=${Date.now() - DAY}`, { cookie: adm }))).items.length > 0)
+assert.equal((await req('/api/admin/audit?action=%01', { cookie: adm })).status, 400)
+r = await req('/api/admin/audit?format=csv&action=system.', { cookie: adm })
+assert.equal(r.status, 200); assert.match(r.headers.get('content-type') ?? '', /^text\/csv/); assert.match(r.headers.get('content-disposition') ?? '', /audit\.csv/)
+const csvLines = (await r.text()).split('\n')
+assert.equal(csvLines[0], 'ts,actor,action,target_type,target_id,meta'); assert.ok(csvLines.length >= 3 && csvLines.slice(1).every((l) => l.includes('"system.')))
+// 사용자 상세 동작: 세션 전부 폐기(정지 없이) · 탈퇴 취소(트리 복원) · provider_sub 노출
+const f1 = await login('user', 'frank')
+const frankId = (await json<{ user: { id: string } }>(await me(f1))).user.id
+assert.equal((await req(`/api/admin/users/${frankId}/revoke-sessions`, { body: {}, cookie: adm })).status, 200)
+assert.equal((await me(f1)).status, 401)
+assert.equal((await json<{ items: { provider_sub: string; suspended_at: null }[] }>(await req(`/api/admin/users?q=${frankId}`, { cookie: adm }))).items[0].provider_sub, 'fake-frank')
+assert.equal((await req(`/api/admin/users/${frankId}/undelete`, { body: {}, cookie: adm })).status, 409) // 탈퇴 대기 아님
+ins.run('t-frank', frankId, '프랭크', Date.now(), Date.now(), null)
+await req(`/api/admin/users/${frankId}/delete`, { body: {}, cookie: adm })
+assert.ok((db.prepare("SELECT deleted_at FROM trees WHERE id = 't-frank'").get() as { deleted_at: number | null }).deleted_at! > 0)
+assert.equal((await req(`/api/admin/users/${frankId}/undelete`, { body: {}, cookie: adm })).status, 204)
+assert.equal((db.prepare('SELECT deleted_at FROM users WHERE id = ?').get(frankId) as { deleted_at: null }).deleted_at, null)
+assert.equal((db.prepare("SELECT deleted_at FROM trees WHERE id = 't-frank'").get() as { deleted_at: null }).deleted_at, null)
+assert.ok(db.prepare("SELECT 1 FROM audit_log WHERE action = 'user.restore' AND target_id = ? AND actor_id = ?").get(frankId, adminId))
+assert.ok(db.prepare("SELECT 1 FROM audit_log WHERE action = 'user.sessions_revoke' AND target_id = ?").get(frankId))
+db.prepare("DELETE FROM trees WHERE id = 't-frank'").run()
+assert.equal((await req('/api/admin/users/not-a-uuid/revoke-sessions', { body: {}, cookie: adm })).status, 404)
+// 다른 관리자 정지·삭제 403(상호 잠금), 자기 자신도 여전히 403
+const adm2 = await login('admin', 'second')
+const admin2Id = (await json<{ user: { id: string } }>(await me(adm2))).user.id
+assert.equal((await req(`/api/admin/users/${admin2Id}/suspend`, { body: {}, cookie: adm })).status, 403)
+assert.equal((await req(`/api/admin/users/${admin2Id}/delete`, { body: {}, cookie: adm })).status, 403)
+assert.equal((await req(`/api/admin/users/${adminId}/suspend`, { body: {}, cookie: adm })).status, 403)
+assert.equal((await me(adm2)).status, 200)
+// 수동 실행: 자식 프로세스는 가짜 — 202 → 실행 중 409 → 끝나면 다시 202. 없는 작업 404
+const spawned: string[] = []
+let finish = () => {}
+hooks.spawn = (script, onExit) => { spawned.push(script); finish = onExit }
+assert.equal((await req('/api/admin/ops/run/backup', { body: {}, cookie: adm })).status, 202)
+assert.deepEqual(spawned, ['server/account/backup.ts'])
+assert.equal((await req('/api/admin/ops/run/backup', { body: {}, cookie: adm })).status, 409)
+assert.equal((await json<{ ops: { jobs: { backup: boolean } } }>(await req('/api/admin/stats', { cookie: adm }))).ops.jobs.backup, true)
+finish()
+assert.equal((await req('/api/admin/ops/run/backup', { body: {}, cookie: adm })).status, 202); finish()
+assert.equal((await req('/api/admin/ops/run/daily', { body: {}, cookie: adm })).status, 202); finish()
+assert.equal((await req('/api/admin/ops/run/vacuum', { body: {}, cookie: adm })).status, 404)
+assert.equal(spawned.length, 3)
+// checkpoint · 재시작(exit 는 가짜, 응답 뒤 300ms) · 관리자 목록
+r = await req('/api/admin/ops/checkpoint', { body: {}, cookie: adm })
+assert.equal(r.status, 200); assert.ok('busy' in (await json(r)))
+let exited = 0
+hooks.exit = (code) => { exited = code }
+assert.equal((await req('/api/admin/ops/restart', { body: {}, cookie: adm })).status, 204)
+assert.equal(exited, 0); await new Promise((res) => setTimeout(res, 400)); assert.equal(exited, 1) // 비정상 코드여야 Restart=on-failure
+for (const a of ['system.backup_run', 'system.daily_run', 'system.checkpoint', 'system.restart']) assert.ok(db.prepare('SELECT 1 FROM audit_log WHERE action = ?').get(a), a)
+r = await req('/api/admin/ops/admins', { cookie: adm })
+assert.deepEqual(await json(r), { file: join(tmp, 'admins.json'), list: ['google:g-admin'], me: 'fake:fake-root' })
+assert.equal((await req('/api/admin/ops/admins', { cookie: f1 })).status, 404)
 
 // ---- 세션 슬라이딩·관리자 24h 절대 상한·비활동 60분 ----
 const adm3 = await login('admin', 'root')
