@@ -37,5 +37,8 @@ assert.equal(serialize(A.lines), '- ==y:강조==\n-x')
 // HTML: 이스케이프, 빈 줄 <br>
 assert.equal(toHtml(parse('- <b>&\n==p:x==')), '<div class="ln b">&lt;b&gt;&amp;</div><div class="ln"><mark class="hl-p">x</mark></div>')
 assert.equal(toHtml(parse('')), '<div class="ln"><br></div>')
+// 보안(S3): 사용자 텍스트의 < > 는 전부 엔티티로 — 결과에 남는 태그는 div·mark·br 뿐이어야 한다(dangerouslySetInnerHTML 3곳의 유일한 방어선)
+for (const evil of ['<img onerror=x>==p:</mark>==', '==p:<script>alert(1)</script>==', '" onmouseover=alert(1) x="', '<svg onload=alert(1)>', '== ==" onclick="x'])
+  assert.equal(toHtml(parse(evil)).match(/<(?!div|mark|br|\/div|\/mark)/g), null, `toHtml escapes tags: ${evil}`)
 
 console.log('content.check ok')

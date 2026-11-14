@@ -913,6 +913,14 @@ Google과 카카오를 지원한다. 코드는 `server/account/oauth.ts`와 `ses
 | 개인정보 기록 | 요청 기록과 DB에 IP·브라우저 원문을 남기지 않는다 | `server/index.ts`, `session.ts` |
 | 로그인 후 엉뚱한 곳으로 보내기 | 돌아갈 주소는 `#/`로 시작하는 것만 허용 | `server/account/oauth.ts`, `core/me.ts` |
 
+#### 보안 결정 (2026-11-14 검토 반영, 근거 `docs/research/security_2026-11-14/`)
+
+- **가짜 로그인(`AUTH_FAKE`)은 루프백 http 에서만 켜진다.** origin 이 https 이거나 바인딩이 `127.0.0.1`·`::1`·`localhost` 가 아니면 서버가 기동을 거부하고, systemd 유닛이 `AUTH_FAKE=0` 을 env 파일 뒤에 덮어쓴다. 오설정 한 번으로 무인증 관리자가 되는 길을 막는다.
+- **CSP 는 기동 시 `dist/index.html` 의 인라인 `<script>` 를 sha256 해시로 계산해 `script-src 'self' 'sha256-…'` 에 넣는다.** 테마 스크립트·PWA 등록 코드는 그대로 두고, `dangerouslySetInnerHTML` 3곳(노트)의 이스케이프가 회귀해도 외부·인라인 스크립트가 돌지 않는 2차 방어선이다. `style-src` 만 `'unsafe-inline'`, `frame-ancestors 'none'`.
+- **레이트 리밋의 IP 는 `cf-connecting-ip` 만 믿는다.** `x-forwarded-for` 폴백을 없애 직접 접속 경로에서 헤더 회전으로 제한을 피하는 길을 닫았다. 터널 밖 직접 접속은 전부 `local` 한 키로 묶인다.
+- **백업 파일은 디렉터리 700·파일 600.** 로컬 사본 14개와 `pre-migrate-*.db` 는 평문이라 파일 권한이 유일한 보호다. 외부 전송본만 `age` 암호화. 처리방침 ②·⑩ 이 이 사실을 그대로 적는다.
+- **보존 주기는 처리방침 ITEMS 와 1:1.** 처리된 신고·소명·게시중단·요청·피드백은 90일, **미처리** 게시중단·요청은 접수 180일 또는 대상 트리 소멸 시 삭제(연락처 잔존 방지). 세션은 사용자당 최신 20개, `auto_correct_days` 는 병합 뒤에도 3,660개 상한.
+
 API 목록, 환경 변수, 매일 도는 작업은 [9장](#9-서버-참고표-api-환경-변수-정기-작업)에 있다.
 
 ---
@@ -1146,10 +1154,10 @@ UI 라이브러리와 CSS 프레임워크를 쓰지 않는다. 규칙은 `src/in
 | `core/outline.check.ts` | 개요 변환 |
 | `core/srs/srs.check.ts` | 채점, 간격, 색 |
 | `core/repo.check.ts` | 트리 목록 정렬과 검색 |
-| `core/backup.check.ts` | 백업 파일 검사 |
+| `core/backup.check.ts` | 백업 파일 검사, `__proto__`·`constructor` 키 백업으로 프로토타입 미오염 |
 | `core/sync/engine.check.ts` | 동기화 엔진(`fake-indexeddb` 위에서): superseded 뒤 pull 의 고아 처리, 같은 `updatedAt` 메아리 제외, 410 분류, id 재매핑, 409 `user_mismatch` |
 | `features/editor/graph/layout.check.ts` | 카드 배치, 검색, 되돌리기 위치 찾기 |
-| `features/editor/content/content.check.ts` | 내용 형식 |
+| `features/editor/content/content.check.ts` | 내용 형식, `toHtml` 이 사용자 텍스트의 `<`·`>` 를 남기지 않음(태그는 div·mark·br 만) |
 | `features/flash/flash.check.ts` | 플래시 출제 |
 | `features/dnd/dnd.check.ts` | 퀴즈 채점 |
 
@@ -1159,7 +1167,7 @@ UI 라이브러리와 CSS 프레임워크를 쓰지 않는다. 규칙은 `src/in
 
 - Playwright가 직접 빌드하고, 4173 포트에 서버를 띄우고, 새 DB(`.e2e-data/`)로 시작한다.
 - **설치된 Microsoft Edge로 돈다.** Edge가 없으면 실행되지 않는다.
-- 파일 8개에 테스트가 24개다.
+- 파일 9개에 테스트가 25개다.
 
 | 파일 | 다루는 것 |
 |---|---|
@@ -1171,6 +1179,7 @@ UI 라이브러리와 CSS 프레임워크를 쓰지 않는다. 규칙은 `src/in
 | `server.spec.ts` | 두 기기 동기화, 첫 로그인 병합, 공유 링크, 탈퇴와 복구, 비로그인은 로그인 확인·공지 말고 서버를 부르지 않음, 갤러리 직접 진입 시 시트 CSS |
 | `regress.spec.ts` | 11-10 개선의 회귀 2건(다른 기기 학습 기록, 병합 대화) |
 | `sync-robust.spec.ts` | 여러 번에 나눠 받는 pull, 트리 200개 한도 |
+| `security.spec.ts` | 악성 제목·내용·별칭 트리 공개 → 공유 보기·플래시 탭·갤러리 미리보기에서 dialog 0·주입 태그 0, OG 셸에 raw 태그 없음 |
 
 ---
 
@@ -1188,8 +1197,8 @@ UI 라이브러리와 CSS 프레임워크를 쓰지 않는다. 규칙은 `src/in
 - 서버는 바깥으로 포트를 열지 않는다. Cloudflare Tunnel이 유일한 입구다.
 - 경로: 앱은 `/opt/drilldown`, 데이터는 `/var/lib/drilldown`, 비밀 값은 `/etc/drilldown/env`.
 - systemd 유닛은 서버 하나와 타이머 둘(백업, 정리)이다.
-- **새 버전 올리기** (절차서 기준): `git pull && npm ci && npm run build && sudo systemctl restart drilldown-server`. DB 마이그레이션은 시작할 때 자동으로 된다.
-- 백업은 암호화해서 외부 저장소로 올리도록 설정할 수 있다. 복호화 열쇠는 서버에 두지 않는다. 복원 절차는 절차서에 있다.
+- **새 버전 올리기** (절차서 기준): 빌드는 다른 기기에서 하고 `dist/` 만 Pi 로 보낸다. Pi 에는 `npm ci --omit=dev` 로 런타임 의존성만 두고 `sudo npm` 은 쓰지 않는다(dev 의존성·postinstall 을 운영 호스트에서 돌리지 않기 위해). 그 뒤 `sudo systemctl restart drilldown-server`. DB 마이그레이션은 시작할 때 자동으로 된다.
+- 백업은 로컬 평문 사본 14개(모드 600)와, 설정하면 `age` 로 암호화해 외부 저장소로 올리는 전송본으로 나뉜다. 복호화 열쇠는 서버에 두지 않는다. 복원 절차는 절차서에 있고, 리허설은 평문·암호문 두 경로 모두 `integrity_check` 로 끝낸다.
 
 > **빠진 고리.** 절차서는 서버에서 `git clone`과 `git pull`로 코드를 받는다고 쓰여 있다. 그런데 `app` 저장소에는 원격이 없다. 배포하려면 먼저 원격 저장소를 만들어 올려야 한다.
 
