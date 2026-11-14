@@ -1,39 +1,23 @@
 // D1 빈칸 퀴즈: 뼈대 트리(리프 = 빈칸) + 섞인 리프 카드 트레이
-import { Fragment, useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { Fragment, useMemo, useState, type CSSProperties } from 'react'
 import type { StudySource } from '../../core/source'
 import { logEvent } from '../../core/events'
-import { getRoot } from '../../core/repo'
 import type { ID, TreeNode } from '../../core/types'
-import { href } from '../../router'
 import { Icon } from '../../ui/Icon'
-import { I } from '../../ui/icons'
 import { checkCheck, eye, eyeOff, rotateCcw } from '../../ui/icons.all'
 import { haptic } from '../feel'
 import { toast } from '../Toast'
-import { coarseHint, useStudySource } from '../flash/study'
-import TreeHeader from '../TreeHeader'
-import { gradeDnd, leavesOf, moveCard, scopeOf, shuffle, type Place, type Score } from './dnd'
-import { Ghost, Progress, ResultMark, ScopeGate, ScopeSelect, ScoreLine, TreeCanvas } from './kit'
+import { attemptOf, gradeDnd, leavesOf, moveCard, shuffle, type Place, type Score } from './dnd'
+import { Ghost, Progress, QuizShell, ResultMark, ScoreLine, TreeCanvas } from './kit'
 import { useDragDrop } from './useDragDrop'
 
 const MAX_LEAVES = 30 // U30: 이보다 많고 ?root= 가 없으면 범위부터 고른다
 
-export default function DndPage({ treeId, rootId, source }: { treeId: string; rootId?: string; source?: StudySource }) {
-  const src = useStudySource(source, treeId)
-  const [all, setAll] = useState<TreeNode[] | null>(null)
-  useEffect(() => void src.nodes().then((ns) => { setAll(ns); coarseHint('dnd', '카드 탭 → 빈칸 탭', I.squareDashed) }), [src])
-  const rid = all && (all.some((n) => n.id === rootId) ? rootId! : getRoot(all).id)
-  const scope = all && rid ? scopeOf(all, rid) : null
-  const to = (id: ID) => (source ? href.shared(treeId, 'dnd', id) : href.dnd(treeId, id))
+export default function DndPage(p: { treeId: string; rootId?: string; source?: StudySource }) {
   return (
-    <section>
-      <TreeHeader treeId={treeId} active="dnd">
-        {all && rid && <ScopeSelect nodes={all} value={rid} to={to} />}
-      </TreeHeader>
-      {all && rid && scope && (rootId === undefined && leavesOf(scope).length > MAX_LEAVES
-        ? <ScopeGate nodes={all} rootId={rid} to={to} />
-        : <Quiz treeId={treeId} scope={scope} source={src} />)}
-    </section>
+    <QuizShell {...p} mode="dnd" hint="카드 탭 → 빈칸 탭" big={(scope) => leavesOf(scope).length > MAX_LEAVES}>
+      {(scope, src) => <Quiz treeId={p.treeId} scope={scope} source={src} />}
+    </QuizShell>
   )
 }
 
@@ -45,6 +29,7 @@ function Quiz({ treeId, scope, source }: { treeId: ID; scope: TreeNode[]; source
   const [place, setPlace] = useState<Place>({})
   const [score, setScore] = useState<Score | null>(null)
   const [answer, setAnswer] = useState(false)
+  const [startedAt] = useState(() => Date.now()) // attempts.startedAt = 퀴즈 마운트 시각
   const { drag, sel, handlers } = useDragDrop((card, to) => setPlace((p) => moveCard(p, card, to)), !score)
 
   if (!leaves.length) return <p className="dnd-empty muted">빈칸으로 낼 하위 개념이 없어요</p>
@@ -67,6 +52,7 @@ function Quiz({ treeId, scope, source }: { treeId: ID; scope: TreeNode[]; source
         toast('저장하지 못했어요') // S3: 채점 전으로 되돌려 다시 누를 수 있게
         return setScore(null)
       }
+      await source.attempt?.(attemptOf(treeId, rootId, startedAt, s)) // 서버 지표(K2·회독·활성화율)의 원천
     }
     if (!source.ephemeral) await logEvent('dnd_attempt_completed', { mode: 'dnd', rootId, total: s.total, correct: s.correct }, treeId)
   }

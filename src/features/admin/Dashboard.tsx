@@ -4,10 +4,9 @@ import type { AdminStats } from '../../core/api'
 import { I } from '../../ui/icons'
 import { ban, database, hardDrive, network } from '../../ui/icons.all'
 import { Icon } from '../../ui/Icon'
-import { bytes, dur, date, H26, useGet, when } from './shared'
+import { bytes, DAY, dur, date, H26, useGet, when } from './shared'
 import { Card, Loading } from './widgets'
 
-const DAY = 86400_000
 /** 복원 리허설은 월 1회(런북 §3) — 45일 넘으면 빨강 */
 const REHEARSAL_DAYS = 45
 const sum = (o: Record<string, number>, prefix: string) => Object.entries(o).reduce((a, [k, v]) => (k.startsWith(prefix) ? a + v : a), 0)
@@ -23,7 +22,7 @@ export default function Dashboard() {
   const bStale = b.at > 0 && now - b.at > H26, dStale = d.at > 0 && now - d.at > H26
   const bOk = b.ok && !bStale && (b.uploaded || !b.configured)
   const last = s.errors.recent[0], ce = o.client_errors.recent[0]
-  const rssPct = Math.round((s.rss / o.rss_max) * 100)
+  const rssPct = o.rss_max ? Math.round((s.rss / o.rss_max) * 100) : null // systemd MemoryMax 없음(개발) → 한도 없음
   const r429 = sum(k, '429:'), pulls = sum(k, 'sync.pull'), pushes = sum(k, 'sync.push')
   const rehearsal = o.restore_at ? Math.floor((now - o.restore_at) / DAY) : null
   return (
@@ -38,11 +37,12 @@ export default function Dashboard() {
           sub={b.at ? <><span className="dot" data-ok={bOk} /> {bytes(b.bytes)} · {b.uploaded ? '외부 업로드됨' : b.configured ? '외부 업로드 안 됨' : '로컬만'}{bStale && ' · 26시간 초과'}{b.error && <><br />{b.error}</>}</> : '백업 타이머가 아직 돌지 않았어요'} />
         <Card icon={I.refreshCw} label="일일 작업" value={d.at ? when(d.at) : '아직 없음'}
           sub={d.at ? <><span className="dot" data-ok={d.ok && !dStale} /> 세션 {d.purged_sessions} · 톰스톤 {d.purged_tombstones} · 탈퇴 {d.purged_users}{dStale && ' · 26시간 초과'}{d.error && <><br />{d.error}</>}</> : '일일 타이머가 아직 돌지 않았어요'} />
-        <Card icon={I.check} label="가동" value={dur(s.uptime_s)} sub={<><span className="dot" data-ok={rssPct < 80} /> RSS {bytes(s.rss)} · {rssPct}% / {Math.round(o.rss_max / 1048576)} MiB</>} />
+        <Card icon={I.check} label="가동" value={dur(s.uptime_s)} sub={<><span className="dot" data-ok={rssPct === null || rssPct < 80} /> RSS {bytes(s.rss)} · {rssPct === null ? '한도 없음' : `${rssPct}% / ${Math.round(o.rss_max / 1048576)} MiB`}</>} />
         <Card icon={database} label="DB 파일" value={bytes(o.db.file)}
           sub={<><span className="dot" data-ok={o.db.wal < 64e6} /> WAL {bytes(o.db.wal)} · 페이지 {o.db.page_count.toLocaleString()} × {(o.db.page_size / 1024).toFixed(0)}K · 빈 페이지 {o.db.freelist.toLocaleString()}<br />백업 폴더 {bytes(o.db.backups_bytes)} ({o.db.backups.length}개)</>} />
         <Card icon={I.logIn} label="세션" value={o.sessions.total} sub={`만료 대기 ${o.sessions.expired} · 관리자 ${o.sessions.admin}`} />
         <Card icon={ban} label="정지 · 탈퇴 대기" value={`${s.users.suspended} · ${s.users.pending_delete}`} />
+        <Card icon={I.pencil} label="열린 피드백" value={s.product.feedback_open} sub="피드백 탭에서 처리" />
         <Card icon={I.circleAlert} label="서버 오류 (재시작 이후)" value={s.errors.count} sub={last ? `${when(last.ts)} ${last.method} ${last.path}` : '없음'} />
         <Card icon={I.circleAlert} label="클라이언트 오류 (재시작 이후)" value={o.client_errors.count} sub={ce ? `${when(ce.ts)} ${ce.message.slice(0, 60)}` : '없음'} />
         <Card icon={I.lock} label="429 (재시작 이후)" value={r429} sub={r429 ? Object.entries(k).filter(([n]) => n.startsWith('429:')).map(([n, v]) => `${n.slice(4)} ${v}`).join(' · ') : '없음'} />

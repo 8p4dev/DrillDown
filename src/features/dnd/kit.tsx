@@ -1,13 +1,17 @@
 // 퀴즈 화면 공용 조각: 범위 선택, 트리 캔버스(layout 재사용), 드래그 고스트, 진행 막대, 점수, 결과 마크
-import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { byOrder, withParent } from '../../core/path'
+import { getRoot } from '../../core/repo'
+import type { StudySource } from '../../core/source'
 import type { ID, TreeNode } from '../../core/types'
+import { href } from '../../router'
 import { Icon } from '../../ui/Icon'
 import { I } from '../../ui/icons'
 import { crosshair, x } from '../../ui/icons.all'
 import { layout } from '../editor/graph/layout'
-import { goTo } from '../flash/study'
-import { CARD, sideLayout } from './dnd'
+import { coarseHint, goTo, useStudySource } from '../flash/study'
+import TreeHeader from '../TreeHeader'
+import { CARD, scopeOf, sideLayout } from './dnd'
 import type { DragState } from './useDragDrop'
 import './dnd.css'
 
@@ -15,6 +19,30 @@ const MIN_SCALE = 0.6
 const SIDE_MAX = 640 // 캔버스 폭이 이 이하면 좌→우 배치
 const SIDE_BELOW_SCALE = 0.8 // 위→아래 배율이 이보다 작으면 좌→우 배치(글자 약 10.4px 미만)
 const CANVAS_PAD = 4 // dnd.css .dnd-canvas padding 과 같게
+
+/**
+ * 빈칸·백지 페이지 껍데기: 소스·노드 로드·범위(?root=) 해석·범위 선택·U30 범위 게이트. children 이 Quiz 를 그린다.
+ * big(scope) 가 true 이고 URL 에 ?root= 가 없으면 ScopeGate
+ */
+export function QuizShell(p: {
+  treeId: string; rootId?: string; source?: StudySource; mode: 'dnd' | 'blank'; hint: string
+  big: (scope: TreeNode[]) => boolean; children: (scope: TreeNode[], src: StudySource) => ReactNode
+}) {
+  const src = useStudySource(p.source, p.treeId)
+  const [all, setAll] = useState<TreeNode[] | null>(null)
+  useEffect(() => void src.nodes().then((ns) => { setAll(ns); coarseHint(p.mode, p.hint, I.squareDashed) }), [src, p.mode, p.hint])
+  const rid = all && (all.some((n) => n.id === p.rootId) ? p.rootId! : getRoot(all).id)
+  const scope = all && rid ? scopeOf(all, rid) : null
+  const to = (id: ID) => (p.source ? href.shared(p.treeId, p.mode, id) : href[p.mode](p.treeId, id))
+  return (
+    <section>
+      <TreeHeader treeId={p.treeId} active={p.mode}>
+        {all && rid && <ScopeSelect nodes={all} value={rid} to={to} />}
+      </TreeHeader>
+      {all && rid && scope && (p.rootId === undefined && p.big(scope) ? <ScopeGate nodes={all} rootId={rid} to={to} /> : p.children(scope, src))}
+    </section>
+  )
+}
 
 /** 자식 있는 노드를 전위 순서로 [노드, 깊이, 리프 수] */
 function branches(nodes: TreeNode[]): [TreeNode, number, number][] {

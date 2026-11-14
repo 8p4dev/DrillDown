@@ -6,21 +6,14 @@ import { eye } from '../../ui/icons.all'
 import { Icon } from '../../ui/Icon'
 import { TwoStep } from '../../ui/TwoStep'
 import { toast } from '../Toast'
-import { ACTION, date, guard, p2, post, useGet, when } from './shared'
-import { Loading, TreeLink } from './widgets'
+import { ymd } from '../../core/fmt'
+import { date, DAY, guard, post, useGet, when } from './shared'
+import { Dday, Loading, TreeLink } from './widgets'
 
 const KIND: Record<DsrKind, string> = { access: '열람', correct: '정정', delete: '삭제', suspend: '처리정지', minor: '미성년', other: '기타' }
 const CHANNEL: Record<string, string> = { email: '이메일', app: '앱', other: '기타' }
 const TD_STATE: Record<TakedownState, string> = { received: '접수 — 트리 없음', hidden: '숨김 · 소유자 통보됨', resume_notified: '재개 예정 통보됨', resumed: '재개', litigation: '소 제기 · 숨김 유지', confirmed: '확정 — 재개 요구 없음', rejected: '기각' }
-Object.assign(ACTION, {
-  'dsr.access': '열람 요청 처리', 'dsr.correct': '정정 요청 처리', 'dsr.delete': '삭제 요청 처리', 'dsr.suspend': '처리정지 요청 처리', 'dsr.minor': '미성년 요청 처리', 'dsr.other': '기타 요청 처리', 'dsr.reject': '정보주체 요청 반려',
-  'takedown.notify': '재개 예정일 통보(권리자)', 'takedown.litigation': '소 제기 접수 · 숨김 유지', 'takedown.confirm': '게시중단 확정', 'takedown.reject': '게시중단 기각', 'tree.hide_confirm': '임시조치 → 확정 숨김', 'settings.auto_hide_reports': '자동 숨김 기준 변경',
-})
-const DAY = 86_400_000
-const today = () => { const d = new Date(); return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}` }
-/** 기한까지 남은 날. 지나면 D+N 빨강, 3일 이내 빨강 테두리 */
-const dday = (at: number) => Math.ceil((at - Date.now()) / DAY)
-const Dday = ({ at }: { at: number }) => { const d = dday(at); return <span className="dday" data-soon={d <= 3} data-over={d < 0}>{d < 0 ? `D+${-d}` : `D-${d}`}</span> }
+const today = () => ymd(Date.now())
 
 export default function RequestsTab() {
   const [all, setAll] = useState(false)
@@ -32,7 +25,7 @@ export default function RequestsTab() {
   const add = (e: React.FormEvent) => {
     e.preventDefault()
     void post<{ request: DsrRequest }>('/api/admin/requests', {
-      kind: f.kind, channel: f.channel, received_at: new Date(f.received_at).getTime(),
+      kind: f.kind, channel: f.channel, received_at: new Date(`${f.received_at}T00:00:00`).getTime(), // 로컬 자정(SystemTab dayStart 와 같게) — 'YYYY-MM-DD' 만 주면 UTC
       target_type: f.target_type || undefined, target_id: f.target_id.trim() || undefined, note: f.note.trim() || undefined,
     }).then((r) => { setReqs((p) => ({ items: [...(p?.items ?? []), r.request].sort((a, b) => a.due_at - b.due_at) })); setF((x) => ({ ...x, target_id: '', note: '' })); toast('접수됨 · 기한 10일') }, guard)
   }
@@ -76,7 +69,7 @@ export default function RequestsTab() {
                 <td data-l="메모">{r.note ?? '—'}</td>
                 <td className="act">
                   {!r.resolved_at && <>
-                    <button type="button" aria-label={`${KIND[r.kind]} 요청 완료`} onClick={() => settle(r, 'done')}>완료</button>
+                    <TwoStep label="완료" confirmLabel="정말 완료" verb={`${KIND[r.kind]} 요청 완료`} onConfirm={() => settle(r, 'done')} />
                     <TwoStep label="반려" confirmLabel="정말 반려" onConfirm={() => settle(r, 'rejected')} />
                   </>}
                 </td>
@@ -106,7 +99,7 @@ export default function RequestsTab() {
                 <TwoStep label="기각" confirmLabel="정말 기각" verb="기각(숨김 해제)" onConfirm={() => tdAct(k, 'reject')} />
               </>}
               {k.state === 'resume_notified' && <>
-                <button type="button" onClick={() => tdAct(k, 'resume')}><Icon d={eye} /> 재개</button>
+                <TwoStep label={<><Icon d={eye} /> 재개</>} confirmLabel="정말 재개" verb="재개(공개 복귀)" onConfirm={() => tdAct(k, 'resume')} />
                 <TwoStep label="소 제기" confirmLabel="정말 소 제기" verb="소 제기 접수(숨김 유지)" onConfirm={() => tdAct(k, 'litigation')} />
               </>}
             </li>

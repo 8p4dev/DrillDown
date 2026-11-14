@@ -3,7 +3,7 @@
 // 비로그인은 휴지통·내보내기만 보인다(P0 #4·#5).
 // 아바타 파일 업로드는 없다(서버는 이미지 저장 안 함, 03 §3.3).
 import { useEffect, useRef, useState } from 'react'
-import { api, ApiError, type MyFeedback } from '../../core/api'
+import { api, ApiError, FEEDBACK_CATEGORY, type MyFeedback } from '../../core/api'
 import { importBackup, parseBackup } from '../../core/backup'
 import { db } from '../../core/db'
 import { exportEvents } from '../../core/events'
@@ -28,7 +28,6 @@ const rel = (t: number) => {
 }
 const daysLeft = (deletedAt: number) => Math.max(1, Math.ceil((deletedAt + TRASH_MS - Date.now()) / 86_400_000))
 const upload = '<path d="M12 3v12" /><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="m17 8-5-5-5 5" />'
-const FEEDBACK_CATEGORY = { bug: '버그', idea: '제안', content: '콘텐츠 오류', other: '기타' } as const
 const messageSquare = '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />'
 const okNick = (s: string) => s.length >= 1 && s.length <= 20 && !/[\p{Cc}]/u.test(s)
 const fail = (e: unknown) => toast(e instanceof ApiError && e.status === 0 ? '오프라인이에요' : '실패했어요 · 다시 시도해 주세요')

@@ -8,6 +8,7 @@ import { Icon } from '../../ui/Icon'
 import { I } from '../../ui/icons'
 import { externalLink, star } from '../../ui/icons.all'
 import { Sheet } from '../../ui/Sheet'
+import './share-list.css' // 미리보기 시트(.share-sheet·.sheet-x) — #/gallery 직접 진입 때도 로드되게
 import './share.css'
 
 type Sort = 'recent' | 'copies'
@@ -36,7 +37,7 @@ export default function GalleryPage() {
   const [items, setItems] = useState<GalleryItem[] | null>(null)
   const [page, setPage] = useState(1)
   const [more, setMore] = useState(false)
-  const [failed, setFailed] = useState(false)
+  const [failed, setFailed] = useState<boolean | 'off'>(false) // 'off' = 운영 스위치로 꺼짐(404)
   const [input, setInput] = useState('')
   const [q, setQ] = useState('')
   // 같은 쪽 다시 시도: 실패해도 page 는 그대로 두고 이 값만 올린다('더 보기' 실패 쪽 건너뜀 방지)
@@ -59,7 +60,7 @@ export default function GalleryPage() {
         setMore(r.hasMore)
         setDone(key)
       },
-      () => { if (!ac.signal.aborted) { setFailed(true); setDone(key) } },
+      (e) => { if (!ac.signal.aborted) { setFailed(e instanceof ApiError && e.status === 404 ? 'off' : true); setDone(key) } },
     )
     return () => ac.abort()
   }, [sort, page, q, retry, key])
@@ -99,7 +100,9 @@ export default function GalleryPage() {
         </div>
         <input type="search" className="gallery-search" aria-label="제목 검색" placeholder="제목 검색" maxLength={50} value={input} onChange={(e) => setInput(e.target.value)} />
       </header>
-      {failed && !items?.length ? (
+      {failed === 'off' ? (
+        <p className="empty muted">공개 트리 목록이 지금은 꺼져 있습니다</p>
+      ) : failed && !items?.length ? (
         <div className="empty">
           <p className="muted">공개 트리를 불러오지 못했습니다</p>
           <button type="button" onClick={() => { setFailed(false); setItems(null); setRetry((n) => n + 1) }}>다시 시도</button>

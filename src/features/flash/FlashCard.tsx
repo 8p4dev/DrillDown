@@ -1,4 +1,4 @@
-// 플래시카드 한 장: 개념 하나 + 가려진 하위 개념. FlashPage·ReviewPage 공용
+// 플래시카드 한 장: 개념 하나 + 가려진 하위 개념
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { logEvent } from '../../core/events'
 import { childrenOf } from '../../core/repo'
@@ -28,7 +28,7 @@ const Mark = ({ color }: { color: NodeColor }) => {
 
 const NONE: ColorInfo = { color: 'none', misplaced: false }
 
-/** 세션 끝 요약(.flash-summary) — 플래시·복습 공용. children = 행동 버튼 */
+/** 세션 끝 요약(.flash-summary). children = 행동 버튼 */
 export function Summary({ known, unknown, children }: { known: number; unknown: TreeNode[]; children: ReactNode }) {
   return (
     <div className="card flash-summary" role="region" aria-label="요약">
@@ -65,18 +65,15 @@ interface Props {
   initialRated?: Map<ID, boolean>
   /** →/Enter 키: 다음 카드로 */
   onNext?: () => void
-  /** U41(R3-P15): 평가 버튼을 줄 하위. 없으면 전부. 나머지는 회색 '참고'(복습에서 기한 아닌 형제) */
-  rateable?: Set<ID>
 }
 
 /** 입력 중이거나 수정키가 눌렸으면 단축키 무시 */
 const typing = (e: KeyboardEvent) =>
   e.ctrlKey || e.metaKey || e.altKey || e.isComposing || (e.target as HTMLElement).closest?.('input, textarea, select, [contenteditable]')
 
-export default function FlashCard({ treeId, nodes, conceptId, colors, srs, source, onRated, onDive, initialRated, onNext, rateable }: Props) {
+export default function FlashCard({ treeId, nodes, conceptId, colors, srs, source, onRated, onDive, initialRated, onNext }: Props) {
   const concept = nodes.find((n) => n.id === conceptId)
   const kids = useMemo(() => childrenOf(nodes, conceptId), [nodes, conceptId])
-  const canRate = (id: ID) => !rateable || rateable.has(id)
   const [open, setOpen] = useState(false)
   const [mounted, setMounted] = useState(false) // 처음 펼칠 때 마운트. 이후 닫힘은 CSS(.closed)가 맡는다
   const [rated, setRated] = useState(() => new Map<ID, boolean>(initialRated))
@@ -101,7 +98,11 @@ export default function FlashCard({ treeId, nodes, conceptId, colors, srs, sourc
       setShook(null)
       return
     }
-    if (!s) return // 노드가 지워짐(다른 기기 삭제가 반영됨) — 기록 없음
+    if (!s) { // 노드가 지워짐(다른 기기 삭제가 반영됨) — 기록 없음. 평가 버튼으로 되돌리고 알린다
+      setRated((m) => { const c = new Map(m); c.delete(n.id); return c })
+      toast('삭제된 노드예요')
+      return
+    }
     if (!source.ephemeral) await logEvent('flash_rated', { nodeId: n.id, known }, treeId)
     onRated(s, known)
   }
@@ -114,7 +115,7 @@ export default function FlashCard({ treeId, nodes, conceptId, colors, srs, sourc
       if (!open || typing(e)) return
       const t = e.target as HTMLElement
       if (e.key === '1' || e.key === '2') {
-        const k = kids.find((c) => canRate(c.id) && !rated.has(c.id))
+        const k = kids.find((c) => !rated.has(c.id))
         if (k) { e.preventDefault(); rate(k, e.key === '1') }
       } else if (onNext && (e.key === 'ArrowRight' || (e.key === 'Enter' && (t === document.body || t === cardRef.current)))) {
         e.preventDefault()
@@ -160,7 +161,7 @@ export default function FlashCard({ treeId, nodes, conceptId, colors, srs, sourc
             return (
               <li
                 key={k.id}
-                className={`flash-kid ${colorClass(color(k.id))}${shook === k.id ? ' shake' : ''}${canRate(k.id) ? '' : ' ref'}`}
+                className={`flash-kid ${colorClass(color(k.id))}${shook === k.id ? ' shake' : ''}`}
                 data-node-id={k.id}
                 data-color={color(k.id).color}
                 data-rated={r === undefined ? undefined : r ? 'known' : 'unknown'}
@@ -177,9 +178,7 @@ export default function FlashCard({ treeId, nodes, conceptId, colors, srs, sourc
                   )}
                 </div>
                 <div className="flash-rate">
-                  {!canRate(k.id) ? (
-                    <span className="flash-ref muted" data-tip="오늘 기한이 아니라 평가하지 않아요">참고</span>
-                  ) : r === undefined ? (
+                  {r === undefined ? (
                     <>
                       <button type="button" className="known" data-tip="알음 (1)" onClick={() => rate(k, true)}><Icon d={I.check} /> 알음</button>
                       <button type="button" className="unknown" data-tip="모름 (2)" onClick={() => rate(k, false)}><Icon d={x} /> 모름</button>

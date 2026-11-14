@@ -1,12 +1,12 @@
 // 신고·게시중단 접수 상태 #/report/<id> — GET /api/report/:id (상태·시각만, 연락처·트리 정보 없음). 신고자(§103 ② 권리주장자)에게 결과를 알리는 앱 내 경로. T2 #26
 import { useEffect, useState } from 'react'
 import { api, ApiError, type ReportStatus } from '../../core/api'
+import { hm, ymd } from '../../core/fmt'
 import { href } from '../../router'
 import '../account/account.css'
 import './legal.css'
 
-const p2 = (n: number) => String(n).padStart(2, '0')
-const when = (t: number) => { const d = new Date(t); return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())} ${p2(d.getHours())}:${p2(d.getMinutes())}` }
+const when = (t: number) => `${ymd(t)} ${hm(t)}`
 /** "<kind>.<state>" → [제목, 설명]. 없으면 kind 무관 state 로 */
 const TEXT: Record<string, [string, string]> = {
   'report.open': ['검토 중', '운영자가 검토 중입니다. 임시 숨김 30일 안에 결정합니다.'],

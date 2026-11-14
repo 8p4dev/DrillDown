@@ -1,7 +1,7 @@
 // 피드백·버그 보내기 시트 — 계정 화면 버튼으로 연다(비로그인도 가능). POST /api/feedback(종류·≤500자·관련 트리 선택). T4 #43.
 // 이메일을 저장하지 않는 서비스라 사용자가 운영자에게 닿는 유일한 글 통로 — 입력란에 "연락처를 적지 마세요". 처리 결과·운영자 메모는 계정 화면 "내 피드백"(GET /api/me/feedback)
 import { useEffect, useState } from 'react'
-import { api, ApiError, type FeedbackCategory } from '../../core/api'
+import { api, ApiError, FEEDBACK_CATEGORY, type FeedbackCategory } from '../../core/api'
 import { listTrees } from '../../core/repo'
 import type { Tree } from '../../core/types'
 import { I } from '../../ui/icons'
@@ -10,7 +10,6 @@ import { Sheet } from '../../ui/Sheet'
 import { toast } from '../Toast'
 import '../share/share-list.css'
 
-const FEEDBACK_CATEGORY: Record<FeedbackCategory, string> = { bug: '버그', idea: '제안', content: '콘텐츠 오류', other: '기타' } // FeedbackTab·AccountPage 와 같은 표
 
 export default function FeedbackSheet({ open, onClose, onSent }: { open: boolean; onClose: () => void; onSent?: () => void }) {
   const [category, setCategory] = useState<FeedbackCategory>('bug')

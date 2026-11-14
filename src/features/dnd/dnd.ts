@@ -1,6 +1,6 @@
 // D&D 퀴즈 순수 로직 — 셔플·배치 상태 변경·채점 (DOM·Dexie 없음, dnd.check.ts 로 검증)
 import { ancestorsOf, byOrder } from '../../core/path'
-import type { ID, TreeNode } from '../../core/types'
+import type { BlankAttempt, ID, TreeNode } from '../../core/types'
 import { layout, MARGIN, type Box, type Graph } from '../editor/graph/layout'
 
 export const CARD = { w: 148, h: 44 } // 모든 칸 고정 크기(제목 2줄 말줄임)
@@ -65,6 +65,9 @@ function matchPairs(expected: string[], actual: [string, ID][]): Record<ID, bool
 
 /** placed = 사용자가 놓은 카드 id — 비어 있으면 채점 결과를 SRS 에 기록하지 않는다(U35) */
 export interface Score { ok: Record<ID, boolean>; correct: number; total: number; placed: ID[] }
+/** 채점 1회 → attempts 행(id 는 소스가 붙인다). 빈칸·백지는 자동 채점만이라 recall = edge = 정답률, self/overridden 0 */
+export const attemptOf = (treeId: ID, rootId: ID, startedAt: number, s: Score, completedAt = Date.now()): Omit<BlankAttempt, 'id'> =>
+  ({ treeId, rootId, startedAt, completedAt, nodeRecall: s.correct / s.total, edgeAccuracy: s.correct / s.total, autoGradedCount: s.total, selfGradedCount: 0, overriddenCount: 0 })
 
 // ── D1: 뼈대 + 리프 빈칸 ─────────────────────────────────────
 

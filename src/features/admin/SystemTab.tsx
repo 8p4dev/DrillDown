@@ -2,7 +2,7 @@
 // + 관리자 목록(#33) + OAuth 상태(#36) + 복원 안내·백업 파일 목록(#37) + 감사 로그 필터·CSV(#35). 03 §3.4 시스템 행, 런북 §4·§5.
 import { useEffect, useState } from 'react'
 import { refreshMe } from '../../core/me'
-import { type AdminStats, type AuditRow, type OpsStats, type Settings } from '../../core/api'
+import { api, ApiError, type AdminStats, type AuditRow, type OpsJobs, type OpsStats, type Settings } from '../../core/api'
 import { href } from '../../router'
 import { I } from '../../ui/icons'
 import { database, eye, hardDrive, rotateCcw, shield } from '../../ui/icons.all'
@@ -10,12 +10,9 @@ import { Icon } from '../../ui/Icon'
 import { TwoStep } from '../../ui/TwoStep'
 import { toast } from '../Toast'
 import NoticeForm from './NoticeForm'
-import { ACTION, bytes, guard, post, TARGET, useGet, usePaged, when } from './shared'
+import { ACTION, bytes, DAY, guard, post, TARGET, useGet, usePaged, when } from './shared'
 import { Loading, More } from './widgets'
 
-Object.assign(ACTION, { 'system.backup_run': '수동 백업 실행', 'system.daily_run': '일일 작업 실행', 'system.checkpoint': 'WAL checkpoint', 'system.restart': '서버 재시작' })
-
-const DAY = 86400_000
 const NOTE_KIND: [string, string][] = [['incident', '사건'], ['restore', '복원'], ['note', '메모']]
 const metaText = (m: Record<string, unknown> | null) =>
   !m ? '' : typeof m.reason === 'string' ? `사유: ${m.reason}` : typeof m.text === 'string' ? m.text : 'after' in m ? `→ ${JSON.stringify(m.after)}`
@@ -74,13 +71,21 @@ function Ops({ onDone }: { onDone: () => void }) {
   )
 }
 
-/** 서버: 버전·재시작 필요·[재시작](exit 1 → systemd 가 되살림) · [지금 백업]/[일일 작업](자식 프로세스, 실행 중엔 3초마다 갱신) · [WAL checkpoint] */
+/** 서버: 버전·재시작 필요·[재시작](exit 1 → systemd 가 되살림) · [지금 백업]/[일일 작업](자식 프로세스, 실행 중엔 10초마다 가벼운 jobs 폴링) · [WAL checkpoint] */
 function Server({ s, onDone }: { s: AdminStats; onDone: () => void }) {
   const o = s.ops, j = o.jobs
   const busy = j.backup || j.daily
   // 내 브라우저가 받은 진입 번들(index-<hash>.js) — 서버 dist 와 다르면 "새 빌드 있음"(w2 #9)
   const mine = Array.from(document.scripts, (x) => /index-([\w-]+)\.js/.exec(x.src)?.[1]).find(Boolean) ?? null
-  useEffect(() => { if (!busy) return; const t = setInterval(onDone, 3000); return () => clearInterval(t) }, [busy, onDone])
+  // 작업 중 폴링은 GET /api/admin/ops/jobs(계약 C) — stats 는 readdir·stat 을 다 하므로 Pi 가 가장 바쁠 때 피한다. 끝났을 때만 stats 를 다시 읽는다. 라우트가 없으면(404) stats 폴링으로
+  useEffect(() => {
+    if (!busy) return
+    const t = setInterval(() => void api<OpsJobs>('/api/admin/ops/jobs').then(
+      (j) => { if (!j.running.backup && !j.running.daily) onDone() },
+      (e) => { if (e instanceof ApiError && e.status === 404) onDone() },
+    ), 10_000)
+    return () => clearInterval(t)
+  }, [busy, onDone])
   const run = (job: 'backup' | 'daily') => void post(`/api/admin/ops/run/${job}`).then(() => { toast(job === 'backup' ? '백업 시작 · 끝나면 대시보드 "백업" 이 갱신돼요' : '일일 작업 시작'); onDone() }, guard)
   const checkpoint = () => void post<{ log: number; checkpointed: number }>('/api/admin/ops/checkpoint').then((r) => { toast(r.log < 0 ? 'checkpoint 완료' : `checkpoint 완료 · WAL ${r.checkpointed}/${r.log} 프레임`); onDone() }, guard)
   const restart = () => void post('/api/admin/ops/restart').then(() => {
@@ -115,7 +120,7 @@ function Server({ s, onDone }: { s: AdminStats; onDone: () => void }) {
 /** admins.json(읽기 전용) + 내 식별자. 편집은 /etc 가 읽기 전용이라 SSH */
 function Admins() {
   const [a] = useGet<{ file: string; list: string[]; me: string }>('/api/admin/ops/admins')
-  if (!a) return null
+  if (!a) return <><h2>관리자 목록</h2><Loading /></>
   const listed = a.list.includes(a.me)
   return (
     <>

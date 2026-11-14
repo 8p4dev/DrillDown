@@ -32,7 +32,7 @@ export default function Minimap({ nodes, rootId, currentId, colors, onGo }: Prop
   } as React.CSSProperties
   const lit = (id: ID) => id === currentId || byId.get(id)?.parentId === currentId
 
-  // U39: 마우스 보조 — 키보드·스크린리더는 경로·카드로 이동(Tab 정지점 0)
+  // U39: 마우스 보조 — 키보드·스크린리더는 경로·카드로 이동(Tab 정지점 0). figure 가 aria-hidden 이라 안쪽 role/aria/키 핸들러는 두지 않는다
   return (
     <figure className={`minimap${open ? ' open' : ''}`} aria-label="미니맵" aria-hidden style={focus}>
       <svg viewBox={`0 0 ${g.width} ${g.height}`} preserveAspectRatio="xMidYMin meet">
@@ -52,15 +52,7 @@ export default function Minimap({ nodes, rootId, currentId, colors, onGo }: Prop
               data-node-id={id}
               data-color={colors.get(id)?.color ?? 'none'}
               aria-current={id === currentId ? 'location' : undefined}
-              {...(go && {
-                role: 'button',
-                tabIndex: -1,
-                'aria-label': `${n.title}(으)로 이동`,
-                onClick: () => onGo(id),
-                onKeyDown: (e: React.KeyboardEvent) => {
-                  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onGo(id) }
-                },
-              })}
+              onClick={go ? () => onGo(id) : undefined}
             >
               <title>{n.title}</title>
               <rect x={b.x} y={b.y} width={b.w} height={b.h} />

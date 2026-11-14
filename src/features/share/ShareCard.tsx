@@ -42,7 +42,12 @@ function ShareCard(p: ShareCardProps) {
       data-width={step}
       className={`node-row${p.selected ? ' selected' : ''}${p.depth === 0 ? ' root' : ''}${p.still ? ' still' : ''}`}
       style={{ left: p.x, top: p.y, width: widths[step] }}
+      tabIndex={p.selected ? 0 : -1}
       onClick={p.onSelect}
+      onKeyDown={(e) => { // 키보드: Enter/Space 선택, ←/→ 접기·펼치기(접기 배지는 aria-hidden — 카드가 대신 받는다)
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); p.onSelect() }
+        else if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && p.hasChildren) { e.preventDefault(); p.onToggle() }
+      }}
     >
       <div className="node-title" title={p.node.title}>{p.node.title || ' '}</div>
       {p.node.note && <div className="node-note" dangerouslySetInnerHTML={{ __html: toHtml(parse(p.node.note)) }} />}
