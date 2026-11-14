@@ -2,7 +2,7 @@
 // push/pull 엔진(sync/engine.ts)은 onLogin 안에서만 동적 import — 비로그인은 엔진을 아예 받지 않는다 (01 §3.8).
 import { useSyncExternalStore } from 'react'
 
-export type SyncState =
+type SyncState =
   | { kind: 'saved' }
   | { kind: 'syncing' }
   | { kind: 'offline'; pending: number }

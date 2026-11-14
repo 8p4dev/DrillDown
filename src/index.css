@@ -6,7 +6,7 @@
   --ok: #1a7f37; --danger: #d1242f; --on-fill: #ffffff;
   --radius-sm: 0; --radius: 2px; --radius-lg: 2px;
   /* 글자 크기 단계 */
-  --fs-xs: .75rem; --fs-sm: .85rem; --fs-md: .95rem; --fs-lg: 1.1rem; --fs-xl: 1.4rem; --fs-2xl: 2rem;
+  --fs-xs: .75rem; --fs-sm: .85rem; --fs-md: .95rem; --fs-lg: 1.1rem; --fs-xl: 1.4rem;
   /* 레이아웃 · 터치 · 키보드 (02 §3.3: --kb 는 viewport.ts 가 쓴다) */
   --nav-h: 52px; --tap: auto; --safe-b: env(safe-area-inset-bottom, 0px); --safe-t: env(safe-area-inset-top, 0px);
   --kb: 0px; --vv-h: 100dvh; --tree-head-h: 7rem;

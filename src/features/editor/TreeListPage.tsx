@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { initialOf, toneOf } from '../../core/avatar'
 import { api } from '../../core/api'
-import { exportEvents, logEvent } from '../../core/events'
+import { logEvent } from '../../core/events'
 import { useMe } from '../../core/me'
 import { createTree, listTreeMeta, markTreeDeleted, matchTitle, purgeDeletedTrees, renameTree, restoreTree, type TreeMeta } from '../../core/repo'
 import { CAP, type Tree } from '../../core/types'
 import { href } from '../../router'
+import { ago } from '../../ui/ago'
 import { Icon } from '../../ui/Icon'
 import { I } from '../../ui/icons'
 import ShareSheet from '../share/ShareSheet'
@@ -28,15 +29,6 @@ const coarse = () => matchMedia('(pointer: coarse)').matches
 /** 검색칸을 보일 최소 트리 수(U42), 한도 안내를 시작할 수(U02) */
 const SEARCH_MIN = 10
 const WARN_AT = 190
-const rtf = new Intl.RelativeTimeFormat('ko')
-/** '방금' · 'n분 전' · 'n시간 전' · 'n일 전' · 'n개월 전' · 'n년 전' */
-function ago(t: number): string {
-  const s = (Date.now() - t) / 1000
-  if (s < 60) return '방금'
-  for (const [u, sec] of [['year', 31_536_000], ['month', 2_592_000], ['day', 86_400], ['hour', 3_600]] as const)
-    if (s >= sec) return rtf.format(-Math.floor(s / sec), u)
-  return rtf.format(-Math.floor(s / 60), 'minute')
-}
 let persistAsked = false // U05: 세션당 1회
 const isTyping = (el: EventTarget | null) => el instanceof HTMLElement && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))
 
@@ -124,19 +116,13 @@ export default function TreeListPage() {
       await reload()
       toast(`"${t.title}" 삭제 · 휴지통에 7일 보관`, {
         label: '되돌리기',
+        undo: true,
         run: () => {
           setNewId(t.id)
           restoreTree(t.id).then(reload)
         },
       }, UNDO_MS)
     }, 200) // 카드 사라짐(opacity·scale) 뒤에 목록에서 뺀다
-  }
-
-  const exportLog = async () => {
-    const url = URL.createObjectURL(new Blob([await exportEvents()], { type: 'application/json' }))
-    const a = Object.assign(document.createElement('a'), { href: url, download: `drilldown-events-${new Date().toISOString().slice(0, 10)}.json` })
-    a.click()
-    URL.revokeObjectURL(url)
   }
 
   return (
@@ -149,9 +135,6 @@ export default function TreeListPage() {
             <Icon d={I.trash2} size={20} />
           </a>
         )}
-        <button type="button" className="ghost" aria-label="학습 기록 내보내기" data-tip="학습 기록 내보내기" onClick={exportLog}>
-          <Icon d={I.download} size={20} />
-        </button>
       </header>
       <form onSubmit={create} className="trees-form card">
         <input ref={input} aria-label="새 트리 제목" placeholder="새 트리 제목 (예: 노동법)" maxLength={CAP.title} value={title} onChange={(e) => setTitle(e.target.value)} />

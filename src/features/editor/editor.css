@@ -73,14 +73,14 @@ main:has(> .editor) { max-width: none; }
 .node-row.root { --card-border: var(--text); border-width: 2px; }
 /* 측정 전·드래그로 따라오는 카드는 즉시 / 너비 핸들 드래그 중엔 폭 즉시 */
 .node-row.still { transition-property: background-color, border-color, transform, width; }
-.node-row.resizing { transition-property: left, top, background-color, border-color, transform; }
 .node-row.still.resizing { transition-property: background-color, border-color, transform; }
 /* 선택 = 포커스와 같은 모양(01 §3.1.1) */
 .node-row.selected { outline: 2px solid var(--text); outline-offset: 2px; }
 /* 집어 드는 순간은 빠르게(press), 놓을 때는 위 기본값 */
 .node-row.lifted { z-index: 2; transform: scale(1.03); border-color: var(--text); transition-timing-function: var(--ease-press); }
 .node-row.cut { opacity: .45; border-style: dashed; }
-.node-row.resizing { outline: 2px dashed var(--border-strong); outline-offset: 2px; }
+/* 너비 핸들 드래그 중: 폭 즉시 + 점선 외곽선(선택 외곽선보다 뒤에 둬 이긴다) */
+.node-row.resizing { transition-property: left, top, background-color, border-color, transform; outline: 2px dashed var(--border-strong); outline-offset: 2px; }
 .graph.dragging .node-row { cursor: grabbing; }
 
 /* input 선택자: 전역 입력칸 규칙(index.css)보다 우선해야 한다 */

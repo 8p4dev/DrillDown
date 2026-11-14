@@ -12,8 +12,9 @@ import { deleteTree, listTrees, restoreTree, TRASH_MS } from '../../core/repo'
 import { retrySync } from '../../core/sync'
 import type { Tree } from '../../core/types'
 import { href } from '../../router'
+import { ago } from '../../ui/ago'
 import { I } from '../../ui/icons'
-import { logOut, shield, undo2 } from '../../ui/icons.all'
+import { logOut, messageSquare, shield, upload } from '../../ui/icons.all'
 import { Icon } from '../../ui/Icon'
 import { toast } from '../Toast'
 import { Avatar } from '../../ui/Avatar'
@@ -22,14 +23,8 @@ import FeedbackSheet from './FeedbackSheet'
 import { PROVIDER_LABEL, ProviderLogo } from './providers'
 import './account.css'
 
-const rel = (t: number) => {
-  const m = Math.round((Date.now() - t) / 60000)
-  return m < 1 ? '방금' : m < 60 ? `${m}분 전` : m < 1440 ? `${Math.round(m / 60)}시간 전` : `${Math.round(m / 1440)}일 전`
-}
 const daysLeft = (deletedAt: number) => Math.max(1, Math.ceil((deletedAt + TRASH_MS - Date.now()) / 86_400_000))
-const upload = '<path d="M12 3v12" /><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="m17 8-5-5-5 5" />'
 const FEEDBACK_CATEGORY = { bug: '버그', idea: '제안', content: '콘텐츠 오류', other: '기타' } as const
-const messageSquare = '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />'
 const okNick = (s: string) => s.length >= 1 && s.length <= 20 && !/[\p{Cc}]/u.test(s)
 const fail = (e: unknown) => toast(e instanceof ApiError && e.status === 0 ? '오프라인이에요' : '실패했어요 · 다시 시도해 주세요')
 
@@ -51,7 +46,7 @@ export default function AccountPage() {
   const loadFb = () => { if (loggedIn) api<{ items: MyFeedback[] }>('/api/me/feedback').then((r) => setMyFb(r.items), () => setMyFb([])) }
 
   const loggedIn = !!me
-  useEffect(() => { if (loggedIn) loadSessions().catch(() => { /* 목록 비움 */ }) }, [loggedIn])
+  useEffect(() => { if (loggedIn) loadSessions().catch(fail) }, [loggedIn]) // r3 M3: 실패를 묵음으로 두면 빈 목록이 "기기 없음" 처럼 보인다
   // eslint-disable-next-line react-hooks/exhaustive-deps -- 로그인 상태가 바뀔 때만
   useEffect(loadFb, [loggedIn])
   const reload = () => {
@@ -97,8 +92,8 @@ export default function AccountPage() {
         <ul>
           {trash.map((t) => (
             <li key={t.id}>
-              <span className="grow">{t.title}<br /><span className="muted">{rel(t.deletedAt!)} 삭제 · {daysLeft(t.deletedAt!)}일 뒤 영구 삭제</span></span>
-              <button type="button" className="icon-btn" aria-label={`${t.title} 복구`} onClick={() => void restore(t)}><Icon d={undo2} /> 복구</button>
+              <span className="grow">{t.title}<br /><span className="muted">{ago(t.deletedAt!)} 삭제 · {daysLeft(t.deletedAt!)}일 뒤 영구 삭제</span></span>
+              <button type="button" className="icon-btn" aria-label={`${t.title} 복구`} onClick={() => void restore(t)}><Icon d={I.undo2} /> 복구</button>
             </li>
           ))}
         </ul>
@@ -170,7 +165,7 @@ export default function AccountPage() {
         <div className="profile-main">
           {editing ? (
             <input className="nick-edit" aria-label="닉네임" defaultValue={u.nickname} autoFocus maxLength={20}
-              onFocus={(e) => e.target.select()}
+              onFocus={(e) => { done.current = false; e.target.select() }} // r3 M2: Enter/Esc 뒤 blur 가 안 온 브라우저에서 done 이 남지 않게(TreeCard 와 같은 패턴)
               onKeyDown={(e) => {
                 if (e.key === 'Enter') { done.current = true; saveNick(e.currentTarget.value) }
                 if (e.key === 'Escape') { done.current = true; setEditing(false) }
@@ -206,7 +201,7 @@ export default function AccountPage() {
         <ul>
           {sessions.map((s) => (
             <li key={s.id6}>
-              <span className="grow">{s.ua} {s.current && <span className="badge">현재</span>}<br /><span className="muted">{rel(s.last_seen_at)}</span></span>
+              <span className="grow">{s.ua} {s.current && <span className="badge">현재</span>}<br /><span className="muted">{ago(s.last_seen_at)}</span></span>
               {!s.current && <button type="button" className="ghost" aria-label={`${s.ua} 로그아웃`} data-tip="로그아웃" onClick={() => void revokeSession(s.id6).catch(fail)}><Icon d={logOut} /></button>}
             </li>
           ))}
@@ -228,7 +223,7 @@ export default function AccountPage() {
             {myFb.map((f) => (
               <li key={f.id}>
                 <span className="grow">{FEEDBACK_CATEGORY[f.category]} · {f.text}<br />
-                  <span className="muted">{rel(f.created_at)} · {f.resolved_at ? '처리됨' : '확인 중'}{f.note && ` · 운영자: ${f.note}`}</span></span>
+                  <span className="muted">{ago(f.created_at)} ·{f.resolved_at ? '처리됨' : '확인 중'}{f.note && ` · 운영자: ${f.note}`}</span></span>
               </li>
             ))}
           </ul>

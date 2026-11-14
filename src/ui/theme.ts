@@ -52,7 +52,7 @@ function subscribe(f: () => void) {
   return () => void subs.delete(f)
 }
 
-export function setTheme(t: Theme) {
+function setTheme(t: Theme) {
   try {
     localStorage.setItem(KEY, t) // 한 번 고르면 시스템 설정이 바뀌어도 유지
   } catch { /* 사생활 모드 등 — 메모리 상태 없이 DOM 만 갱신 */ }

@@ -1,6 +1,6 @@
 // 트리 저장소 — 공유 계약 §4.2. 쓰기 함수는 같은 트랜잭션에서 outbox 를 남긴다(04 §3.1 쓰기 훅 표, db.track)
 import { api, type SharedTree } from './api'
-import { db, newId, track, type OutboxRow } from './db'
+import { db, newId, track, type Row } from './db'
 import { flush } from './sync'
 import { byOrder, childIndex } from './path'
 import type { ID, NodeSrs, Tree, TreeNode, Visibility } from './types'
@@ -9,7 +9,6 @@ export { byOrder, childIndex }
 
 /** 쓰기 훅 트랜잭션에 들어가는 테이블 */
 const W = () => [db.trees, db.nodes, db.outbox, db.meta]
-type Row = Omit<OutboxRow, 'seq' | 'at'>
 const treeRow = (id: ID, op: Row['op'] = 'put'): Row => ({ kind: 'tree', id, treeId: id, op })
 const nodeRow = (n: Pick<TreeNode, 'id' | 'treeId'>, op: Row['op'] = 'put'): Row => ({ kind: 'node', id: n.id, treeId: n.treeId, op })
 
@@ -65,7 +64,7 @@ export function restoreTree(treeId: ID): Promise<number> {
 /** 휴지통 보존 기간(C2). 이보다 오래 전에 지운 트리만 하드 삭제된다 */
 export const TRASH_MS = 7 * 86_400_000
 /** 로컬 events 보존 기간(F11). 서버로 가지 않고 쌓이기만 하는 테이블 */
-export const EVENTS_MS = 180 * 86_400_000
+const EVENTS_MS = 180 * 86_400_000
 /** 트리 목록이 열릴 때 호출: deletedAt 이 7일보다 오래된 트리만 하드 삭제 + 180일 지난 events 정리 */
 export async function purgeDeletedTrees(now = Date.now()): Promise<void> {
   const victims = (await db.trees.toArray()).filter((t) => t.deletedAt && t.deletedAt < now - TRASH_MS)

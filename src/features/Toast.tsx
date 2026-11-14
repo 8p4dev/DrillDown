@@ -6,7 +6,8 @@ import { useSyncExternalStore } from 'react'
 import { Icon } from '../ui/Icon'
 import { I } from '../ui/icons'
 
-type Action = { label: string; run: () => void; icon?: string }
+/** undo: 되돌리기 성격의 액션 — 아이콘(undo2)을 붙이고, 그 동작을 무의미하게 만드는 now 토스트가 대체할 수 있다 */
+type Action = { label: string; run: () => void; icon?: string; undo?: true }
 type Item = { id: number; text: string; action?: Action; ms: number; hint?: boolean; icon?: string }
 
 let queue: Item[] = [] // queue[0] 이 지금 보이는 것
@@ -28,12 +29,10 @@ function dismiss(t: Item) {
   if (head) arm()
   emit()
 }
-const UNDO = /되돌리기|실행 취소/
-
 function push(t: Item, now = false) {
   const head = queue[0]
   // now: 지금 떠 있는 것을 대체(힌트·되돌리기 외 액션 토스트는 대체하지 않음 — 그 액션은 아직 유효하다)
-  if (now && head && !head.hint && (!head.action || UNDO.test(head.action.label))) queue = queue.slice(1)
+  if (now && head && !head.hint && (!head.action || head.action.undo)) queue = queue.slice(1)
   // 일반 토스트는 언제나 힌트보다 앞(힌트가 [확인] 전까지 되돌리기·복사됨을 막지 않게). 힌트는 맨 뒤.
   // 정보 토스트는 액션 토스트보다도 앞('잘라냄' 이 10초 [되돌리기] 뒤에서 기다리지 않게)
   const i = t.hint ? -1 : queue.findIndex((x) => x.hint || (!t.action && !!x.action))
@@ -74,7 +73,7 @@ export function Toaster() {
           <span>{t.text}</span>
           {t.action && (
             <button type="button" onClick={() => (t.action!.run(), dismiss(t))}>
-              {(t.action.icon ?? (UNDO.test(t.action.label) ? I.undo2 : undefined)) && <Icon d={t.action.icon ?? I.undo2} />}
+              {(t.action.icon || t.action.undo) && <Icon d={t.action.icon ?? I.undo2} />}
               {t.action.label}
             </button>
           )}

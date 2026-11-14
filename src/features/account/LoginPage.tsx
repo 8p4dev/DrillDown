@@ -31,6 +31,7 @@ export default function LoginPage({ e, r, returnTo }: { e?: string; r?: string; 
           onClick={() => go('kakao')}>
           <ProviderLogo provider="kakao" fill="#000000" /> {PROVIDER_LABEL.kakao}로 계속
         </button>
+        {(off('google') || off('kakao')) && <span className="stat">{UNSET}</span>}{/* r3 L5: disabled 버튼의 data-tip 은 키보드·SR·터치가 못 읽는다 */}
         {inapp && (
           <p className="login-inapp" role="status">
             외부 브라우저에서 열어 주세요

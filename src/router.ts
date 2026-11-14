@@ -21,7 +21,7 @@ const MODES: Mode[] = ['flash', 'dnd', 'blank']
 const ADMIN_TABS: AdminTab[] = ['users', 'trees', 'requests', 'metrics', 'feedback', 'system']
 export const SLUG_RE = /^[1-9A-HJ-NP-Za-km-z]{11}$/
 
-export function parseHash(hash: string): Route {
+function parseHash(hash: string): Route {
   const [path, query = ''] = hash.replace(/^#/, '').split('?')
   const p = path.split('/').filter(Boolean)
   const qs = new URLSearchParams(query)
@@ -42,7 +42,7 @@ export function parseHash(hash: string): Route {
 }
 
 /** pathname /t/<slug> 가 우선, 아니면 해시 */
-export function parseLocation(loc: Pick<Location, 'pathname' | 'search' | 'hash'>): Route {
+function parseLocation(loc: Pick<Location, 'pathname' | 'search' | 'hash'>): Route {
   const m = /^\/t\/([^/]+)\/?$/.exec(loc.pathname)
   // 공유 보기에서 '#/…' 링크(내 트리 등)를 누르면 /t/<slug>#/… 가 된다 → 앱 해시 라우트로 보고 경로를 / 로 정리
   if (m && loc.hash.length > 1) {

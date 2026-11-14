@@ -55,7 +55,6 @@ function signedOut() {
 
 /** 현재 사용자. null = 비로그인 또는 확인 중 */
 export const useMe = (): Me | null => use(() => me)
-export const getMe = () => me
 /** 첫 /api/me 응답을 받았는가 — 로그인 필요 화면이 "확인 중"에 #/login 으로 튀지 않게 */
 export const useMeReady = () => use(() => ready)
 /** 점검 중(로그인 여부 무관). /api/me 의 maintenance 또는 아무 요청의 503 maintenance */
@@ -84,7 +83,7 @@ export function refreshMe(): Promise<Me | null> {
 
 /** return_to 는 '#/' 로 시작하는 해시만(오픈 리디렉트 차단, 03 §3.2). 로그인 화면으로는 돌아가지 않는다 */
 const safeReturn = (r?: string) => (r && r.startsWith('#/') && !r.startsWith('#/login') ? r : '#/')
-export function loginUrl(provider: Provider, returnTo?: string, opts: { as?: 'user' | 'admin'; name?: string } = {}): string {
+function loginUrl(provider: Provider, returnTo?: string, opts: { as?: 'user' | 'admin'; name?: string } = {}): string {
   const q = new URLSearchParams({ return_to: safeReturn(returnTo) })
   if (provider === 'fake') {
     q.set('as', opts.as ?? 'user')

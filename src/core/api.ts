@@ -49,7 +49,7 @@ export async function api<T>(path: string, init: { method?: string; body?: unkno
 
 /** 'fake' = AUTH_FAKE=1 개발·E2E 로그인 (orchestration_server.md A1) */
 export type Provider = 'google' | 'kakao' | 'fake'
-export type Role = 'user' | 'admin'
+type Role = 'user' | 'admin'
 
 export interface User {
   id: ID
@@ -245,7 +245,7 @@ export interface Session {
   current: boolean
 }
 
-export interface ApiErrorBody {
+interface ApiErrorBody {
   error: { code: string; message: string; field?: string } // 코드 목록: 03 §3.6 + 04 §3.6
 }
 

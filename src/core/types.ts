@@ -17,6 +17,8 @@ export interface Tree {
   sourceTreeId?: ID
   /** 소프트 삭제 시각. 로컬은 7일 보존(휴지통) 뒤 purgeDeletedTrees 가 하드 삭제. listTrees 는 이 값이 있는 트리를 숨긴다 */
   deletedAt?: number
+  /** 운영 숨김(서버가 진실, pull 로만 받는다 — push 본문에서는 뺀다). 공유 시트·카드 배지가 본다 */
+  hiddenByAdmin?: boolean
 }
 
 export interface TreeNode {

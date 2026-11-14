@@ -1,8 +1,8 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { flushSync } from 'react-dom'
 import { logEvent } from '../../core/events'
 import { cloneBranch, nodesToOutline, outlineToNodes, parseOutline, serializeOutline, splitTitle } from '../../core/outline'
-import { byOrder, childIndex, childrenOf, deleteNodes, descendantsOf, getTreeNodes, putNodes } from '../../core/repo'
+import { childIndex, childrenOf, deleteNodes, descendantsOf, getTreeNodes, putNodes } from '../../core/repo'
 import { getSrsMap, missHeat } from '../../core/srs'
 import { ancestorsOf } from '../../core/path'
 import { CAP, type ID, type NodeSrs, type TreeNode } from '../../core/types'
@@ -11,7 +11,7 @@ import { Icon } from '../../ui/Icon'
 import { I } from '../../ui/icons'
 import { NodePath } from '../../ui/NodePath'
 import { Sheet } from '../../ui/Sheet'
-import { clipboardPaste, copy, cornerDownRight, eraser, highlighter, keyboard, list, listTree, network, search, sparkles, undo2, x, zoomIn, zoomOut } from '../../ui/icons.all'
+import { arrowDown, arrowUp, clipboardPaste, copy, copyPlus, cornerDownRight, eraser, foldVertical, highlighter, indentDecrease, indentIncrease, keyboard, list, listTree, network, redo2, scissors, search, sparkles, unfoldVertical, zoomIn, zoomOut } from '../../ui/icons.all'
 import NodeRow from './NodeRow'
 import NoteEditor, { type NoteApi, type NoteOp } from './content/NoteEditor'
 import GraphView from './graph/GraphView'
@@ -27,7 +27,12 @@ import './editor.css'
 
 const UNDO_LIMIT = 50
 const UNDO_MS = 10_000 // 노드 삭제 되돌리기(02 §3.5: 트리 삭제와 같은 10초)
-const narrow = () => matchMedia('(max-width: 760px)').matches
+// 좁은 화면(760px): 카드 폭 단계(NodeRow)·개요 칸 줄 수. 카드마다 구독하지 않고 여기서 1회 구독해 prop 으로 내린다(r3 L3)
+const narrowMq = matchMedia('(max-width: 760px)')
+const subscribeNarrow = (cb: () => void) => {
+  narrowMq.addEventListener('change', cb)
+  return () => narrowMq.removeEventListener('change', cb)
+}
 const coarse = () => matchMedia('(pointer: coarse)').matches
 
 // ---- 순수 트리 연산 (노드 배열은 불변으로 다룬다: 바뀐 노드만 새 객체) ----
@@ -90,15 +95,10 @@ const AI_PROMPT = `다음 주제를 공부용 트리(개요)로 정리해 주세
 주제: `
 /** 노드별 자식 유무·하위 수·형제 위치를 한 번에 계산 (O(n log n)). 노드마다 childrenOf/descendantsOf 를 부르면 O(n²) */
 function countTree(ns: TreeNode[]) {
-  const kids = new Map<ID, TreeNode[]>()
-  for (const n of ns) {
-    if (n.parentId === null) continue
-    const k = kids.get(n.parentId)
-    if (k) k.push(n)
-    else kids.set(n.parentId, [n])
-  }
+  const kids = childIndex(ns)
+  kids.delete(null)
   const pos = new Map<ID, [number, number]>()
-  for (const k of kids.values()) k.sort(byOrder).forEach((n, i) => pos.set(n.id, [i + 1, k.length]))
+  for (const k of kids.values()) k.forEach((n, i) => pos.set(n.id, [i + 1, k.length]))
   const desc = new Map<ID, number>()
   const walk = (id: ID): number => {
     const total = (kids.get(id) ?? []).reduce((sum, k) => sum + 1 + walk(k.id), 0)
@@ -146,6 +146,7 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
   const [editId, setEditId] = useState<ID | null>(null)
   const [draft, setDraft] = useState('')
   const [noteEditId, setNoteEditId] = useState<ID | null>(null) // 카드 안에서 내용 편집 중인 노드
+  const narrow = useSyncExternalStore(subscribeNarrow, () => narrowMq.matches)
   const [cutId, setCutId] = useState<ID | null>(null)
   const [ioOpen, setIoOpen] = useState(false) // 개요 붙여넣기 · 내보내기 시트. 루트만 있는 트리에 들어오면 자동으로 1회 연다(A2)
   const [importText, setImportText] = useState('')
@@ -153,6 +154,7 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
   // 핸들러가 같은 이벤트 안에서 여러 번 commit 해도 최신 상태를 보도록 ref 를 기준으로 삼는다
   const nodesRef = useRef<TreeNode[]>([])
   const editRef = useRef<ID | null>(null)
+  const noteRef = useRef<ID | null>(null) // noteEditId 의 ref 판 — dd:remote 리스너가 의존성 없이 읽는다
   const draftRef = useRef('')
   const undoRef = useRef<Step[]>([])
   const redoRef = useRef<Step[]>([])
@@ -190,11 +192,11 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
   }, [loaded]) // oxlint-disable-line react-hooks/exhaustive-deps -- 진입 1회: ioOpen 은 nodes 와 같은 배치에서 정해진다
   // 동기화 엔진이 pull 뒤 쏘는 dd:remote{treeIds}: 내 트리면 노드·학습 기록을 다시 읽어 교체한다(E16).
   // undo/redo 스택은 비운다(E2: 옛 스냅샷으로 되돌리면 다른 기기가 추가한 노드가 지워진다).
-  // 편집 중인 노드(카드 제목·카드 내용·패널 live)는 로컬 값을 유지해 입력칸을 덮지 않는다.
+  // 편집 중인 노드(카드 제목·카드 내용·패널 live)는 로컬 값을 유지해 입력칸을 덮지 않는다. 편집 상태는 ref 로 읽어 리스너를 다시 붙이지 않는다(r3 L2).
   useEffect(() => {
     const onRemote = (e: Event) => {
       if (!(e as CustomEvent<{ treeIds: string[] }>).detail?.treeIds?.includes(treeId)) return
-      const keep = new Set([editId, noteEditId, liveBase.current ? selId : null])
+      const keep = new Set([editRef.current, noteRef.current, liveBase.current ? selRef.current : null])
       getSrsMap(treeId).then(setSrs)
       getTreeNodes(treeId).then((remote) => {
         const local = new Map(nodesRef.current.map((n) => [n.id, n]))
@@ -202,6 +204,8 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
         undoRef.current = []
         redoRef.current = []
         nodesRef.current = next
+        // r3 H1: 실시간 편집 중이면 시작 스냅샷도 원격 반영 뒤 배열로 — endLive 가 원격 이전 배열을 undo 에 넣고 Ctrl+Z 가 다른 기기 노드를 지우는 경로 차단
+        if (liveBase.current) liveBase.current = next
         setNodes(next)
         setSelId((id) => (next.some((n) => n.id === id) ? id : (next.find((n) => n.parentId === null)?.id ?? '')))
         setCutId((id) => (id && next.some((n) => n.id === id) ? id : null))
@@ -209,7 +213,7 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
     }
     addEventListener('dd:remote', onRemote)
     return () => removeEventListener('dd:remote', onRemote)
-  }, [treeId, editId, noteEditId, selId])
+  }, [treeId])
   // 키보드(--kb)·시각 뷰포트 추적. 키보드가 열리면 단축키 시트는 닫는다(02 규칙 4(b))
   useEffect(() => {
     startViewport()
@@ -296,7 +300,7 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
   const selRef = useRef<ID>('')
   useLayoutEffect(() => {
     viewRef.current = { open, depth: viewDepth, top: top?.id ?? '' }
-    selRef.current = sel?.id ?? ''
+    selRef.current = sel?.id ?? '' // oxlint-disable-line react/immutability -- ref 갱신. dd:remote 리스너가 최신 선택을 ref 로 읽는다(의존성 없이)
   })
   // 맞춤의 스크롤 단계: 배율 상태가 zoomRef 를 따라잡은 커밋에서(같으면 같은 커밋). selRef 갱신 뒤에 와야 한다
   useLayoutEffect(() => {
@@ -396,6 +400,7 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
   const live = (id: ID, p: Partial<TreeNode>) => commit(patch(nodesRef.current, id, p), false)
   function startNoteEdit(id: ID) {
     setSelId(id)
+    noteRef.current = id
     setNoteEditId(id)
   }
   const toOutline = () => outlineRef.current?.focus()
@@ -563,7 +568,7 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
     setSelId(rows[i - 1]?.node.id ?? topNode().id)
     if (cutId && gone.has(cutId)) setCutId(null)
     // 확인창 대신 되돌리기
-    toast(`"${name}" 삭제${sub.length ? ` (하위 ${sub.length}개)` : ''}`, { label: '실행 취소', run: () => undoIf(ns) }, UNDO_MS)
+    toast(`"${name}" 삭제${sub.length ? ` (하위 ${sub.length}개)` : ''}`, { label: '실행 취소', run: () => undoIf(ns), undo: true }, UNDO_MS)
   }
   /** 잘라낸 서브트리를 선택 노드의 마지막 자식으로 이동 (id 유지 → 학습 기록 보존) */
   function paste(targetId: ID) {
@@ -594,7 +599,7 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
     const name = n.title || '제목 없음'
     commit([...base, ...copy], `"${name}" 복제`)
     setSelId(copy[0].id)
-    toast(`"${name}" 복제${copy.length > 1 ? ` (하위 ${copy.length - 1}개)` : ''}`, { label: '되돌리기', run: () => undoIf(ns) }, UNDO_MS)
+    toast(`"${name}" 복제${copy.length > 1 ? ` (하위 ${copy.length - 1}개)` : ''}`, { label: '되돌리기', run: () => undoIf(ns), undo: true }, UNDO_MS)
   }
   /** 마지막 자식으로 새 노드를 만들고 제목 편집 (구조 바 +자식 — 키보드의 Enter 후 Tab) */
   function addChild(id: ID) {
@@ -689,7 +694,7 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
     setIoOpen(false)
     toast(
       `${count}개 추가${dup ? ` · 최상위 중복 ${dup}개` : ''}${long ? ` · 긴 제목 ${long}개를 잘라 메모로 옮겼습니다` : ''}`,
-      { label: '되돌리기', run: () => undoIf(ns) },
+      { label: '되돌리기', run: () => undoIf(ns), undo: true },
       UNDO_MS,
     )
   }
@@ -752,15 +757,15 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
   const tools: [key: string, label: string, icon: string, disabled?: boolean][] = [
     ['child', '자식 추가', cornerDownRight],
     ['sib', '아래에 형제 추가', I.plus, atTop],
-    ['up', '위로 옮기기', ICON.up, at === 1],
-    ['down', '아래로 옮기기', ICON.down, at === of],
-    ['outdent', '내어쓰기', ICON.outdent, atTop || cur.parentId === top!.id],
-    ['indent', '들여쓰기', ICON.indent, at === 1],
-    cutId ? ['paste', '여기에 붙이기', clipboardPaste] : ['cut', '잘라내기', ICON.scissors, atTop],
+    ['up', '위로 옮기기', arrowUp, at === 1],
+    ['down', '아래로 옮기기', arrowDown, at === of],
+    ['outdent', '내어쓰기', indentDecrease, atTop || cur.parentId === top!.id],
+    ['indent', '들여쓰기', indentIncrease, at === 1],
+    cutId ? ['paste', '여기에 붙이기', clipboardPaste] : ['cut', '잘라내기', scissors, atTop],
     ['del', '삭제', I.trash2, atTop],
-    ['fold', opened ? '접기' : '펼치기', opened ? ICON.fold : ICON.unfold, !kids],
-    ['undo', '실행 취소', undo2],
-    ['redo', '다시 실행', ICON.redo],
+    ['fold', opened ? '접기' : '펼치기', opened ? foldVertical : unfoldVertical, !kids],
+    ['undo', '실행 취소', I.undo2],
+    ['redo', '다시 실행', redo2],
   ]
   const struct = (
     <div className="struct" role="toolbar" aria-label="구조 편집">
@@ -829,6 +834,7 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
                 pos={pos}
                 setSize={setSize}
                 hiddenCount={open(n, box.depth) ? 0 : counts.desc(n.id)}
+                narrow={narrow}
                 selected={n.id === cur.id}
                 cut={n.id === cutId}
                 heat={missHeat(srs.get(n.id))}
@@ -854,7 +860,7 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
                       ref={cardNote}
                       autoFocus
                       onFocus={beginLive}
-                      onBlur={() => (endLive(), setNoteEditId(null))}
+                      onBlur={() => (endLive(), (noteRef.current = null), setNoteEditId(null))}
                       onEscape={toOutline}
                     />
                   )
@@ -920,13 +926,13 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
         <div className="io">
           <header className="sheet-head">
             <h2>개요 붙여넣기 · 내보내기</h2>
-            <button type="button" className="ghost sheet-x" aria-label="닫기" data-tip="닫기" onClick={() => setIoOpen(false)}><Icon d={x} /></button>
+            <button type="button" className="ghost sheet-x" aria-label="닫기" data-tip="닫기" onClick={() => setIoOpen(false)}><Icon d={I.x} /></button>
           </header>
           <p className="muted">들여쓰기된 목차를 붙여 넣으면 선택한 노드 아래에 트리가 됩니다. 내보내기는 같은 형식의 텍스트를 복사합니다.</p>
           <textarea
             ref={importRef}
             aria-label="개요 텍스트"
-            rows={narrow() ? 3 : 5}
+            rows={narrow ? 3 : 5}
             value={importText}
             placeholder={'들여쓰기 목차를 붙여넣으세요 (탭·스페이스, -, 1., 가., ①, # 허용 · 제목 :: 메모)\n노동법\n  개별적 근로관계법\n    근로계약 :: 근로자와 사용자의 합의'}
             onChange={(e) => setImportText(e.target.value)}
@@ -964,18 +970,6 @@ export default function EditorPage({ treeId, rootId }: { treeId: string; rootId?
 }
 
 const KEYS_ID = 'editor-keys'
-/** 구조 바 아이콘 (Lucide 1.70.0, ISC — ui/icons.all 에 없는 것만) */
-const ICON = {
-  up: '<path d="m5 12 7-7 7 7" /><path d="M12 19V5" />',
-  down: '<path d="M12 5v14" /><path d="m19 12-7 7-7-7" />',
-  indent: '<path d="M21 5H11" /><path d="M21 12H11" /><path d="M21 19H11" /><path d="m3 8 4 4-4 4" />',
-  outdent: '<path d="M21 5H11" /><path d="M21 12H11" /><path d="M21 19H11" /><path d="m7 8-4 4 4 4" />',
-  scissors: '<circle cx="6" cy="6" r="3" /><path d="M8.12 8.12 12 12" /><path d="M20 4 8.12 15.88" /><circle cx="6" cy="18" r="3" /><path d="M14.8 14.8 20 20" />',
-  fold: '<path d="m7 20 5-5 5 5" /><path d="m7 4 5 5 5-5" />',
-  unfold: '<path d="m7 15 5 5 5-5" /><path d="m7 9 5-5 5 5" />',
-  copyPlus: '<line x1="15" x2="15" y1="12" y2="18" /><line x1="12" x2="18" y1="15" y2="15" /><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />',
-  redo: '<path d="m15 14 5-5-5-5" /><path d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5A5.5 5.5 0 0 0 9.5 20H13" />',
-}
 /** 단축키 팝오버: [키(공백 = 여러 키), 2~3단어 동작] */
 const KEYS: [string, string][] = [
   ['↑ ↓', '부모 · 첫 자식 (세로 보기는 ← →)'],
@@ -1037,7 +1031,7 @@ function DetailPanel({ api, ...p }: {
       <div className="detail-path">
         {p.path}
         {p.focusHref && <a className="focus-here" href={p.focusHref}>이 가지만 보기</a>}
-        {p.onDuplicate && <button type="button" className="to-import" aria-label="가지 복제" data-tip="가지 복제" onClick={p.onDuplicate}><Icon d={ICON.copyPlus} /></button>}
+        {p.onDuplicate && <button type="button" className="to-import" aria-label="가지 복제" data-tip="가지 복제" onClick={p.onDuplicate}><Icon d={copyPlus} /></button>}
         <button type="button" className="to-import" aria-label="이 가지 내보내기" data-tip="이 가지 내보내기 (개요 복사)" onClick={p.onExport}><Icon d={copy} /></button>
         <button type="button" className="to-import" aria-label="개요 붙여넣기 열기" data-tip="개요 붙여넣기" onClick={p.onImport}><Icon d={clipboardPaste} /></button>
       </div>
@@ -1115,7 +1109,7 @@ function Aliases({ value, onChange }: { value: string[]; onChange: (v: string[])
       {value.map((a) => (
         <span key={a} className="alias-chip">
           {a}
-          <button type="button" aria-label={`별칭 ${a} 삭제`} onClick={() => onChange(value.filter((v) => v !== a))}><Icon d={x} size={16} /></button>
+          <button type="button" aria-label={`별칭 ${a} 삭제`} onClick={() => onChange(value.filter((v) => v !== a))}><Icon d={I.x} size={16} /></button>
         </span>
       ))}
       <input
