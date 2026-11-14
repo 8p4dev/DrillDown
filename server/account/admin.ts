@@ -20,13 +20,36 @@ export function audit(db: DB, actor: string | null, action: string, targetType: 
     .run(Date.now(), actor, action, targetType, targetId, meta ? JSON.stringify(meta) : null)
 }
 
-export function getSettings(db: DB): Settings {
-  const s: Settings = { notice: { text: '', enabled: false }, maintenance: { enabled: false } }
-  for (const r of db.prepare('SELECT key, value FROM settings').all() as { key: string; value: string }[]) {
-    if (r.key === 'notice') s.notice = JSON.parse(r.value)
-    if (r.key === 'maintenance') s.maintenance = JSON.parse(r.value)
+/** 저장 모양: notices = Notice[], maintenance = {manual, from?, until?}, auto_hide_reports = number. enabled·notice 는 지금 시각 기준 파생값(스케줄러 없음, T2 #29) */
+export function getSettings(db: DB, now = Date.now()): Settings {
+  const raw: Record<string, unknown> = {}
+  for (const r of db.prepare('SELECT key, value FROM settings').all() as { key: string; value: string }[]) raw[r.key] = JSON.parse(r.value)
+  const notices = Array.isArray(raw.notices) ? (raw.notices as Settings['notices']) : []
+  const m = (raw.maintenance ?? {}) as { manual?: boolean; enabled?: boolean; from?: number | null; until?: number | null }
+  const manual = !!(m.manual ?? m.enabled) // enabled = 005 이전 저장 모양
+  const scheduled = m.from != null && m.from <= now && (m.until == null || now < m.until)
+  const first = notices.find((n) => n.audience === 'all' && noticeActive(n, now))
+  return {
+    notice: { text: first?.text ?? '', enabled: !!first },
+    notices,
+    maintenance: { enabled: manual || scheduled, manual, from: m.from ?? null, until: m.until ?? null },
+    auto_hide_reports: typeof raw.auto_hide_reports === 'number' ? raw.auto_hide_reports : 3,
   }
-  return s
+}
+export const noticeActive = (n: Settings['notices'][number], now: number) => (n.from == null || n.from <= now) && (n.until == null || now < n.until)
+/** 공지 1건 검증(≤160자, url 은 http(s) ≤200, 기간은 ms, audience 2종). 틀리면 400 */
+function notice(v: unknown, i: number): Settings['notices'][number] {
+  const o = (typeof v === 'object' && v !== null ? v : {}) as Record<string, unknown>
+  const f = `notices[${i}]`
+  const text = optText(o.text, 160, f) ?? fail(400, 'invalid', '공지 내용을 적어 주세요', f)
+  const url = optText(o.url, 200, f)
+  if (url && !/^https?:\/\//.test(url)) fail(400, 'invalid', '링크는 http(s) 주소여야 합니다', f)
+  const ms = (x: unknown) => (x == null || x === '' ? null : Number.isFinite(x) && (x as number) > 0 ? (x as number) : fail(400, 'invalid', '기간이 올바르지 않습니다', f))
+  const from = ms(o.from), until = ms(o.until)
+  if (from != null && until != null && until <= from) fail(400, 'invalid', '종료가 시작보다 앞입니다', f)
+  if (o.audience !== 'all' && o.audience !== 'users') fail(400, 'invalid', '대상을 고르세요', f)
+  const id = typeof o.id === 'string' && /^[A-Za-z0-9_-]{1,32}$/.test(o.id) ? o.id : randomUUID().slice(0, 8)
+  return { id, text, ...(url ? { url } : {}), from, until, audience: o.audience as 'all' | 'users' }
 }
 
 /** 제어문자 금지 검증 (03 §3.6 입력 검증) */
@@ -127,9 +150,19 @@ function registerReport(app: Hono<AppEnv>) {
       const db = c.get('db')
       const owner = (db.prepare('SELECT owner_id FROM trees WHERE id = ?').get(treeId) as { owner_id: string } | undefined)?.owner_id
       if (u && owner === u.id) fail(403, 'forbidden', '내 트리는 신고할 수 없습니다')
-      db.prepare('INSERT INTO reports(id,tree_id,reporter_id,reason,note,created_at) VALUES(?,?,?,?,?,?)').run(id, treeId, u?.id ?? null, b.reason as string, note, Date.now())
+      const now = Date.now()
+      tx(db, () => {
+        db.prepare('INSERT INTO reports(id,tree_id,reporter_id,reason,note,created_at) VALUES(?,?,?,?,?,?)').run(id, treeId, u?.id ?? null, b.reason as string, note, now)
+        // T2 #28: 열린 신고가 N건(settings.auto_hide_reports, 0 = 끔)에 닿으면 자동 임시 숨김 30일 — 운영자 부재 대비. 행위자 NULL = 시스템
+        const n = getSettings(db, now).auto_hide_reports
+        const open = n > 0 ? (db.prepare('SELECT COUNT(*) n FROM reports WHERE tree_id = ? AND resolved_at IS NULL').get(treeId) as { n: number }).n : 0
+        if (n > 0 && open >= n && !(db.prepare('SELECT hidden_by_admin_at h FROM trees WHERE id = ?').get(treeId) as { h: number | null }).h) {
+          setHidden(db, treeId, true, now, now + 30 * DAY)
+          audit(db, null, 'tree.hide', 'tree', treeId, { reason: `신고 ${open}건 누적 자동 임시 숨김`, auto: true, reports: open, until: now + 30 * DAY })
+        }
+      })
     }
-    return c.json({ id }, 201)
+    return c.json({ id }, 201) // id = 접수번호 — #/report/<id> 로 상태 조회(T2 #26)
   })
 }
 
@@ -318,29 +351,41 @@ export function registerAdmin(app: Hono<AppEnv>) {
   })
 
   app.get('/api/admin/settings', (c) => c.json({ settings: getSettings(c.get('db')) }))
+  // 저장은 원본(notices 배열·maintenance {manual,from,until}·auto_hide_reports)만. 응답은 getSettings 파생값 포함 (T2 #29)
   app.put('/api/admin/settings', async (c) => {
     const db = c.get('db')
-    const b = await body<{ notice?: { text?: unknown; enabled?: unknown }; maintenance?: { enabled?: unknown } }>(c)
+    const b = await body<{ notices?: unknown; maintenance?: { manual?: unknown; from?: unknown; until?: unknown }; auto_hide_reports?: unknown }>(c)
     const before = getSettings(db)
-    const next: Settings = structuredClone(before)
-    if (b.notice !== undefined) {
-      if (typeof b.notice !== 'object' || b.notice === null || typeof b.notice.enabled !== 'boolean') fail(400, 'invalid', '공지 값이 올바르지 않습니다', 'notice')
-      next.notice = { text: optText(b.notice!.text ?? '', 80, 'notice') ?? '', enabled: b.notice!.enabled as boolean }
+    const stored: Record<string, unknown> = { notices: before.notices, maintenance: { manual: before.maintenance.manual, from: before.maintenance.from ?? null, until: before.maintenance.until ?? null }, auto_hide_reports: before.auto_hide_reports }
+    const next = { ...stored }
+    if (b.notices !== undefined) {
+      if (!Array.isArray(b.notices) || b.notices.length > 10) fail(400, 'invalid', '공지는 10개까지입니다', 'notices')
+      next.notices = (b.notices as unknown[]).map(notice)
     }
     if (b.maintenance !== undefined) {
-      if (typeof b.maintenance !== 'object' || b.maintenance === null || typeof b.maintenance.enabled !== 'boolean') fail(400, 'invalid', '점검 모드 값이 올바르지 않습니다', 'maintenance')
-      next.maintenance = { enabled: b.maintenance!.enabled as boolean }
+      const m = b.maintenance
+      if (typeof m !== 'object' || m === null || typeof m.manual !== 'boolean') fail(400, 'invalid', '점검 모드 값이 올바르지 않습니다', 'maintenance')
+      const ms = (x: unknown) => (x == null || x === '' ? null : Number.isFinite(x) && (x as number) > 0 ? (x as number) : fail(400, 'invalid', '점검 시각이 올바르지 않습니다', 'maintenance'))
+      const from = ms(m!.from), until = ms(m!.until)
+      if (from != null && until != null && until <= from) fail(400, 'invalid', '종료가 시작보다 앞입니다', 'maintenance')
+      if (from == null && until != null) fail(400, 'invalid', '시작 시각이 필요합니다', 'maintenance')
+      next.maintenance = { manual: m!.manual as boolean, from, until }
+    }
+    if (b.auto_hide_reports !== undefined) {
+      const n = b.auto_hide_reports
+      if (!Number.isInteger(n) || (n as number) < 0 || (n as number) > 20) fail(400, 'invalid', '자동 숨김 기준은 0~20 입니다', 'auto_hide_reports')
+      next.auto_hide_reports = n
     }
     const now = Date.now()
     const put = db.prepare('INSERT INTO settings(key,value,updated_at) VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at')
     tx(db, () => {
-      for (const k of ['notice', 'maintenance'] as const)
-        if (JSON.stringify(before[k]) !== JSON.stringify(next[k])) {
+      for (const k of ['notices', 'maintenance', 'auto_hide_reports'] as const)
+        if (JSON.stringify(stored[k]) !== JSON.stringify(next[k])) {
           put.run(k, JSON.stringify(next[k]), now)
-          audit(db, me(c), `settings.${k}`, 'settings', k, { before: before[k], after: next[k] })
+          audit(db, me(c), `settings.${k === 'notices' ? 'notice' : k}`, 'settings', k, { before: stored[k], after: next[k] })
         }
     })
-    return c.json({ settings: next })
+    return c.json({ settings: getSettings(db) })
   })
 
   // 감사 로그: 필터(action 접두·target_id·기간) + CSV(≤5,000행, T3 #35). audit_ts·audit_target 인덱스 사용

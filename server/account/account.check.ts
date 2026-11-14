@@ -182,9 +182,12 @@ await req(`/api/admin/users/${carol[0].id}/unsuspend`, { body: {}, cookie: adm }
 assert.equal((await me(await login('user', 'carol'))).status, 200)
 
 // ---- 공지·점검 모드 ----
-assert.equal((await req('/api/admin/settings', { method: 'PUT', body: { notice: { text: 'x'.repeat(81), enabled: true } }, cookie: adm })).status, 400)
-r = await req('/api/admin/settings', { method: 'PUT', body: { notice: { text: '오늘 밤 점검', enabled: true }, maintenance: { enabled: true } }, cookie: adm })
-assert.deepEqual((await json<{ settings: unknown }>(r)).settings, { notice: { text: '오늘 밤 점검', enabled: true }, maintenance: { enabled: true } })
+assert.equal((await req('/api/admin/settings', { method: 'PUT', body: { notices: [{ text: 'x'.repeat(161), audience: 'all' }] }, cookie: adm })).status, 400)
+assert.equal((await req('/api/admin/settings', { method: 'PUT', body: { maintenance: { enabled: true } }, cookie: adm })).status, 400) // 005 부터 manual
+r = await req('/api/admin/settings', { method: 'PUT', body: { notices: [{ id: 'n1', text: '오늘 밤 점검', audience: 'all' }], maintenance: { manual: true } }, cookie: adm })
+const sv = (await json<{ settings: { notice: unknown; notices: unknown[]; maintenance: { enabled: boolean; manual: boolean }; auto_hide_reports: number } }>(r)).settings
+assert.deepEqual(sv.notice, { text: '오늘 밤 점검', enabled: true }); assert.equal(sv.notices.length, 1)
+assert.deepEqual([sv.maintenance.enabled, sv.maintenance.manual, sv.auto_hide_reports], [true, true, 3])
 const d1 = await login('user', 'dave')
 r = await req('/api/sync', { cookie: d1 })
 assert.equal(r.status, 503); assert.equal(r.headers.get('retry-after'), '300'); assert.equal((await err(r)).code, 'maintenance')
@@ -193,7 +196,7 @@ assert.equal(r.status, 200)
 assert.deepEqual(await json(r).then((x) => [x.notice, x.maintenance]), [{ text: '오늘 밤 점검' }, true])
 assert.notEqual((await req('/api/sync', { cookie: adm })).status, 503)
 assert.equal((await req('/api/health')).status, 200)
-await req('/api/admin/settings', { method: 'PUT', body: { maintenance: { enabled: false } }, cookie: adm })
+await req('/api/admin/settings', { method: 'PUT', body: { maintenance: { manual: false } }, cookie: adm })
 assert.notEqual((await req('/api/sync', { cookie: d1 })).status, 503)
 r = await req('/api/admin/audit?limit=50', { cookie: adm })
 const acts = (await json<{ items: { action: string; meta: unknown }[] }>(r)).items.map((x) => x.action)
@@ -258,6 +261,135 @@ assert.equal((db.prepare("SELECT hidden_by_admin_at h FROM trees WHERE id = 't-a
 assert.deepEqual((await json<{ items: unknown[] }>(await req('/api/admin/appeals', { cookie: adm }))).items, [])
 assert.deepEqual((await json<{ hidden_trees: unknown[] }>(await me(c2))).hidden_trees, [])
 for (const a of ['tree.appeal', 'tree.unhide', 'user.search', 'user.view']) assert.ok(db.prepare('SELECT 1 FROM audit_log WHERE action = ?').get(a), a) // 조회 감사 포함
+
+// ---- 법규·통지(워커 B, T2 #23·#25~#29): 공지 복수·기간·대상, 점검 예약, 자동 숨김, 게시중단, 접수 상태, 정보주체 요청, 임시조치 30일 ----
+const T0 = Date.now()
+const hidden = (id: string) => { const { h, u } = db.prepare('SELECT hidden_by_admin_at h, hidden_until u FROM trees WHERE id = ?').get(id) as { h: number | null; u: number | null }; return { h, u } }
+// 공지: 기간 밖·users 대상은 필터, 비로그인 /api/notices 는 all 만. 점검 예약은 시작 전이면 예고
+r = await req('/api/admin/settings', { method: 'PUT', body: { notices: [
+  { id: 'now', text: '지금 공지', url: 'https://example.com/x', audience: 'all' },
+  { id: 'later', text: '예정 공지', from: T0 + DAY, audience: 'all' },
+  { id: 'past', text: '지난 공지', until: T0 - 1000, audience: 'all' },
+  { id: 'u', text: '회원 공지', audience: 'users' },
+], maintenance: { manual: false, from: T0 + 2 * DAY, until: T0 + 3 * DAY } }, cookie: adm })
+assert.equal(r.status, 200)
+const lm = (await json<{ legal: { notices: { id: string }[]; maintenance_scheduled?: { from: number } }; maintenance: boolean }>(await me(d1)))
+assert.deepEqual(lm.legal.notices.map((n) => n.id), ['now', 'u']); assert.equal(lm.legal.maintenance_scheduled?.from, T0 + 2 * DAY); assert.equal(lm.maintenance, false)
+const an = await json<{ notices: { id: string; url?: string }[]; maintenance_scheduled?: unknown }>(await req('/api/notices'))
+assert.deepEqual(an.notices.map((n) => n.id), ['now']); assert.equal(an.notices[0].url, 'https://example.com/x'); assert.ok(an.maintenance_scheduled)
+assert.equal((await req('/api/admin/settings', { method: 'PUT', body: { notices: [{ text: 'bad', url: 'javascript:1', audience: 'all' }] }, cookie: adm })).status, 400)
+assert.equal((await req('/api/admin/settings', { method: 'PUT', body: { maintenance: { manual: false, from: T0 + 2 * DAY, until: T0 + DAY } }, cookie: adm })).status, 400)
+// 점검 예약: 창 안이면 수동 꺼져 있어도 503 + /api/me maintenance true. 창 지나면 통과
+await req('/api/admin/settings', { method: 'PUT', body: { maintenance: { manual: false, from: T0 - 1000, until: T0 + DAY } }, cookie: adm })
+assert.equal((await req('/api/sync', { cookie: d1 })).status, 503)
+assert.equal((await json<{ maintenance: boolean }>(await me(d1))).maintenance, true)
+await req('/api/admin/settings', { method: 'PUT', body: { maintenance: { manual: false, from: T0 - DAY, until: T0 - 1000 } }, cookie: adm })
+assert.notEqual((await req('/api/sync', { cookie: d1 })).status, 503)
+await req('/api/admin/settings', { method: 'PUT', body: { notices: [], maintenance: { manual: false } }, cookie: adm })
+assert.deepEqual((await json<{ notices: unknown[] }>(await req('/api/notices'))).notices, [])
+
+// 자동 숨김(#28): 기준 2 → 2번째 신고에 임시 숨김 30일, 행위자 NULL, 소유자에게 사유. 접수번호로 상태 조회(#26)
+assert.equal((await req('/api/admin/settings', { method: 'PUT', body: { auto_hide_reports: 21 }, cookie: adm })).status, 400)
+await req('/api/admin/settings', { method: 'PUT', body: { auto_hide_reports: 2 }, cookie: adm })
+ins.run('t-auto', carol[0].id, '자동', T0, T0, null)
+db.prepare("UPDATE trees SET slug = 'Auto5tree11' WHERE id = 't-auto'").run()
+r = await req('/api/t/Auto5tree11/report', { body: { reason: 'spam' }, ip: 'auto-1' })
+const rep1 = (await json<{ id: string }>(r)).id
+assert.equal(hidden('t-auto').h, null)
+assert.equal((await req('/api/t/Auto5tree11/report', { body: { reason: 'abuse' }, ip: 'auto-2' })).status, 201)
+assert.ok(hidden('t-auto').h! > 0 && hidden('t-auto').u! >= T0 + 30 * DAY)
+assert.ok(db.prepare("SELECT 1 FROM audit_log WHERE action = 'tree.hide' AND target_id = 't-auto' AND actor_id IS NULL").get())
+assert.match((await json<{ hidden_trees: { id: string; reason: string }[] }>(await me(c2))).hidden_trees.find((t) => t.id === 't-auto')!.reason, /자동/)
+r = await req('/api/report/' + rep1, { ip: 'st-1' })
+assert.deepEqual(await json<{ kind: string; state: string; received_at: number; updated_at: number | null }>(r).then((x) => [x.kind, x.state, x.received_at > 0, x.updated_at]), ['report', 'open', true, null])
+assert.equal((await req('/api/report/not-a-uuid', { ip: 'st-1' })).status, 404)
+assert.equal((await req('/api/report/' + crypto.randomUUID(), { ip: 'st-1' })).status, 404)
+r = await req('/api/admin/trees', { cookie: adm })
+assert.ok((await json<{ items: { id: string; hidden_until: number | null }[] }>(r)).items.find((t) => t.id === 't-auto')!.hidden_until! > T0)
+// 임시조치 만료(#27): legalDaily 가 해제 + 행위자 NULL. 확정(confirm)은 만료 없음
+const { legalDaily } = await import('./legal.ts')
+legalDaily(db, T0 + 31 * DAY)
+assert.deepEqual(hidden('t-auto'), { h: null, u: null })
+assert.ok(db.prepare("SELECT 1 FROM audit_log WHERE action = 'tree.unhide' AND target_id = 't-auto' AND actor_id IS NULL").get())
+assert.equal((await req('/api/admin/trees/t-auto/confirm', { body: {}, cookie: adm })).status, 409)
+r = await req('/api/admin/trees/t-auto/hold', { body: { reason: '판단 보류' }, cookie: adm })
+assert.ok((await json<{ tree: { hidden_until: number } }>(r)).tree.hidden_until > T0 + 29 * DAY)
+assert.equal((await req('/api/admin/trees/t-auto/hold', { body: {}, cookie: adm })).status, 409)
+assert.equal((await req('/api/admin/trees/t-auto/confirm', { body: {}, cookie: adm })).status, 200)
+assert.equal(hidden('t-auto').u, null); assert.ok(hidden('t-auto').h! > 0)
+legalDaily(db, T0 + 400 * DAY)
+assert.ok(hidden('t-auto').h! > 0) // 확정은 만료 안 함
+await req('/api/admin/trees/t-auto/unhide', { body: {}, cookie: adm })
+db.prepare("UPDATE reports SET resolved_at = ?, resolution = 'dismissed' WHERE id = ?").run(T0, rep1)
+assert.deepEqual(await json(await req('/api/report/' + rep1, { ip: 'st-1' })).then((x) => [x.state, x.updated_at]), ['dismissed', T0])
+
+// 게시중단(#23): 검증 400, 유효 → 201 + 즉시 숨김(확정) + 소유자 사유, IP 4번째 429, 상태 조회에 연락처 없음, 관리자 흐름 통보→재개
+ins.run('t-td', carol[0].id, '교재 전사', T0, T0, null)
+db.prepare("UPDATE trees SET slug = 'Take5tree11' WHERE id = 't-td'").run()
+const td = { url: 'http://localhost/t/Take5tree11?m=flash', name: '권리자', contact: 'holder@example.com', claim: '등록 제C-2026-1호\n원본 https://example.com/book', attest: true }
+assert.equal((await err(await req('/api/takedown', { body: { ...td, attest: false }, ip: 'td-v' }))).field, 'attest')
+assert.equal((await err(await req('/api/takedown', { body: { ...td, url: 'https://example.com/other' }, ip: 'td-v' }))).field, 'url')
+r = await req('/api/takedown', { body: td, ip: 'td-1' })
+assert.equal(r.status, 201)
+const tdId = (await json<{ id: string }>(r)).id
+assert.ok(hidden('t-td').h! > 0); assert.equal(hidden('t-td').u, null)
+assert.match((await json<{ hidden_trees: { id: string; reason: string }[] }>(await me(c2))).hidden_trees.find((t) => t.id === 't-td')!.reason, /저작권/)
+assert.equal((await req('/api/takedown', { body: td, ip: 'td-1' })).status, 201) // 같은 트리 두 번째 — 다시 숨기지 않음(감사 1건)
+assert.equal((await req('/api/takedown', { body: { ...td, url: 'None5tree11' }, ip: 'td-1' })).status, 201) // 없는 트리도 접수(received, tree NULL)
+assert.equal((db.prepare("SELECT COUNT(*) n FROM audit_log WHERE action = 'tree.hide' AND target_id = 't-td'").get() as { n: number }).n, 1)
+assert.equal((await req('/api/takedown', { body: td, ip: 'td-1' })).status, 429)
+const stt = await json<Record<string, unknown>>(await req('/api/report/' + tdId, { ip: 'st-2' }))
+assert.deepEqual([stt.kind, stt.state, 'claimant_contact' in stt, 'contact' in stt], ['takedown', 'hidden', false, false])
+r = await req('/api/admin/takedowns', { cookie: adm })
+const tds = (await json<{ items: { id: string; state: string; claimant_contact: string; tree: { id: string } | null; appealed_at: number | null }[] }>(r)).items
+assert.equal(tds.length, 3); assert.equal(tds.find((k) => k.id === tdId)!.claimant_contact, 'holder@example.com'); assert.equal(tds.find((k) => k.id === tdId)!.tree!.id, 't-td')
+assert.equal((await req(`/api/admin/takedowns/${tdId}`, { body: { action: 'resume' }, cookie: adm })).status, 200) // hidden → resume 허용
+await req(`/api/admin/trees/t-td/hide`, { body: {}, cookie: adm }) // 다시 숨겨 통보 흐름 검사
+db.prepare("UPDATE takedowns SET state = 'hidden', resolved_at = NULL WHERE id = ?").run(tdId)
+assert.equal((await req('/api/trees/t-td/appeal', { body: { text: '제가 쓴 요약입니다' }, cookie: c2 })).status, 201) // 소유자 재개 요구 = 소명
+assert.ok((await json<{ items: { id: string; appealed_at: number | null }[] }>(await req('/api/admin/takedowns', { cookie: adm }))).items.find((k) => k.id === tdId)!.appealed_at! > 0)
+assert.equal((await req(`/api/admin/takedowns/${tdId}`, { body: { action: 'confirm' }, cookie: adm })).status, 200) // hidden → confirm 가능. 아래 통보 흐름을 위해 되돌린다
+db.prepare("UPDATE takedowns SET state = 'hidden', resolved_at = NULL WHERE id = ?").run(tdId)
+db.prepare("UPDATE appeals SET resolved_at = NULL, resolution = NULL WHERE tree_id = 't-td'").run()
+assert.equal((await req(`/api/admin/takedowns/${tdId}`, { body: { action: 'bogus' }, cookie: adm })).status, 400)
+r = await req(`/api/admin/takedowns/${tdId}`, { body: { action: 'resume_notify' }, cookie: adm })
+const tdn = (await json<{ takedown: { state: string; resume_due: number; counter_at: number } }>(r)).takedown
+assert.equal(tdn.state, 'resume_notified'); assert.ok(tdn.resume_due > T0 + 6 * DAY && tdn.counter_at > 0)
+assert.equal((await req(`/api/admin/takedowns/${tdId}`, { body: { action: 'confirm' }, cookie: adm })).status, 409) // resume_notified 에서 confirm 불가
+r = await req(`/api/admin/takedowns/${tdId}`, { body: { action: 'resume' }, cookie: adm })
+assert.equal((await json<{ takedown: { state: string; resolved_at: number } }>(r)).takedown.state, 'resumed')
+assert.equal(hidden('t-td').h, null)
+assert.equal(db.prepare("SELECT 1 FROM appeals WHERE tree_id = 't-td' AND resolved_at IS NULL").get(), undefined)
+assert.deepEqual((await json<{ items: unknown[] }>(await req('/api/admin/takedowns', { cookie: adm }))).items.length, 2)
+for (const a of ['takedown.notify', 'tree.unhide']) assert.ok(db.prepare("SELECT 1 FROM audit_log WHERE action = ? AND target_id = 't-td'").get(a), a)
+// 트리 없는 접수는 기각, 처리 90일 뒤 연락처 포함 행 삭제
+const rcv = tds.find((k) => k.tree === null)!
+assert.equal((await json<{ takedown: { state: string } }>(await req(`/api/admin/takedowns/${rcv.id}`, { body: { action: 'reject' }, cookie: adm }))).takedown.state, 'rejected')
+legalDaily(db, T0 + 91 * DAY)
+assert.equal(db.prepare('SELECT 1 FROM takedowns WHERE id = ?').get(tdId), undefined)
+assert.equal((await req('/api/report/' + tdId, { ip: 'st-2' })).status, 404)
+
+// 정보주체 요청(#25): 수동 입력, due = +10일, 완료 → audit dsr.<kind>, 90일 뒤 삭제
+assert.equal((await req('/api/admin/requests', { body: { kind: 'bogus' }, cookie: adm })).status, 400)
+r = await req('/api/admin/requests', { body: { kind: 'access', channel: 'email', received_at: T0 - 9 * DAY, target_type: 'user', target_id: carol[0].id, note: '열람 요청 메일' }, cookie: adm })
+assert.equal(r.status, 201)
+const rq = (await json<{ request: { id: string; due_at: number; state: string } }>(r)).request
+assert.equal(rq.due_at, T0 + DAY); assert.equal(rq.state, 'open')
+r = await req('/api/admin/requests', { body: { kind: 'minor' }, cookie: adm })
+const rq2 = (await json<{ request: { id: string; channel: string } }>(r)).request
+assert.equal(rq2.channel, 'email')
+assert.deepEqual((await json<{ items: { id: string }[] }>(await req('/api/admin/requests', { cookie: adm }))).items.map((x) => x.id), [rq.id, rq2.id]) // 기한 임박 순
+assert.equal((await req(`/api/admin/requests/${rq.id}`, { body: { action: 'later' }, cookie: adm })).status, 400)
+r = await req(`/api/admin/requests/${rq.id}`, { body: { action: 'done', note: '내보내기 전달' }, cookie: adm })
+assert.deepEqual(await json<{ request: { state: string; note: string } }>(r).then((x) => [x.request.state, x.request.note]), ['done', '내보내기 전달'])
+assert.equal((await req(`/api/admin/requests/${rq.id}`, { body: { action: 'done' }, cookie: adm })).status, 409)
+assert.ok(db.prepare("SELECT 1 FROM audit_log WHERE action = 'dsr.access' AND target_type = 'user' AND target_id = ?").get(carol[0].id))
+assert.equal((await json<{ items: unknown[] }>(await req('/api/admin/requests?status=all', { cookie: adm }))).items.length, 2)
+await req(`/api/admin/requests/${rq2.id}`, { body: { action: 'rejected' }, cookie: adm })
+legalDaily(db, T0 + 91 * DAY)
+assert.equal((db.prepare('SELECT COUNT(*) n FROM requests').get() as { n: number }).n, 0)
+await req('/api/admin/settings', { method: 'PUT', body: { auto_hide_reports: 3 }, cookie: adm })
+db.prepare("DELETE FROM reports WHERE tree_id IN ('t-auto','t-td')").run(); db.prepare("DELETE FROM trees WHERE id IN ('t-auto','t-td')").run()
 
 // ---- 운영 기록·감사 로그 불변(트리거) ----
 assert.equal((await req('/api/admin/ops/note', { body: { kind: 'bad', text: 'x' }, cookie: adm })).status, 400)

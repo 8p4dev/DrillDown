@@ -100,8 +100,61 @@ export interface Me {
   product: ProductMe
 }
 
-/** GET /api/me 의 법규·통지 부분(server/account/legal.ts 가 채운다) — 공지 목록 등 */
-export interface LegalMe {}
+/** GET /api/me 의 법규·통지 부분(server/account/legal.ts 가 채운다). 비로그인은 GET /api/notices 가 같은 모양(audience='all' 만) */
+export interface LegalMe {
+  /** 지금 유효한 공지(기간 안·대상 맞음) */
+  notices: Notice[]
+  /** 예약된 점검(아직 시작 전)의 사전 고지. 점검 중 자체는 Me.maintenance */
+  maintenance_scheduled?: { from: number; until: number | null }
+}
+/** 공지 1건 — settings.notices. 기간 없음 = 항상, audience 'users' = 로그인 사용자만 */
+export interface Notice {
+  id: string
+  text: string
+  url?: string
+  from?: number | null
+  until?: number | null
+  audience: 'all' | 'users'
+}
+/** 저작권 게시중단 요청(GET /api/admin/takedowns) — 저작권법 §103. received → hidden(즉시 숨김·소유자 앱 내 통보) → resume_notified(재개 예정일 통보) → resumed | litigation. 또는 confirmed(30일 내 재개 요구 없음) | rejected */
+export type TakedownState = 'received' | 'hidden' | 'resume_notified' | 'resumed' | 'litigation' | 'confirmed' | 'rejected'
+export interface Takedown {
+  id: ID
+  slug: string
+  tree: { id: ID; title: string; slug: string | null; hidden_by_admin_at: number | null } | null
+  claimant_name: string
+  claimant_contact: string
+  claim: string
+  state: TakedownState
+  received_at: number
+  hidden_at: number | null
+  counter_at: number | null
+  resume_due: number | null
+  resolved_at: number | null
+  /** 소유자가 보낸 열린 소명(= 재개 요구) 시각 */
+  appealed_at: number | null
+}
+/** 정보주체 요청(GET /api/admin/requests) — 열람·정정·삭제·처리정지·미성년·기타, 기한 10일 */
+export type DsrKind = 'access' | 'correct' | 'delete' | 'suspend' | 'minor' | 'other'
+export interface DsrRequest {
+  id: ID
+  kind: DsrKind
+  channel: string
+  received_at: number
+  due_at: number
+  target_type: 'user' | 'tree' | null
+  target_id: string | null
+  state: 'open' | 'done' | 'rejected'
+  note: string | null
+  resolved_at: number | null
+}
+/** GET /api/report/:id — 접수번호로 보는 상태(연락처·트리 정보 없음) */
+export interface ReportStatus {
+  kind: 'report' | 'takedown'
+  state: 'open' | 'hidden' | 'dismissed' | TakedownState
+  received_at: number
+  updated_at: number | null
+}
 /** GET /api/me 의 제품 부분(server/account/product.ts 가 채운다) — 운영 스위치 */
 export interface ProductMe { flags: ProductFlags }
 
@@ -262,6 +315,8 @@ export interface AdminTree {
   node_count: number
   updated_at: number
   hidden_by_admin_at: number | null
+  /** 임시조치(보류 숨김) 만료. null = 확정 숨김 또는 숨김 아님 */
+  hidden_until: number | null
   open_reports: number
   /** 관리자 "삭제 트리 복구" 목록용(7일 유예 중). 없음/null = 삭제 안 됨 */
   deleted_at?: number | null
@@ -290,8 +345,13 @@ export interface Appeal {
 }
 
 export interface Settings {
+  /** 파생(읽기 전용): 지금 유효한 audience='all' 첫 공지. 저장은 notices 로 */
   notice: { text: string; enabled: boolean }
-  maintenance: { enabled: boolean }
+  notices: Notice[]
+  /** enabled = manual || (from ≤ now < until). PUT 은 manual·from·until 만 받는다 */
+  maintenance: { enabled: boolean; manual: boolean; from?: number | null; until?: number | null }
+  /** 열린 신고가 이 수에 닿으면 자동 임시 숨김(30일). 0 = 끔 */
+  auto_hide_reports: number
 }
 
 export interface AuditRow {

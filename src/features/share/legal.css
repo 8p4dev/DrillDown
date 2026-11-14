@@ -1,0 +1,9 @@
+/* 게시중단 요청 폼·접수 상태 (#/takedown, #/report/<id>) — 계정 화면 레이아웃(.account.privacy) 위에 폼만 얹는다 */
+.legal-form { display: flex; flex-direction: column; gap: .75rem; }
+.legal-form label:not(.toggle) { display: flex; flex-direction: column; gap: .3rem; font-size: var(--fs-sm); color: var(--text-2); }
+.legal-form input:not([type='checkbox']), .legal-form textarea { border-radius: var(--radius); font-size: var(--fs-md); color: var(--text); }
+.legal-form textarea { resize: vertical; }
+.legal-form [aria-invalid='true'] { border-color: var(--danger); }
+.legal-form .form-error { margin: 0; color: var(--danger); font-size: var(--fs-sm); }
+.legal-form button { align-self: flex-start; }
+.receipt { font-variant-numeric: tabular-nums; user-select: all; overflow-wrap: anywhere; }

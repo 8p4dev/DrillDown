@@ -78,7 +78,7 @@ export function treeStats(db: DB): { total: number; public: number; hidden: numb
 
 /** 관리자 공개 트리 목록(visibility='public' 또는 삭제 7일 이내). 소유자 닉네임은 users 조인. open_reports 는 SA 가 reports 로 채운다.
  *  커서 = "<정렬키>_<id>" (정렬키: 기본 updated_at, deleted=true 면 deleted_at, 내림차순) */
-export function listTreesForAdmin(db: DB, opts: { cursor?: string; limit: number; deleted?: boolean }): { items: { id: string; title: string; slug: string | null; owner: { id: string; nickname: string }; node_count: number; updated_at: number; hidden_by_admin_at: number | null; deleted_at: number | null }[]; next: string | null } {
+export function listTreesForAdmin(db: DB, opts: { cursor?: string; limit: number; deleted?: boolean }): { items: { id: string; title: string; slug: string | null; owner: { id: string; nickname: string }; node_count: number; updated_at: number; hidden_by_admin_at: number | null; hidden_until: number | null; deleted_at: number | null }[]; next: string | null } {
   const key = opts.deleted ? 't.deleted_at' : 't.updated_at'
   const where = opts.deleted ? 't.deleted_at IS NOT NULL AND t.deleted_at >= ?' : "t.visibility = 'public' AND t.deleted_at IS NULL AND ? IS NOT NULL"
   const args: (string | number)[] = [opts.deleted ? Date.now() - GRACE_MS : 0]
@@ -86,21 +86,22 @@ export function listTreesForAdmin(db: DB, opts: { cursor?: string; limit: number
   const m = opts.cursor ? /^(\d+)_(.+)$/.exec(opts.cursor) : null
   if (m) { cur = ` AND (${key} < ? OR (${key} = ? AND t.id < ?))`; args.push(Number(m[1]), Number(m[1]), m[2]) }
   const limit = Math.max(1, Math.min(100, Math.floor(opts.limit) || 20))
-  const rows = db.prepare(`SELECT t.id, t.title, t.slug, t.owner_id, u.nickname, t.node_count, t.updated_at, t.hidden_by_admin_at, t.deleted_at, ${key} AS k
-    FROM trees t JOIN users u ON u.id = t.owner_id WHERE ${where}${cur} ORDER BY ${key} DESC, t.id DESC LIMIT ?`).all(...args, limit + 1) as { id: string; title: string; slug: string | null; owner_id: string; nickname: string; node_count: number; updated_at: number; hidden_by_admin_at: number | null; deleted_at: number | null; k: number }[]
+  const rows = db.prepare(`SELECT t.id, t.title, t.slug, t.owner_id, u.nickname, t.node_count, t.updated_at, t.hidden_by_admin_at, t.hidden_until, t.deleted_at, ${key} AS k
+    FROM trees t JOIN users u ON u.id = t.owner_id WHERE ${where}${cur} ORDER BY ${key} DESC, t.id DESC LIMIT ?`).all(...args, limit + 1) as { id: string; title: string; slug: string | null; owner_id: string; nickname: string; node_count: number; updated_at: number; hidden_by_admin_at: number | null; hidden_until: number | null; deleted_at: number | null; k: number }[]
   const page = rows.slice(0, limit)
   return {
-    items: page.map((r) => ({ id: r.id, title: r.title, slug: r.slug, owner: { id: r.owner_id, nickname: r.nickname }, node_count: r.node_count, updated_at: r.updated_at, hidden_by_admin_at: r.hidden_by_admin_at, deleted_at: r.deleted_at })),
+    items: page.map((r) => ({ id: r.id, title: r.title, slug: r.slug, owner: { id: r.owner_id, nickname: r.nickname }, node_count: r.node_count, updated_at: r.updated_at, hidden_by_admin_at: r.hidden_by_admin_at, hidden_until: r.hidden_until, deleted_at: r.deleted_at })),
     next: rows.length > limit ? `${page[page.length - 1].k}_${page[page.length - 1].id}` : null,
   }
 }
 
-/** 관리자 숨김/해제 → 바뀐 트리(없으면 null). seq 를 올려 소유자 기기가 pull 로 hidden 상태를 받는다 */
-export function setHidden(db: DB, treeId: string, hidden: boolean, now: number): { id: string; title: string; hidden_by_admin_at: number | null } | null {
+/** 관리자 숨김/해제 → 바뀐 트리(없으면 null). seq 를 올려 소유자 기기가 pull 로 hidden 상태를 받는다.
+ *  until = 임시조치(보류 숨김) 만료 시각(망법 §44조의2 ④ 30일). 없으면 확정 숨김. 해제하면 항상 NULL */
+export function setHidden(db: DB, treeId: string, hidden: boolean, now: number, until: number | null = null): { id: string; title: string; hidden_by_admin_at: number | null; hidden_until: number | null } | null {
   const t = db.prepare('SELECT owner_id FROM trees WHERE id = ?').get(treeId) as { owner_id: string } | undefined
   if (!t) return null
-  return db.prepare('UPDATE trees SET hidden_by_admin_at = ?, seq = ? WHERE id = ? RETURNING id, title, hidden_by_admin_at')
-    .get(hidden ? now : null, nextSeq(db, t.owner_id), treeId) as { id: string; title: string; hidden_by_admin_at: number | null }
+  return db.prepare('UPDATE trees SET hidden_by_admin_at = ?, hidden_until = ?, seq = ? WHERE id = ? RETURNING id, title, hidden_by_admin_at, hidden_until')
+    .get(hidden ? now : null, hidden ? until : null, nextSeq(db, t.owner_id), treeId) as { id: string; title: string; hidden_by_admin_at: number | null; hidden_until: number | null }
 }
 
 /** 사용자 상세(관리자) 트리 목록. 삭제 유예 중은 제외 */
