@@ -389,9 +389,11 @@ server/  ──▶  src/core/types.ts 의 CAP (한도 상수 하나만 가져다
 | `#/tree/<id>/blank` | `blank` | `features/dnd/BlankDndPage` (화면 이름은 "백지") |
 | `#/login` | `login` | `features/account/LoginPage` |
 | `#/account` | `account` | `features/account/AccountPage` |
-| `#/admin`, `#/admin/users`, `/trees`, `/system` | `admin` | `features/admin/AdminPage` |
+| `#/admin`, `#/admin/users`, `/trees`, `/requests`, `/metrics`, `/feedback`, `/system` | `admin` | `features/admin/AdminPage` |
 | `#/gallery` | `gallery` | `features/share/GalleryPage` |
-| `#/privacy` | `privacy` | `features/account/PrivacyPage` |
+| `#/privacy`, `#/terms` | `privacy`, `terms` | `features/account/PrivacyPage`, `TermsPage` |
+| `#/takedown` | `takedown` | `features/share/TakedownPage` (저작권 게시중단 요구, 비로그인 가능) |
+| `#/report/<id>` | `report` | `features/share/ReportStatusPage` (신고·게시중단 접수 상태, 연락처 없음) |
 | `/t/<slug>`, `/t/<slug>?m=flash` (`dnd`, `blank`도 가능) | `shared` | `features/share/SharedPage` |
 
 > **이름 주의.** 코드의 `dnd`는 화면의 "빈칸", 코드의 `blank`는 화면의 "백지"다. 둘 다 `features/dnd/` 폴더에 있다. 코드를 찾을 때 자주 헷갈린다.
@@ -676,7 +678,7 @@ EditorPage                     상태, 저장, 키보드, 확대·축소 전부 
 - **로그인** (`LoginPage.tsx`): Google과 카카오 OAuth만 있다. 비밀번호 로그인은 없다. 새 창을 띄우지 않고 같은 창에서 이동한다. 카카오톡 같은 앱 안의 브라우저에서는 Google 버튼을 끄고 외부 브라우저로 여는 방법을 안내한다.
 - **병합 대화** (`MergeDialog.tsx`): 로그인했는데 이 기기에 이미 트리가 있을 때 뜬다. 자세한 분기는 [7장의 시나리오 1](#시나리오-1-로그인-없이-쓰다가-처음-로그인한다)에 있다.
 - **계정 화면** (`AccountPage.tsx`): 닉네임, 로그인된 기기 목록, 휴지통, 데이터 내보내기(`drilldown-export.json`), 백업 가져오기, 로그아웃, 탈퇴. 비로그인 상태에서도 휴지통과 내보내기·가져오기는 쓸 수 있다.
-- **관리자 화면** (`AdminPage.tsx`): 탭이 네 개다. 대시보드, 사용자(정지·삭제), 공개 트리(숨김·신고 처리·복구), 시스템(공지, 점검 모드, 감사 로그).
+- **관리자 화면** (`AdminPage.tsx`): 탭마다 파일 하나(`features/admin/*Tab.tsx`), 공용은 `shared.tsx`·`widgets.tsx`. 탭 일곱 개: 대시보드(수치·카운터·백업 상태), 사용자(검색·상세·정지·삭제·세션 폐기·탈퇴 취소), 공개 트리(보류 30일/확정 숨김·신고 처리·복구), 요청(정보주체 요청·게시중단 흐름), 지표(학습 지표·일일 통계 그래프·큐레이션), 피드백(수집함·처리·메모), 시스템(공지·점검 예약·운영 스위치·서버 패널·사건 대응·감사 로그). 오늘 구현 요약은 `docs/ADMIN_2026-11-14.md`.
 
 ---
 
@@ -982,6 +984,16 @@ API 목록, 환경 변수, 매일 도는 작업은 [9장](#9-서버-참고표-ap
 | GET `/api/admin/appeals`, POST `/appeals/<id>/resolve` | 소명 큐와 처리(`accepted` = 숨김 해제, `rejected`). 숨김 해제(`/unhide`)도 열린 소명을 수용 처리한다 |
 | POST `/api/admin/ops/revoke-sessions` | 전 세션 폐기(관리자 본인 포함, 사건 대응) |
 | POST `/api/admin/ops/note` | 운영 기록(`incident`·`restore`·`note`) → 감사 로그 `system.*` |
+| GET `/api/admin/ops/admins`, POST `/ops/run/<backup\|daily>`, `/ops/restart`, `/ops/checkpoint` | 관리자 목록 읽기(`admins.json`), 수동 백업·일일 작업(자식 프로세스, 동시 409), 재시작(audit 후 exit 1), WAL checkpoint (`ops.ts`) |
+| POST `/api/admin/users/<id>/revoke-sessions`, `/undelete` | 사용자 세션 전부 폐기, 탈퇴 취소(트리 복구 포함) |
+| POST `/api/admin/trees/<id>/hold`, `/confirm` | 보류 숨김(30일, `hidden_until`, `legalDaily` 가 해제)과 확정 숨김 (`legal.ts`) |
+| GET `/api/admin/takedowns`, POST `/takedowns/<id>` | 게시중단 큐와 상태 전이(통보·재개·소 제기·확정·기각). 연락처는 처리 후 90일 삭제 |
+| GET / POST `/api/admin/requests`, POST `/requests/<id>` | 정보주체 요청 큐(수동 입력, D-10, 완료 시 audit `dsr.<kind>`) |
+| GET `/api/admin/product/metrics?days=`, `/product/trees`, `/product/reports` | 학습·성장 지표(현재 스키마 SQL, 100ms 목표), 공개 트리 큐레이션, 소유자·신고자 단위 신고 집계 (`product.ts`) |
+| GET / PUT `/api/admin/product/settings` | 운영 스위치 `flags`(갤러리·신고·별점·공개 전환, 서버 라우트도 같은 값으로 거절)와 추천 고정 `featured_slugs` |
+| GET `/api/admin/feedback`, POST `/feedback/<id>` | 피드백 수집함과 처리·메모 |
+
+관리자 전용이 아닌 것(법규·제품): POST `/api/takedown`(비로그인, IP 3/시 메모리 버킷) · GET `/api/report/<id>`(접수 상태만) · GET `/api/notices`(비로그인 공지, 60초 캐시) · POST `/api/feedback`(비로그인 5/시·로그인 20/시) + GET `/api/me/feedback` · POST `/api/client-error`(≤200자, 분당 10건, 메모리 카운터). 마이그레이션 005(takedowns·requests·`trees.hidden_until`)·006(daily_stats·feedback·`trees.view_count`).
 
 관리자 전용이 아닌 것: POST `/api/trees/<id>/appeal` — 운영 숨김된 트리의 소유자가 소명을 보낸다(트리당 열린 소명 1건, 하루 5건). 사유·소명 상태는 GET `/api/me` 의 `hidden_trees` 로 내려가고 공유 시트가 보여 준다. 정지된 사용자는 로그인 리디렉션 `#/login?e=suspended&r=<사유>` 로 사유를 본다.
 

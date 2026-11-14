@@ -139,7 +139,7 @@ test('탈퇴 2단계 → 로그아웃 → 7일 안 재로그인이면 계정·�
 
 test('비로그인은 서버에 아무것도 보내지 않는다(sync 엔진 청크 미로드)', async ({ page }) => {
   const api: string[] = []
-  page.on('request', (r) => { const u = new URL(r.url()); if (u.pathname.startsWith('/api/') && u.pathname !== '/api/me' && u.pathname !== '/api/auth/providers') api.push(u.pathname) })
+  page.on('request', (r) => { const u = new URL(r.url()); if (u.pathname.startsWith('/api/') && !['/api/me', '/api/auth/providers', '/api/notices'].includes(u.pathname)) api.push(u.pathname) })
   await makeTree(page, '헌법', '기본권')
   await page.goto('/#/')
   await page.waitForTimeout(2500)
