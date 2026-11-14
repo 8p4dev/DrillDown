@@ -7,7 +7,7 @@ const root = resolve(import.meta.dirname, '..')
 export const env = {
   port: Number(e.PORT ?? 3000),
   /** 127.0.0.1 만 (외부는 같은 호스트의 cloudflared Tunnel, 04 §3.12 D1) */
-  host: e.HOST ?? '127.0.0.1',
+  host: e.HOST || '127.0.0.1', // 빈 HOST= 도 루프백(빈 문자열은 모든 인터페이스 바인딩, v2 ✘2)
   /** 공개 주소. OAuth redirect_uri·og:url·공유 링크에 쓴다. 도메인은 사용자 결정 D18 — 미정이면 로컬 주소 */
   origin: (e.PUBLIC_ORIGIN ?? `http://localhost:${e.PORT ?? 3000}`).replace(/\/$/, ''),
   dataDir: resolve(root, e.DATA_DIR ?? 'data'),

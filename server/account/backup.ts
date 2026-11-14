@@ -19,6 +19,7 @@ export async function runBackup(db: DB, now = new Date()): Promise<BackupResult>
     const dir = join(env.dataDir, 'backups')
     // 로컬 사본은 평문(age 는 외부 전송본에만) — 디렉터리 700·파일 600 으로 다른 계정이 못 읽게(s4 M1). Windows 는 chmod 가 no-op
     mkdirSync(dir, { recursive: true, mode: 0o700 })
+    try { chmodSync(dir, 0o700) } catch { /* Windows no-op */ } // mode 는 신규 생성에만 적용 — 기존 755 폴더도 조인다(v2 ✘5)
     const ymd = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`
     const file = join(dir, `app-${ymd}.db`)
     rmSync(file, { force: true })

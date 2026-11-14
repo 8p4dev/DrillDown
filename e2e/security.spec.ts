@@ -48,7 +48,10 @@ test('악성 제목·내용·별칭 트리 공개 → 공유 보기·갤러리 �
   const owner = await browser.newContext()
   const po = await owner.newPage()
   const dialogs: string[] = []
-  po.on('dialog', (d) => { dialogs.push(d.message()); void d.dismiss() })
+  // CSP 가 인라인 핸들러를 막으면 dialog 는 안 뜨고 콘솔에 'Content Security Policy' 거부가 찍힌다 — 그것도 이스케이프 회귀 신호로 센다(v2 사각)
+  const cspv: string[] = []
+  const watch = (pg: typeof po) => { pg.on('dialog', (d) => { dialogs.push(d.message()); void d.dismiss() }); pg.on('console', (m) => { if (/Content Security Policy/.test(m.text())) cspv.push(m.text()) }) }
+  watch(po)
   await login(po, 'mallory')
   await makeTree(po, TITLE, `${NODE}\n임금`)
   // 내용(노트)과 별칭은 편집기 패널에서
@@ -73,14 +76,14 @@ test('악성 제목·내용·별칭 트리 공개 → 공유 보기·갤러리 �
   await po.getByRole('button', { name: '확인' }).click()
   const url = (await po.locator('.share-url').textContent())!.trim()
   const path = new URL(url).pathname
-  expect(dialogs).toEqual([])
+  expect(dialogs).toEqual([]); expect(cspv).toEqual([])
   // 내용·별칭까지 서버에 닿은 뒤에 방문(제목만 보는 waitOnServer 와 달리 노드 본문을 본다)
   await expect.poll(async () => (await (await owner.request.get(`/api${path}`)).text()).includes('alert(4)') ? 'synced' : 'pending', { timeout: 15_000 }).toBe('synced')
 
   // 비로그인 방문자: 공유 보기(OG 셸 + React) → 플래시 탭 → 갤러리 미리보기
   const anon = await browser.newContext()
   const pa = await anon.newPage()
-  pa.on('dialog', (d) => { dialogs.push(d.message()); void d.dismiss() })
+  watch(pa)
   const res = await pa.goto(path)
   expect(res?.status()).toBe(200)
   const shell = await res!.text()
@@ -102,6 +105,6 @@ test('악성 제목·내용·별칭 트리 공개 → 공유 보기·갤러리 �
   await expect(pa.locator('.gallery-outline')).toContainText(NODE)
   expect(await injected(pa)).toBe(0)
 
-  expect(dialogs).toEqual([])
+  expect(dialogs).toEqual([]); expect(cspv).toEqual([])
   await owner.close(); await anon.close()
 })

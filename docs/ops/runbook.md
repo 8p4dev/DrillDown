@@ -41,7 +41,7 @@
 9. 기동 전 env 체크(S1 H1·S4 H1 — 이 둘이 틀리면 Access 밖 경로 한 줄로 누구나 관리자가 된다):
    - [ ] `/etc/drilldown/env` 에 `AUTH_FAKE` 줄이 **없거나 `AUTH_FAKE=0`** 이다(`grep AUTH_FAKE /etc/drilldown/env`). 유닛 셋에 `Environment=AUTH_FAKE=0` 이 EnvironmentFile 뒤에 있어 env 파일 값을 덮는다.
    - [ ] `PUBLIC_ORIGIN=https://<도메인>` 이 **반드시** 있다(비우면 `http://localhost:3000` 으로 잡혀 쿠키 `Secure` 가 빠지고 OAuth redirect 가 어긋난다).
-   - [ ] `HOST` 는 비우거나 `127.0.0.1`(터널만 들어온다).
+   - [ ] `HOST` 줄은 쓰지 않거나 `127.0.0.1`(터널만 들어온다). 빈 `HOST=` 도 쓰지 않는다 — 서버가 루프백으로 되돌리지만 의도를 분명히.
    서버는 `AUTH_FAKE=1` 이면서 origin 이 https 이거나 바인딩이 루프백(127.0.0.1·::1·localhost)이 아니면 기동을 거부한다 — `journalctl -u drilldown-server` 에 `AUTH_FAKE` 줄이 보이면 env 를 고치고 재시작. 로컬 http 개발 기동 로그에 `AUTH_FAKE` 가 보이면 가짜 로그인이 열린 상태다.
 
 ## 2. OAuth 앱 등록 체크리스트
@@ -71,9 +71,9 @@
 | 주기 | 작업 |
 |---|---|
 | 매일 03:00 | `drilldown-backup` — `data/backups/app-YYYYMMDD.db`(14개, 평문·모드 600·디렉터리 700) → `age` → `rclone copyto <remote>/app-YYYYMMDD.db.age`(암호문은 외부본만, 로컬엔 남지 않음). 결과 `backup.json` → 대시보드 "마지막 백업" |
-| 매일 04:00 | `drilldown-daily` — 만료 세션, 탈퇴 7일 purge(소명·피드백 글 포함), 톰스톤, 처리 신고·소명·게시중단·정보주체 요청 90일, 임시조치(30일) 만료 복원, daily_stats, 감사 로그 1년(맨 뒤), WAL checkpoint. 결과 `daily.json`. 게시중단 접수로 숨긴 트리는 30일 임시조치라 큐에서 **확정**하지 않으면 자동 복원된다 |
+| 매일 04:00 | `drilldown-daily` — 만료 세션, 탈퇴 7일 purge(소명·피드백 글 포함), 톰스톤, 처리 신고·소명·게시중단·정보주체 요청·피드백 90일(미처리 게시중단·요청은 180일·대상 트리 소멸 시 삭제), 임시조치(30일) 만료 복원, daily_stats, 감사 로그 1년(맨 뒤), WAL checkpoint. 결과 `daily.json`. 게시중단 접수로 숨긴 트리는 30일 임시조치라 큐에서 **확정**하지 않으면 자동 복원된다 |
 | 매월 | `npm audit`, OS 업데이트 확인, **복원 리허설**(아래 4를 노트북에서 끝까지) |
-| 업데이트 | 빌드 기기에서 `git pull && npm ci && npm run build` → `rsync -a --delete dist/ drilldown@<pi>:/opt/drilldown/dist/`; 서버 코드가 바뀌었으면 Pi 에서 `cd /opt/drilldown && sudo -u drilldown git pull && sudo -u drilldown npm ci --omit=dev`(§1-3) → 재시작은 **관리자 → 시스템 → 서버 → [서버 재시작]**(exit 1 → systemd 가 5초 뒤 되살림) 또는 `sudo systemctl restart drilldown-server`. 빌드 뒤 재시작을 잊으면 같은 패널에 "재시작 필요" 가 빨갛게 뜬다(커밋·빌드 해시도 거기서 확인). 마이그레이션은 기동 시 자동, 직전에 `pre-migrate-NNN.db` 1개 보관 |
+| 업데이트 | 빌드 기기에서 `git pull && npm ci && npm run build` → `rsync -a --delete dist/ drilldown@<pi>:/opt/drilldown/dist/`; 서버 코드가 바뀌었으면 Pi 에서 `cd /opt/drilldown && sudo -u drilldown git pull && sudo -u drilldown npm ci --omit=dev`(§1-3) → 재시작은 **관리자 → 시스템 → 서버 → [서버 재시작]**(exit 1 → systemd 가 5초 뒤 되살림) 또는 `sudo systemctl restart drilldown-server`. **`dist/` 를 바꿨으면 서버도 반드시 재시작**한다 — CSP 의 인라인 스크립트 해시를 기동 시 `dist/index.html` 에서 계산하므로, 재시작 전까지 새 index.html 의 테마·PWA 스크립트가 CSP 에 막힌다. 빌드 뒤 재시작을 잊으면 같은 패널에 "재시작 필요" 가 빨갛게 뜬다(커밋·빌드 해시도 거기서 확인). 마이그레이션은 기동 시 자동, 직전에 `pre-migrate-NNN.db` 1개 보관 |
 
 수동 실행: **관리자 → 시스템 → 서버 → [지금 백업] / [일일 작업 실행]**(타이머와 같은 스크립트를 자식 프로세스로 띄움, 끝나면 대시보드 카드가 갱신되고 오류 문구가 카드에 보인다). 서버 유닛에 `RCLONE_CONFIG=/etc/drilldown/rclone.conf` 가 있어야 외부 업로드까지 된다(`deploy/drilldown-server.service`). SSH 대안: `sudo systemctl start drilldown-daily`, 상세 로그는 `journalctl -u drilldown-daily`. WAL 이 커졌으면 같은 패널 [WAL checkpoint]. 로컬 백업 14개가 실제로 있는지는 시스템 → 복원 표에서 본다(다운로드는 없음).
 

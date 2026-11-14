@@ -60,7 +60,7 @@ export default function PrivacyPage() {
       <p>{contact || '운영자 설정 필요'}</p>
 
       <h2>⑧ 자동 수집 장치(쿠키)</h2>
-      <p><code>sid</code>(로그인 유지), <code>oauth</code>(로그인 중 10분), <code>theme</code>(화면 테마). 모두 기능에 필요하며 광고 쿠키는 없습니다.</p>
+      <p><code>sid</code>(로그인 유지), <code>oauth</code>(로그인 중 10분). 둘 다 기능에 필요하며 광고 쿠키는 없습니다. 화면 테마는 쿠키가 아닌 브라우저 저장소(localStorage)에만 둡니다.</p>
 
       <h2>⑨ AI 학습 활용</h2>
       <p>없습니다.</p>
