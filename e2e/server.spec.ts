@@ -166,6 +166,8 @@ test('갤러리 직접 진입: 미리보기 시트 닫기 버튼 44px', async ({
   const anon = await browser.newContext({ hasTouch: true }) // (pointer: coarse) → --tap 44px
   const pa = await anon.newPage()
   await pa.goto('/#/gallery')
+  // 갤러리 목록은 서버가 (정렬·쪽·검색어) 별로 60초 캐시한다 — 다른 스펙이 먼저 연 빈 목록에 가려지지 않게 제목으로 검색(별도 캐시 키)
+  await pa.getByLabel('제목 검색').fill('갤러리 진입 검증')
   await pa.locator('li.card', { hasText: '갤러리 진입 검증' }).getByRole('button', { name: '미리보기' }).click()
   const x = pa.locator('.sheet-head .sheet-x')
   await expect(x).toBeVisible()
