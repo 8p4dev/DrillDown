@@ -6,6 +6,8 @@ import { tx, type DB } from '../db.ts'
 import { env } from '../env.ts'
 import { body, clientIp, fail, hit, limit, requireUser, type AppEnv } from '../http.ts'
 import { audit, CTRL, getSettings, purgeUserNow, softDeleteUser } from './admin.ts'
+import { legalMe } from './legal.ts'
+import { productMe } from './product.ts'
 import { clearSid } from './session.ts'
 
 const userOf = (db: DB, id: string): User => {
@@ -70,7 +72,8 @@ export function registerMe(app: Hono<AppEnv>) {
   app.get('/api/me', (c) => {
     const db = c.get('db')
     const s = getSettings(db)
-    const me: Me = { user: userOf(db, uid(c)), notice: s.notice.enabled && s.notice.text ? { text: s.notice.text } : null, maintenance: s.maintenance.enabled, hidden_trees: hiddenTreesOf(db, uid(c)) }
+    const me: Me = { user: userOf(db, uid(c)), notice: s.notice.enabled && s.notice.text ? { text: s.notice.text } : null, maintenance: s.maintenance.enabled, hidden_trees: hiddenTreesOf(db, uid(c)),
+      legal: legalMe(db, uid(c)), product: productMe(db, uid(c)) }
     return c.json(me)
   })
 

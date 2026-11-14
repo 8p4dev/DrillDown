@@ -3,7 +3,7 @@ import { flushSync } from 'react-dom'
 
 // 라우트 — 공유 계약 orchestration_ui_first.md §3.1 (오케스트레이터 소유). 해시 라우터 + 공유 보기만 pathname(/t/<slug>, 04 §3.4.2)
 export type Mode = 'edit' | 'flash' | 'dnd' | 'blank'
-export type AdminTab = 'dashboard' | 'users' | 'trees' | 'system'
+export type AdminTab = 'dashboard' | 'users' | 'trees' | 'requests' | 'metrics' | 'feedback' | 'system'
 export type Route =
   | { name: 'trees' }
   | { name: Mode; treeId: string; rootId?: string }
@@ -13,10 +13,12 @@ export type Route =
   | { name: 'gallery' }
   | { name: 'privacy' }
   | { name: 'terms' }
+  | { name: 'takedown' } // 저작권 게시중단 요청 폼 (약관 5)
+  | { name: 'report'; id: string } // 신고·게시중단 접수 상태 조회
   | { name: 'shared'; slug: string; mode: 'view' | Exclude<Mode, 'edit'>; rootId?: string }
 
 const MODES: Mode[] = ['flash', 'dnd', 'blank']
-const ADMIN_TABS: AdminTab[] = ['users', 'trees', 'system']
+const ADMIN_TABS: AdminTab[] = ['users', 'trees', 'requests', 'metrics', 'feedback', 'system']
 export const SLUG_RE = /^[1-9A-HJ-NP-Za-km-z]{11}$/
 
 export function parseHash(hash: string): Route {
@@ -34,6 +36,8 @@ export function parseHash(hash: string): Route {
   if (p[0] === 'gallery') return { name: 'gallery' }
   if (p[0] === 'privacy') return { name: 'privacy' }
   if (p[0] === 'terms') return { name: 'terms' }
+  if (p[0] === 'takedown') return { name: 'takedown' }
+  if (p[0] === 'report' && p[1]) return { name: 'report', id: p[1].slice(0, 64) }
   return { name: 'trees' }
 }
 
@@ -73,6 +77,10 @@ export const href = {
   privacy: () => '#/privacy',
   /** 이용약관·신고 처리 절차 */
   terms: () => '#/terms',
+  /** 저작권 게시중단 요청 폼 */
+  takedown: () => '#/takedown',
+  /** 신고·게시중단 접수 상태(접수번호) */
+  report: (id: string) => `#/report/${id}`,
   /** 공유 보기. 모드 전환은 ?m= (해시를 쓰면 복사한 URL 에서 OG 가 빠진다, 04 §3.4.2) */
   shared: (slug: string, mode?: Exclude<Mode, 'edit'>, rootId?: string) =>
     `/t/${slug}${mode ? `?m=${mode}${rootId ? `&root=${rootId}` : ''}` : ''}`,

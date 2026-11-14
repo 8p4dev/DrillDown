@@ -96,7 +96,14 @@ export interface Me {
   maintenance: boolean
   /** 운영 숨김된 내 트리 — 사유(관리자 메모)·소명 상태. 소명은 POST /api/trees/:id/appeal */
   hidden_trees: { id: ID; title: string; at: number; reason: string | null; appealed_at: number | null }[]
+  legal: LegalMe
+  product: ProductMe
 }
+
+/** GET /api/me 의 법규·통지 부분(server/account/legal.ts 가 채운다) — 공지 목록 등 */
+export interface LegalMe {}
+/** GET /api/me 의 제품 부분(server/account/product.ts 가 채운다) — 운영 스위치(flags) 등 */
+export interface ProductMe {}
 
 /** GET /api/me/sessions 항목 */
 export interface Session {
@@ -124,7 +131,14 @@ export interface AdminStats {
   flags: { auth_fake: boolean }
   uptime_s: number
   rss: number
+  ops: OpsStats
+  product: ProductStats
 }
+
+/** stats.ops (server/account/ops.ts) — DB·WAL 크기, 세션 수, 카운터, 버전, OAuth 상태 등 */
+export interface OpsStats {}
+/** stats.product (server/account/product.ts) — 학습·성장 지표, 신고 SLA 등 */
+export interface ProductStats {}
 
 export interface AdminUser {
   id: ID

@@ -7,6 +7,9 @@ import type { AdminStats, AdminUser, Appeal, AuditRow, Report, Settings } from '
 import { tx, type DB } from '../db.ts'
 import { env } from '../env.ts'
 import { errors } from '../metrics.ts'
+import { registerLegal } from './legal.ts'
+import { opsStats, registerOps } from './ops.ts'
+import { productStats, registerProduct } from './product.ts'
 import { body, clientIp, DAY, fail, hit, limit, requireAdmin, requireUser, type AppEnv } from '../http.ts'
 import { listTreesForAdmin, purgeUser, restoreTree, setHidden, softDeleteTreesOfUser, treeCountOf, treeIdBySlug, treeStats, treesOfUser } from '../sync/owner.ts'
 
@@ -86,6 +89,8 @@ export function stats(db: DB, now = Date.now()): AdminStats {
     disk,
     errors: errors(),
     flags: { auth_fake: env.authFake },
+    ops: opsStats(db),
+    product: productStats(db),
     uptime_s: Math.floor(process.uptime()),
     rss: process.memoryUsage().rss,
   }
@@ -153,6 +158,9 @@ export function registerAdmin(app: Hono<AppEnv>) {
   registerAppeal(app)
   app.use('/api/admin/*', requireAdmin, limit('admin', 120, 60_000))
   const me = (c: Context<AppEnv>) => c.get('user')!.id
+  registerOps(app)
+  registerLegal(app)
+  registerProduct(app)
 
   app.get('/api/admin/stats', (c) => c.json(stats(c.get('db'))))
 
@@ -306,24 +314,6 @@ export function registerAdmin(app: Hono<AppEnv>) {
       resolveAppeals(db, a!.tree_id, res as 'accepted' | 'rejected')
     })
     return c.json({ appeal: appeal(db.prepare(`${APPEAL_SQL} WHERE a.id = ?`).get(id) as ARow) })
-  })
-
-  // ---- 운영 동작 (사건 대응, 런북 §5): 전 세션 폐기 · 운영 기록 ----
-  app.post('/api/admin/ops/revoke-sessions', (c) => {
-    const db = c.get('db')
-    const count = tx(db, () => {
-      const n = Number(db.prepare('DELETE FROM sessions').run().changes)
-      audit(db, me(c), 'system.sessions_revoke_all', 'settings', null, { count: n })
-      return n
-    })
-    return c.json({ count }) // 관리자 본인도 로그아웃된다(의도)
-  })
-  app.post('/api/admin/ops/note', async (c) => {
-    const b = await body<{ kind?: unknown; text?: unknown }>(c)
-    if (b.kind !== 'incident' && b.kind !== 'restore' && b.kind !== 'note') fail(400, 'invalid', '기록 종류를 고르세요', 'kind')
-    const text = optText(b.text, 200, 'text') ?? fail(400, 'invalid', '내용을 적어 주세요', 'text')
-    audit(c.get('db'), me(c), `system.${b.kind as string}`, 'settings', null, { text })
-    return c.body(null, 204)
   })
 
   app.get('/api/admin/settings', (c) => c.json({ settings: getSettings(c.get('db')) }))

@@ -22,6 +22,8 @@ const load = {
   gallery: () => import('./features/share/GalleryPage'),
   privacy: () => import('./features/account/PrivacyPage'),
   terms: () => import('./features/account/TermsPage'),
+  takedown: () => import('./features/share/TakedownPage'),
+  report: () => import('./features/share/ReportStatusPage'),
 }
 const loadAdmin = () => import('./features/admin/AdminPage')
 const TreeListPage = lazy(load.trees)
@@ -36,8 +38,10 @@ const SharedPage = lazy(load.shared)
 const GalleryPage = lazy(load.gallery)
 const PrivacyPage = lazy(load.privacy)
 const TermsPage = lazy(load.terms)
+const TakedownPage = lazy(load.takedown)
+const ReportStatusPage = lazy(load.report)
 
-const TITLES: Record<string, string> = { trees: '내 트리', login: '로그인', account: '계정', admin: '관리', gallery: '공개 트리', privacy: '개인정보 처리방침', terms: '이용약관', edit: '편집', flash: '플래시카드', dnd: '빈칸', blank: '백지' }
+const TITLES: Record<string, string> = { trees: '내 트리', login: '로그인', account: '계정', admin: '관리', gallery: '공개 트리', privacy: '개인정보 처리방침', terms: '이용약관', takedown: '게시중단 요청', report: '접수 상태', edit: '편집', flash: '플래시카드', dnd: '빈칸', blank: '백지' }
 /** 탭 제목(U52): '<트리 이름> · 편집 — Drill Down'. 공유 보기는 서버가 넣은 제목을 둔다 */
 async function titleOf(r: Route): Promise<string | null> {
   if (r.name === 'shared') return null
@@ -130,6 +134,8 @@ export default function App() {
           {r.name === 'gallery' && <GalleryPage />}
           {r.name === 'privacy' && <PrivacyPage />}
           {r.name === 'terms' && <TermsPage />}
+          {r.name === 'takedown' && <TakedownPage />}
+          {r.name === 'report' && <ReportStatusPage id={r.id} />}
           {r.name === 'shared' && <SharedPage key={r.slug} slug={r.slug} mode={r.mode} rootId={r.rootId} />}
           <Prefetch />
         </Suspense>

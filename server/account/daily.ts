@@ -6,6 +6,8 @@ import { env } from '../env.ts'
 import { DAY, GRACE_MS } from '../http.ts'
 import { purgeTombstones } from '../sync/owner.ts'
 import { audit, purgeUserNow } from './admin.ts'
+import { legalDaily } from './legal.ts'
+import { productDaily } from './product.ts'
 import { ABS_USER } from './session.ts'
 
 export interface DailyResult { at: number; ok: boolean; purged_users: number; purged_sessions: number; purged_tombstones: number; error?: string }
@@ -31,6 +33,8 @@ export function runDaily(db: DB, now = Date.now()): DailyResult {
     db.prepare('DELETE FROM audit_log WHERE ts < ?').run(now - 365 * DAY)
     db.prepare('DELETE FROM reports WHERE resolved_at < ?').run(now - 90 * DAY)
     db.prepare('DELETE FROM appeals WHERE resolved_at < ?').run(now - 90 * DAY)
+    legalDaily(db, now)
+    productDaily(db, now)
     // 6.
     db.exec('PRAGMA wal_checkpoint(TRUNCATE); PRAGMA optimize;')
   } catch (e) {
