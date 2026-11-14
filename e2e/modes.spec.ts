@@ -98,3 +98,23 @@ test('백지 D&D: 노드를 끌어 트리 만들기 → 채점 → 에디터 붉
   await expect(row(/^임금$/)).toHaveAttribute('data-miss', '0.25') // missHeat = miss 1 / MISS_MAX 4
   await expect(row(/^해고$/)).toHaveAttribute('data-miss', '0')
 })
+
+// r4-02 회귀: 하위 범위로 바꿨다가 루트로 돌아와도 루트 진행(알음 2)이 덮어써지지 않는다(flash:<tree>:<scope> 저장본 분리)
+test('플래시카드: 범위 전환 뒤 루트 진행 보존', async ({ page }) => {
+  const treeId = await seed(page)
+  await page.goto(`/#/tree/${treeId}/flash`)
+  await page.locator('button[data-concept-id]').click()
+  const kids = page.getByRole('list', { name: '하위 개념' }).locator('li[data-node-id]')
+  await kids.filter({ hasText: '근로계약' }).getByRole('button', { name: '알음', exact: true }).click()
+  await kids.filter({ hasText: '해고' }).getByRole('button', { name: '알음', exact: true }).click()
+  const known = page.getByLabel('평가 집계').locator('b').first()
+  await expect(known).toHaveText('2')
+
+  const scope = page.getByLabel('범위')
+  const sub = (await scope.locator('option', { hasText: '근로계약' }).getAttribute('value'))!
+  await scope.selectOption(sub)
+  await expect(page).toHaveURL(/root=/)
+  await expect(known).toHaveText('0') // 하위 범위는 새 세션
+  await page.goto(`/#/tree/${treeId}/flash`)
+  await expect(known).toHaveText('2') // 루트 저장본 그대로
+})

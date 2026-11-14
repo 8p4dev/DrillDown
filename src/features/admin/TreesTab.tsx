@@ -2,7 +2,8 @@
 // 게시중단·정보주체 요청 큐는 RequestsTab. 보류 숨김은 30일 뒤 legalDaily 가 해제하므로 D-7 안에 확정/해제를 결정한다.
 import { useRef, useState } from 'react'
 import { REASON, type AdminTree, type Appeal, type Report } from '../../core/api'
-import { eye, eyeOff, undo2 } from '../../ui/icons.all'
+import { eye, eyeOff } from '../../ui/icons.all'
+import { I } from '../../ui/icons'
 import { Icon } from '../../ui/Icon'
 import { TwoStep } from '../../ui/TwoStep'
 import { toast } from '../Toast'
@@ -102,7 +103,7 @@ export default function TreesTab() {
           {deleted.map((t) => (
             <li key={t.id}>
               <span className="grow"><strong>{t.title}</strong> · {t.owner.nickname}<br /><span className="muted">{when(t.deleted_at!)} 삭제</span></span>
-              <button type="button" aria-label={`${t.title} 복구`} onClick={() => restore(t)}><Icon d={undo2} /> 복구</button>
+              <button type="button" aria-label={`${t.title} 복구`} onClick={() => restore(t)}><Icon d={I.undo2} /> 복구</button>
             </li>
           ))}
         </ul>

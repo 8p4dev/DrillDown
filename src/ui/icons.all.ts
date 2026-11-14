@@ -2,11 +2,7 @@
 // 값은 <svg> 안쪽 자식 요소 문자열(여러 path/circle/rect). 그리는 법은 ./Icon.tsx. 규격: docs/specs/01_design_system.md §3.5
 // 생성: node icons.mjs (scratch). 손으로 고치지 말고 다시 생성한다.
 /** 그 외 화면용. 각 화면이 필요한 것만 import 해 트리셰이킹되게 named export 로 둔다 */
-// undo2·x·megaphone 은 첫 화면이 써서 ./icons.ts 로 옮겼다(H12, 손으로 수정). 기존 import 가 깨지지 않게 같은 이름으로 재수출
-import { I } from './icons'
-export const undo2 = I.undo2
-export const x = I.x
-export const megaphone = I.megaphone
+// undo2·x·megaphone 은 첫 화면이 써서 ./icons.ts(I.*) 에 있다(H12)
 export const logOut = "<path d=\"m16 17 5-5-5-5\" /><path d=\"M21 12H9\" /><path d=\"M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4\" />"
 export const shield = "<path d=\"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z\" />"
 export const zoomIn = "<circle cx=\"11\" cy=\"11\" r=\"8\" /><line x1=\"21\" x2=\"16.65\" y1=\"21\" y2=\"16.65\" /><line x1=\"11\" x2=\"11\" y1=\"8\" y2=\"14\" /><line x1=\"8\" x2=\"14\" y1=\"11\" y2=\"11\" />"

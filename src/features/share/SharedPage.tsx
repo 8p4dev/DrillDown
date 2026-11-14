@@ -11,7 +11,7 @@ import { CAP, type ID, type NodeSrs, type Tree, type TreeNode } from '../../core
 import { href, navigateShared, type Mode } from '../../router'
 import { Icon } from '../../ui/Icon'
 import { I } from '../../ui/icons'
-import { copy as copyIcon, eye, listTree, network, star, x, zoomIn, zoomOut } from '../../ui/icons.all'
+import { copy as copyIcon, eye, listTree, network, star, zoomIn, zoomOut } from '../../ui/icons.all'
 import GraphView from '../editor/graph/GraphView'
 import type { Dir } from '../editor/graph/layout'
 import { useZoom } from '../editor/graph/useZoom'
@@ -334,7 +334,7 @@ export default function SharedPage({ slug, mode, rootId }: { slug: string; mode:
         <div className="share-sheet">
           <header className="sheet-head">
             <h2>이미 복제한 트리가 있습니다</h2>
-            <button type="button" className="ghost sheet-x" aria-label="닫기" data-tip="닫기" onClick={() => setDup(null)}><Icon d={x} /></button>
+            <button type="button" className="ghost sheet-x" aria-label="닫기" data-tip="닫기" onClick={() => setDup(null)}><Icon d={I.x} /></button>
           </header>
           <p className="muted">‘{dup?.title}’ · 학습 기록은 그 트리에 있습니다</p>
           <div className="actions">
@@ -349,7 +349,7 @@ export default function SharedPage({ slug, mode, rootId }: { slug: string; mode:
           <div className="share-sheet share-report">
             <header className="sheet-head">
               <h2>신고 접수됨</h2>
-              <button type="button" className="ghost sheet-x" aria-label="닫기" data-tip="닫기" onClick={closeReport}><Icon d={x} /></button>
+              <button type="button" className="ghost sheet-x" aria-label="닫기" data-tip="닫기" onClick={closeReport}><Icon d={I.x} /></button>
             </header>
             <p>접수번호 <strong className="tnum" style={{ userSelect: 'all', overflowWrap: 'anywhere' }}>{receipt}</strong></p>
             <p className="muted">이 번호로 처리 결과를 볼 수 있습니다. 연락처는 받지 않으니 적어 두세요.</p>
@@ -362,7 +362,7 @@ export default function SharedPage({ slug, mode, rootId }: { slug: string; mode:
         <form className="share-sheet share-report" onSubmit={sendReport}>
           <header className="sheet-head">
             <h2>신고</h2>
-            <button type="button" className="ghost sheet-x" aria-label="닫기" data-tip="닫기" onClick={closeReport}><Icon d={x} /></button>
+            <button type="button" className="ghost sheet-x" aria-label="닫기" data-tip="닫기" onClick={closeReport}><Icon d={I.x} /></button>
           </header>
           <fieldset>
             <legend className="muted">사유</legend>

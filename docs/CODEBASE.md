@@ -1,6 +1,6 @@
 # Drill Down 코드베이스 안내서
 
-> 기준: 2026-11-12, 편집기 조작·공개 트리 개편(`docs/plans/orchestration_editor_share.md`) 반영. 그 전은 11-10 전 분야 개선(`orchestration_improve.md`). 처음 작성 기준은 11-09 커밋 `593f436`.
+> 기준: 2026-11-14, 관리자 페이지 3단계(`docs/ADMIN_2026-11-14.md`)와 전체 코드 리뷰 수정(`docs/plans/orchestration_review_fix.md`, 보고서 `docs/research/review_2026-11-14/`) 반영. 그 전은 11-12 편집기 조작·공개 트리 개편(`docs/plans/orchestration_editor_share.md`). 그 전은 11-10 전 분야 개선(`orchestration_improve.md`). 처음 작성 기준은 11-09 커밋 `593f436`.
 > 이 문서는 코드를 직접 읽고 정리한 뒤, 코드와 한 번 더 대조한 것이다. 코드가 바뀌면 이 문서가 낡는다. 의심스러우면 코드가 맞다.
 > 경로는 따로 말하지 않으면 `C:\drilldown\app\` 기준이다.
 
@@ -1139,7 +1139,7 @@ UI 라이브러리와 CSS 프레임워크를 쓰지 않는다. 규칙은 `src/in
 
 테스트 프레임워크가 없다. 파일 하나가 단독 스크립트이고, 기대와 다르면 예외를 던진다. 통과하면 `... ok`를 출력한다. 하나가 실패하면 거기서 멈춘다.
 
-클라이언트 쪽은 8개다.
+클라이언트 쪽은 9개다.
 
 | 점검 스크립트 | 점검 대상 |
 |---|---|
@@ -1147,27 +1147,29 @@ UI 라이브러리와 CSS 프레임워크를 쓰지 않는다. 규칙은 `src/in
 | `core/srs/srs.check.ts` | 채점, 간격, 색 |
 | `core/repo.check.ts` | 트리 목록 정렬과 검색 |
 | `core/backup.check.ts` | 백업 파일 검사 |
+| `core/sync/engine.check.ts` | 동기화 엔진(`fake-indexeddb` 위에서): superseded 뒤 pull 의 고아 처리, 같은 `updatedAt` 메아리 제외, 410 분류, id 재매핑, 409 `user_mismatch` |
 | `features/editor/graph/layout.check.ts` | 카드 배치, 검색, 되돌리기 위치 찾기 |
 | `features/editor/content/content.check.ts` | 내용 형식 |
 | `features/flash/flash.check.ts` | 플래시 출제 |
 | `features/dnd/dnd.check.ts` | 퀴즈 채점 |
 
-서버 쪽은 `server/check.ts`가 시작점이다. 메모리에만 있는 SQLite로 앱을 만들어 실제 요청을 보내 본다. `account.check.ts`는 로그인·세션·탈퇴·관리자를, `sync.check.ts`는 push/pull 충돌 사례와 공유를 점검한다.
+서버 쪽은 `server/check.ts`가 시작점이다. 메모리에만 있는 SQLite로 앱을 만들어 실제 요청을 보내 본다. `account.check.ts`는 로그인·세션·탈퇴·관리자·운영·법규(게시중단·요청·공지)를, `product.check.ts`(account.check 끝에서 import)는 지표·피드백·스위치를, `sync.check.ts`는 push/pull 충돌 사례·공유·카드/attempts 상한·마이그레이션 경로(003 → 기동 → 004~006)를 점검한다.
 
 ### 브라우저 통합 테스트 (`npm run e2e`)
 
 - Playwright가 직접 빌드하고, 4173 포트에 서버를 띄우고, 새 DB(`.e2e-data/`)로 시작한다.
 - **설치된 Microsoft Edge로 돈다.** Edge가 없으면 실행되지 않는다.
-- 파일 7개에 테스트가 20개다.
+- 파일 8개에 테스트가 24개다.
 
 | 파일 | 다루는 것 |
 |---|---|
 | `core-flow.spec.ts` | 트리 만들기, 개요 붙여넣기, 키보드 편집, 새로고침 후 유지, 내용 서식 |
-| `modes.spec.ts` | 플래시카드, 빈칸, 백지 |
+| `modes.spec.ts` | 플래시카드(범위 전환 뒤 루트 진행 보존 포함), 빈칸, 백지 |
 | `ux.spec.ts` | 삭제 후 실행 취소, 배율, 목록에서 이름 바꾸기 |
 | `extras.spec.ts` | 패널 편집, 확대·축소, 한글 조합 입력 |
 | `mobile.spec.ts` | 390×844 터치 화면 |
-| `server.spec.ts` | 두 기기 동기화, 첫 로그인 병합, 공유 링크, 탈퇴와 복구, 비로그인은 로그인 확인 말고 서버를 부르지 않음 |
+| `server.spec.ts` | 두 기기 동기화, 첫 로그인 병합, 공유 링크, 탈퇴와 복구, 비로그인은 로그인 확인·공지 말고 서버를 부르지 않음, 갤러리 직접 진입 시 시트 CSS |
+| `regress.spec.ts` | 11-10 개선의 회귀 2건(다른 기기 학습 기록, 병합 대화) |
 | `sync-robust.spec.ts` | 여러 번에 나눠 받는 pull, 트리 200개 한도 |
 
 ---
@@ -1312,6 +1314,9 @@ UI 라이브러리와 CSS 프레임워크를 쓰지 않는다. 규칙은 `src/in
 | 11-05 | 반투명 유리 느낌의 시안 3종 (나중에 전부 폐기) |
 | 11-08 | **재설계**: 흑백 + 초록/빨강, 각진 형태로 전환. 설계 문서 작성 → 화면 먼저 구현 → 서버 구현 (로그인, 동기화, 공유) → 트리가 많고 클 때의 문제 조사 |
 | 11-09 | 조사에서 나온 문제를 급한 순서(P0, P1, P2)로 나눠 수정. 세로 보기 추가 |
+| 11-10 | 전 분야 감사 81건 중 74건 수정 (`docs/IMPROVEMENTS_2026-11-10.md`) |
+| 11-12 | 편집기 조작·공개 트리(갤러리·별점) 개편 |
+| 11-14 | **관리자 페이지 3단계**(운영·법규·제품 지표, `docs/ADMIN_2026-11-14.md`) → **전체 코드 리뷰 4편 → 수정 3브랜치**(서버 r1 전부, 동기화·편집기 r2·r3, 학습·공유·관리자 r4). 백지·빈칸 채점이 attempts 를 기록하기 시작한 날 |
 
 날짜별 내용은 계획 문서와 커밋 제목에서 옮긴 것이다.
 
@@ -1340,6 +1345,8 @@ UI 라이브러리와 CSS 프레임워크를 쓰지 않는다. 규칙은 `src/in
 
 - `feature_backlog.md`: 추가 기능 후보 55개와 상위 10개.
 - `many_trees/SUMMARY.md`: 트리가 많고 클 때의 문제 61개와 우선순위. 11-09의 수정 작업이 이 문서에서 나왔다.
+- `admin/00_synthesis.md`: 관리자 페이지 요구 요소 종합. 11-14 관리자 3단계가 여기서 나왔다.
+- `review_2026-11-14/r1~r4`: 전체 코드 리뷰(서버 / 코어 / 편집기·계정 / 학습·공유·관리자). 발견 ID(`r1 H1`, `r4-01` 등)가 커밋 메시지와 주석에 그대로 쓰인다. 수정 결과는 `docs/ADMIN_2026-11-14.md` 끝의 "리뷰 반영" 절.
 
 ### 바깥의 drilldown-biz
 

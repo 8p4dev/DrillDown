@@ -7,7 +7,7 @@ import type { ID, TreeNode } from '../../core/types'
 import { href } from '../../router'
 import { Icon } from '../../ui/Icon'
 import { I } from '../../ui/icons'
-import { crosshair, x } from '../../ui/icons.all'
+import { crosshair } from '../../ui/icons.all'
 import { layout } from '../editor/graph/layout'
 import { coarseHint, goTo, useStudySource } from '../flash/study'
 import TreeHeader from '../TreeHeader'
@@ -175,7 +175,7 @@ export function Ghost({ drag, title }: { drag: DragState | null; title: (id: ID)
 
 /** 채점 결과의 색 아닌 단서(01 §3.6 #10): 카드·슬롯 우상단 ✓ / ✕. 색은 [data-result] 가 정한다 */
 export function ResultMark({ ok }: { ok: boolean | undefined }) {
-  return ok === undefined ? null : <span className="dnd-mark" aria-hidden><Icon d={ok ? I.check : x} /></span>
+  return ok === undefined ? null : <span className="dnd-mark" aria-hidden><Icon d={ok ? I.check : I.x} /></span>
 }
 
 /** 점수: n / m. 만점은 ok 테두리 카드 + ✓(#12) */

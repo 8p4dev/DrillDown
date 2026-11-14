@@ -2,7 +2,7 @@
 // 스케줄러 없음: 서버가 요청 시각으로 enabled(점검)·유효 공지를 판정한다. 시각 입력은 네이티브 <input type="datetime-local">.
 import { useState } from 'react'
 import { api, type Notice, type Settings } from '../../core/api'
-import { megaphone, x } from '../../ui/icons.all'
+import { I } from '../../ui/icons'
 import { Icon } from '../../ui/Icon'
 import { TwoStep } from '../../ui/TwoStep'
 import { toast } from '../Toast'
@@ -35,7 +35,7 @@ export default function NoticeForm({ settings, onSaved }: { settings: Settings; 
         {list.map((n, i) => (
           <div key={n.id} className="notice-row">
             <label className="admin-search">
-              <Icon d={megaphone} /><input aria-label="공지 내용" placeholder="공지 (160자)" maxLength={160} required value={n.text} onChange={(e) => edit(i, { text: e.target.value })} />
+              <Icon d={I.megaphone} /><input aria-label="공지 내용" placeholder="공지 (160자)" maxLength={160} required value={n.text} onChange={(e) => edit(i, { text: e.target.value })} />
             </label>
             <input type="url" aria-label="링크" placeholder="링크(선택) https://" maxLength={200} value={n.url ?? ''} onChange={(e) => edit(i, { url: e.target.value || undefined })} />
             <label>시작 <input type="datetime-local" aria-label="공지 시작" value={toLocal(n.from)} onChange={(e) => edit(i, { from: fromLocal(e.target.value) })} /></label>
@@ -44,12 +44,12 @@ export default function NoticeForm({ settings, onSaved }: { settings: Settings; 
               <option value="all">전체</option><option value="users">로그인만</option>
             </select>
             <span className="muted">{status(n)}</span>
-            <button type="button" className="ghost" aria-label="공지 삭제" data-tip="삭제" onClick={() => setList((xs) => xs.filter((_, j) => j !== i))}><Icon d={x} /></button>
+            <button type="button" className="ghost" aria-label="공지 삭제" data-tip="삭제" onClick={() => setList((xs) => xs.filter((_, j) => j !== i))}><Icon d={I.x} /></button>
           </div>
         ))}
         <div className="notice-actions">
           <button type="button" onClick={() => setList((xs) => [...xs, { id: newId(), text: '', audience: 'all' }])} disabled={list.length >= 10}>공지 추가</button>
-          <button type="submit" className="primary"><Icon d={megaphone} /> 공지 저장</button>
+          <button type="submit" className="primary"><Icon d={I.megaphone} /> 공지 저장</button>
         </div>
       </form>
       {/* 점검 모드: 한 번에 전 사용자 503 이라 2단계. 끄기 = 수동·예약 모두 해제 */}

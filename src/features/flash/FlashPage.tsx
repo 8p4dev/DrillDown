@@ -9,7 +9,7 @@ import { href } from '../../router'
 import { Icon } from '../../ui/Icon'
 import { I } from '../../ui/icons'
 import { NodePath } from '../../ui/NodePath'
-import { arrowRight, crosshair, listChecks, rotateCcw, x } from '../../ui/icons.all'
+import { arrowRight, crosshair, listChecks, rotateCcw } from '../../ui/icons.all'
 import { shuffle } from '../dnd/dnd'
 import { ScopeSelect } from '../dnd/kit'
 import TreeHeader from '../TreeHeader'
@@ -167,7 +167,7 @@ export default function FlashPage({ treeId, rootId, source }: { treeId: string; 
         {/* 보이는 건 ✓N ✕M, 읽히는 텍스트는 "알음 N · 모름 M"(DS .sr-only) */}
         <span className="flash-tally muted" aria-label="평가 집계">
           <Icon d={I.check} className="ok" /><span className="sr-only">알음 </span><b key={`k${known}`} className="pop-num">{known}</b><span className="sr-only"> · </span>
-          <Icon d={x} className="no" /><span className="sr-only">모름 </span><b key={`u${unknown.length}`} className="pop-num">{unknown.length}</b>
+          <Icon d={I.x} className="no" /><span className="sr-only">모름 </span><b key={`u${unknown.length}`} className="pop-num">{unknown.length}</b>
         </span>
       </TreeHeader>
       <div className={`flash-layout${nodes.length > MINIMAP_MAX ? ' solo' : ''}`}>
@@ -183,7 +183,7 @@ export default function FlashPage({ treeId, rootId, source }: { treeId: string; 
             </div>
           ) : !session ? null : done ? (
             <Summary known={known} unknown={unknown}>
-              {unknown.length > 0 && <button type="button" className="primary" onClick={() => restart(missedOnly(session))}><Icon d={x} /> 모름만 다시</button>}
+              {unknown.length > 0 && <button type="button" className="primary" onClick={() => restart(missedOnly(session))}><Icon d={I.x} /> 모름만 다시</button>}
               {weakBtn}
               <button type="button" className={unknown.length ? undefined : 'primary'} onClick={() => restart(fresh(session.shuffled))}><Icon d={rotateCcw} /> 처음부터 다시</button>
               {!source && <a className="flash-edit-link" href={href.edit(treeId, rootId)}><Icon d={I.pencil} /> 편집으로</a>}

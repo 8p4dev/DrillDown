@@ -147,3 +147,31 @@ test('비로그인은 서버에 아무것도 보내지 않는다(sync 엔진 청
   const engine = await page.evaluate(() => performance.getEntriesByType('resource').some((e) => /engine-/.test(e.name)))
   expect(engine).toBe(false)
 })
+
+// r4-08 회귀: #/gallery 로 직접 들어와도 미리보기 시트 CSS(share-list.css)가 실려 닫기 버튼이 터치 표적(44px) 이다
+test('갤러리 직접 진입: 미리보기 시트 닫기 버튼 44px', async ({ browser }) => {
+  const owner = await browser.newContext()
+  const po = await owner.newPage()
+  await login(po, 'gale')
+  await makeTree(po, '갤러리 진입 검증', '하나\n둘')
+  await waitOnServer(owner, '갤러리 진입 검증')
+  await po.goto('/#/')
+  const card = po.locator('li[data-tree-id]', { hasText: '갤러리 진입 검증' })
+  await card.getByLabel('더 보기').click()
+  await card.getByRole('button', { name: '공유…' }).click()
+  await po.getByRole('group', { name: '공개 범위' }).getByRole('button', { name: '공개', exact: true }).click()
+  await po.getByRole('button', { name: '확인' }).click()
+  await expect(po.locator('.share-url')).toBeVisible()
+
+  const anon = await browser.newContext({ hasTouch: true }) // (pointer: coarse) → --tap 44px
+  const pa = await anon.newPage()
+  await pa.goto('/#/gallery')
+  await pa.locator('li.card', { hasText: '갤러리 진입 검증' }).getByRole('button', { name: '미리보기' }).click()
+  const x = pa.locator('.sheet-head .sheet-x')
+  await expect(x).toBeVisible()
+  await expect(pa.locator('.share-sheet')).toHaveCSS('display', 'grid') // share-list.css 가 실렸다는 직접 신호
+  const box = (await x.boundingBox())!
+  expect(box.width).toBeGreaterThanOrEqual(44)
+  expect(box.height).toBeGreaterThanOrEqual(44)
+  await owner.close(); await anon.close()
+})

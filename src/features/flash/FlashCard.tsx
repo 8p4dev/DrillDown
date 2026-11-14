@@ -7,7 +7,7 @@ import { colorClass, type ColorInfo, type NodeColor } from '../../core/srs'
 import type { ID, NodeSrs, TreeNode } from '../../core/types'
 import { Icon } from '../../ui/Icon'
 import { I } from '../../ui/icons'
-import { chevronDown, cornerDownRight, x } from '../../ui/icons.all'
+import { chevronDown, cornerDownRight } from '../../ui/icons.all'
 import { parse, toHtml } from '../editor/content/format'
 import { haptic } from '../feel'
 import { toast } from '../Toast'
@@ -21,7 +21,7 @@ const Mark = ({ color }: { color: NodeColor }) => {
   if (color !== 'green' && color !== 'lightgreen' && color !== 'red') return null
   return (
     <span className={`flash-state${color === 'green' ? ' dbl' : ''}`} aria-hidden="true">
-      {color === 'red' ? <Icon d={x} /> : <><Icon d={I.check} />{color === 'green' && <Icon d={I.check} />}</>}
+      {color === 'red' ? <Icon d={I.x} /> : <><Icon d={I.check} />{color === 'green' && <Icon d={I.check} />}</>}
     </span>
   )
 }
@@ -181,7 +181,7 @@ export default function FlashCard({ treeId, nodes, conceptId, colors, srs, sourc
                   {r === undefined ? (
                     <>
                       <button type="button" className="known" data-tip="알음 (1)" onClick={() => rate(k, true)}><Icon d={I.check} /> 알음</button>
-                      <button type="button" className="unknown" data-tip="모름 (2)" onClick={() => rate(k, false)}><Icon d={x} /> 모름</button>
+                      <button type="button" className="unknown" data-tip="모름 (2)" onClick={() => rate(k, false)}><Icon d={I.x} /> 모름</button>
                     </>
                   ) : (
                     <button
@@ -191,7 +191,7 @@ export default function FlashCard({ treeId, nodes, conceptId, colors, srs, sourc
                       aria-label={`${r ? '알음' : '모름'} — 다시 평가`}
                       onClick={() => { setShook(null); setRated((m) => { const c = new Map(m); c.delete(k.id); return c }) }}
                     >
-                      <span className="flash-mark" aria-hidden="true"><Icon d={r ? I.check : x} /></span> {r ? '알음' : '모름'}
+                      <span className="flash-mark" aria-hidden="true"><Icon d={r ? I.check : I.x} /></span> {r ? '알음' : '모름'}
                     </button>
                   )}
                 </div>
