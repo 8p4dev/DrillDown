@@ -1,16 +1,15 @@
 // 지표 탭 — 학습·성장 지표 카드(K2·회독별 재현율·자기채점·구조 오답·FSRS 유지율·활성화율·제공자·신고 SLA·1년 미접속·DB/사용자), daily_stats 선그래프(SVG 직접),
 // 운영 기준(사고 72h·재시작), 운영 스위치(flags)·추천 고정, 시드 트리 큐레이션, 소유자·신고자 신고 집계 — T4 #40·#41·#44·#45·#49. docs/plans/orchestration_admin_stage3.md §3
 import { useState } from 'react'
-import { api, type DailyStat, type ProductFlags, type ProductMetrics, type ProductSettings, type ProductTree, type ReportAgg } from '../../core/api'
+import { api, REASON, type DailyStat, type ProductFlags, type ProductMetrics, type ProductSettings, type ProductTree, type ReportAgg } from '../../core/api'
 import { refreshMe } from '../../core/me'
 import { I } from '../../ui/icons'
 import { database, eyeOff, star, userX } from '../../ui/icons.all'
 import { Icon } from '../../ui/Icon'
+import { TwoStep } from '../../ui/TwoStep'
 import { toast } from '../Toast'
-import { ACTION, bytes, guard, REASON, useGet, when } from './shared'
+import { bytes, guard, useGet, when } from './shared'
 import { Card, Loading, TreeLink } from './widgets'
-
-Object.assign(ACTION, { 'settings.flags': '운영 스위치 변경', 'settings.featured': '추천 트리 변경' })
 
 const PERIODS: [number, string][] = [[30, '30일'], [90, '90일'], [0, '전체']]
 const pct = (r: number | null, d = 0) => (r === null ? '—' : `${(r * 100).toFixed(d)}%`)
@@ -22,7 +21,9 @@ export default function MetricsTab() {
   const [days, setDays] = useState(30)
   const [m] = useGet<ProductMetrics>(`/api/admin/product/metrics?days=${days}`)
   const [res, setRes] = useGet<SettingsRes>('/api/admin/product/settings')
-  // 낙관적 반영(체크박스가 응답 전까지 되돌아가지 않게) → 실패하면 서버 값으로 되돌린다. refreshMe 로 상단 바(갤러리 탭)도 따라간다
+  const [draft, setDraft] = useState<ProductFlags | null>(null) // 스위치는 체크해 두고 [저장](2단계)으로 — 클릭 1번에 전 사용자 기능이 꺼지지 않게
+  const flags = draft ?? res?.settings.flags
+  // 낙관적 반영(응답 전까지 되돌아가지 않게) → 실패하면 서버 값으로 되돌린다. refreshMe 로 상단 바(갤러리 탭)도 따라간다
   const save = (patch: Partial<ProductSettings>) => {
     setRes((p) => (p ? { settings: { ...p.settings, ...patch } } : p))
     api<SettingsRes>('/api/admin/product/settings', { method: 'PUT', body: patch }).then((r) => { setRes(r); toast('저장됨'); void refreshMe() },
@@ -44,17 +45,19 @@ export default function MetricsTab() {
         </>
       )}
       <h2>운영 스위치</h2>
-      {!res ? <Loading /> : (
+      {!flags ? <Loading /> : (
         <div className="flags">
           {(Object.keys(FLAG_LABEL) as (keyof ProductFlags)[]).map((k) => (
             <label key={k} className="toggle">
-              <input type="checkbox" checked={res.settings.flags[k]} onChange={(e) => void save({ flags: { ...res.settings.flags, [k]: e.target.checked } })} /> {FLAG_LABEL[k]}
+              <input type="checkbox" checked={flags[k]} onChange={(e) => setDraft({ ...flags, [k]: e.target.checked })} /> {FLAG_LABEL[k]}
             </label>
           ))}
+          <TwoStep label="저장" confirmLabel="정말 저장" verb="운영 스위치 변경" disabled={!draft} onConfirm={() => { save({ flags: draft! }); setDraft(null) }} />
           <span className="muted">끄면 서버가 거절합니다(갤러리 404 · 신고/별점/공개 전환 403). 배포 없이 기능을 내리는 용도</span>
         </div>
       )}
-      <Curation featured={res?.settings.featured_slugs ?? []} onFeatured={(slugs) => save({ featured_slugs: slugs })} />
+      {/* 설정이 오기 전에 [추천]을 누르면 빈 목록 + 1개로 덮어쓰므로 로드 뒤에만 */}
+      {res ? <Curation featured={res.settings.featured_slugs} onFeatured={(slugs) => save({ featured_slugs: slugs })} /> : <Loading />}
       <ReportAggView />
       <p className="muted">보류 — 결정 필요: 후원 막대 · user_activity 코호트(W1/W4) · 허용 표현 승인 큐 · 익명 핑 · 태그·카테고리 · 웹 푸시 · UTM</p>
     </>

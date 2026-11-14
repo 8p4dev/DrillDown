@@ -1,8 +1,8 @@
 // 공유 보기 /t/<slug>?m= — 04 §3.4·§3.10, 02 §3.1 공유 보기 와이어.
 // 보기 탭 = 편집기와 같은 카드 그래프(GraphView·useZoom·editor.css 재사용, 계약 C6) + 읽기 전용 카드(ShareCard) + 하단 복제 바.
 // 플래시·빈칸·백지 = 기존 화면에 메모리 소스 주입(ephemeral). 신고·링크 복사는 헤더 ⋯ 메뉴. 별점은 헤더(계약 C3).
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
-import { api, ApiError, type Rating, type ReportReason, type SharedTree } from '../../core/api'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { api, ApiError, REASON, type Rating, type ReportReason, type SharedTree } from '../../core/api'
 import { useMe } from '../../core/me'
 import { copyTree, listTrees } from '../../core/repo'
 import type { StudySource } from '../../core/source'
@@ -33,12 +33,6 @@ const TABS: { mode: ViewMode; label: string; aria: string; icon: string }[] = [
   { mode: 'flash', label: '플래시', aria: '플래시카드', icon: I.layers },
   { mode: 'dnd', label: '빈칸', aria: '빈칸 퀴즈', icon: I.squareDashed },
   { mode: 'blank', label: '백지', aria: '백지 퀴즈', icon: I.file },
-]
-const REASONS: { v: ReportReason; label: string }[] = [
-  { v: 'copyright', label: '저작권' },
-  { v: 'spam', label: '스팸' },
-  { v: 'abuse', label: '욕설/유해' },
-  { v: 'other', label: '기타' },
 ]
 const STARS = [1, 2, 3, 4, 5]
 /** 편집기의 세로 보기 선호(dd:editor-dir)를 읽기만 한다(A8). 저장은 편집기만 */
@@ -131,7 +125,8 @@ export default function SharedPage({ slug, mode, rootId }: { slug: string; mode:
     return next
   })
 
-  const doCopy = async (again = false) => {
+  const [dup, setDup] = useState<Tree | null>(null) // U57: 이미 복제한 트리 → 시트
+  const doCopy = useCallback(async (again = false) => {
     if (!t) return
     setDup(null)
     const mine = await listTrees()
@@ -140,20 +135,24 @@ export default function SharedPage({ slug, mode, rootId }: { slug: string; mode:
     if (prev) { setDup(prev); return }
     // C5: 로그인 사용자는 서버 한도에 닿으면 복제를 막는다(비로그인은 막지 않음)
     if (me && mine.length >= CAP.treesPerUser) { toast('트리는 200개까지 저장할 수 있습니다'); return }
-    const tree = await copyTree(t)
+    let tree: Tree
+    try {
+      tree = await copyTree(t)
+    } catch {
+      return toast('복제하지 못했어요 · 저장 공간을 확인하세요') // IndexedDB 쿼터·트랜잭션 실패
+    }
     void api(`/api/t/${slug}/copy`, { method: 'POST' }).catch(() => {}) // copy_count 용, 실패 무시
     toast('복제됨 · 원본이 바뀌어도 이 트리는 바뀌지 않습니다', { label: '열기', run: () => location.assign('/' + href.edit(tree.id)) }, 6000)
-  }
-  // U38·Q3: 첫 채점 토스트 [복제] = 헤더 복제와 같은 흐름(U57 중복 확인 포함)
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- 트리가 바뀔 때만 새 소스(체험 토스트 1회 유지)
-  const source = useMemo(() => (t ? memorySource(t, () => void doCopy()) : null), [t])
+  }, [t, me, slug])
+  // U38·Q3: 첫 채점 토스트 [복제] = 헤더 복제와 같은 흐름(U57 중복 확인 포함). 소스는 트리·로그인 상태가 바뀔 때만 새로(체험 토스트 1회 유지)
+  const source = useMemo(() => (t ? memorySource(t, () => void doCopy()) : null), [t, doCopy])
   const [menu, setMenu] = useState(false)
   const [report, setReport] = useState(false)
+  const [sending, setSending] = useState(false)
   const [reason, setReason] = useState<ReportReason>('copyright')
   const [note, setNote] = useState('')
   const [receipt, setReceipt] = useState<string | null>(null) // 신고 접수번호 → #/report/<id> (T2 #26)
   const moreRef = useRef<HTMLDivElement>(null)
-  const [dup, setDup] = useState<Tree | null>(null)
 
   useEffect(() => {
     if (!menu) return
@@ -186,11 +185,15 @@ export default function SharedPage({ slug, mode, rootId }: { slug: string; mode:
   }
   const sendReport = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (sending) return // 응답 전 두 번 눌러 2건 접수되지 않게
+    setSending(true)
     let id: string
     try {
       id = (await api<{ id: string }>(`/api/t/${slug}/report`, { body: { reason, note: note.trim() || undefined } })).id
     } catch (err) {
       return toast(err instanceof ApiError ? err.message : '신고하지 못했습니다')
+    } finally {
+      setSending(false)
     }
     setNote('')
     setReceipt(id) // 시트는 열어 두고 접수번호·상태 링크를 보여 준다
@@ -207,6 +210,9 @@ export default function SharedPage({ slug, mode, rootId }: { slug: string; mode:
     }
   }
   const ownTree = !!me && !!rating && !rating.canRate
+  // 운영 스위치(계약 B): 서버가 flags 를 주면 꺼진 기능은 화면에서도 숨긴다(비로그인 포함). 없으면 켜진 것으로
+  const noRating = t.flags?.rating === false
+  const starTip = noRating ? '별점이 꺼져 있습니다' : ownTree ? '내 트리는 평가할 수 없습니다' : undefined
   // 선택한 카드가 자식 있는 비루트 노드면 그 가지로 플래시 탭을 연다
   const learnFrom = mode === 'view' && selId && selId !== root?.id && counts.hasKids(selId) ? selId : ''
 
@@ -219,11 +225,11 @@ export default function SharedPage({ slug, mode, rootId }: { slug: string; mode:
           {rating && (
             <div className="share-rating">
               <span className="share-rating-avg"><Icon d={star} />{rating.avg === null ? <span className="muted">평가 없음</span> : <><span className="tnum">{rating.avg.toFixed(1)}</span><span className="muted tnum">({rating.count})</span></>}</span>
-              <span className="share-stars" role="group" aria-label="내 별점" data-tip={ownTree ? '내 트리는 평가할 수 없습니다' : undefined}>
+              <span className="share-stars" role="group" aria-label="내 별점" data-tip={starTip}>
                 {STARS.map((n) => (
                   <button
-                    key={n} type="button" aria-label={`별점 ${n}점`} aria-pressed={rating.mine === n} disabled={ownTree}
-                    data-on={rating.mine !== null && n <= rating.mine} data-tip={ownTree ? '내 트리는 평가할 수 없습니다' : `별점 ${n}점`}
+                    key={n} type="button" aria-label={`별점 ${n}점`} aria-pressed={rating.mine === n} disabled={ownTree || noRating}
+                    data-on={rating.mine !== null && n <= rating.mine} data-tip={starTip ?? `별점 ${n}점`}
                     onClick={() => void rate(n)}
                   >
                     <Icon d={star} />
@@ -260,7 +266,7 @@ export default function SharedPage({ slug, mode, rootId }: { slug: string; mode:
             </button>
             {menu && (
               <ul className="share-menu">
-                <li><button type="button" onClick={() => (setMenu(false), setReport(true))}>신고</button></li>
+                {t.flags?.report !== false && <li><button type="button" onClick={() => (setMenu(false), setReport(true))}>신고</button></li>}
                 <li><button type="button" onClick={copyLink}>링크 복사</button></li>
               </ul>
             )}
@@ -312,7 +318,7 @@ export default function SharedPage({ slug, mode, rootId }: { slug: string; mode:
       )}
       {mode !== 'view' && source && (
         <Suspense fallback={<div className="route-loading" aria-busy="true" />}>
-          {mode === 'flash' && <FlashPage key={slug} treeId={slug} rootId={rootId} source={source} />}
+          {mode === 'flash' && <FlashPage key={slug + rootId} treeId={slug} rootId={rootId} source={source} />}
           {mode === 'dnd' && <DndPage key={slug + rootId} treeId={slug} rootId={rootId} source={source} />}
           {mode === 'blank' && <BlankDndPage key={slug + rootId} treeId={slug} rootId={rootId} source={source} />}
         </Suspense>
@@ -360,13 +366,13 @@ export default function SharedPage({ slug, mode, rootId }: { slug: string; mode:
           </header>
           <fieldset>
             <legend className="muted">사유</legend>
-            {REASONS.map((r) => (
-              <label key={r.v}><input type="radio" name="reason" value={r.v} checked={reason === r.v} onChange={() => setReason(r.v)} /> {r.label}</label>
+            {(Object.keys(REASON) as ReportReason[]).map((v) => (
+              <label key={v}><input type="radio" name="reason" value={v} checked={reason === v} onChange={() => setReason(v)} /> {REASON[v]}</label>
             ))}
           </fieldset>
           <textarea aria-label="메모" rows={3} maxLength={300} placeholder="메모 (선택, 300자 이내)" value={note} onChange={(e) => setNote(e.target.value)} />
           <div className="actions">
-            <button type="submit" className="primary">신고</button>
+            <button type="submit" className="primary" disabled={sending}>신고</button>
           </div>
         </form>
         )}

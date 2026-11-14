@@ -72,13 +72,13 @@ export default function FlashPage({ treeId, rootId, source }: { treeId: string; 
   const weak = useMemo(() => (nodes && tree ? weakQueue(nodes, srs.map, tree.scope) : []), [nodes, tree, srs]) // S9: 자식을 틀린 개념, 많이 틀린 순
   const key = tree && !source ? `flash:${treeId}:${tree.scope}` : null // 공유 보기(D19)는 저장하지 않음
   const fresh = useCallback((shuffled: boolean): Session => {
-    const queue = !concepts.length ? [tree?.scope ?? ''] : shuffled ? [concepts[0], ...shuffle(concepts.slice(1))] : concepts // 섞어도 범위 루트(개관)는 맨 앞
+    const queue = shuffled ? [concepts[0], ...shuffle(concepts.slice(1))] : concepts // 섞어도 범위 루트(개관)는 맨 앞
     return { queue, base: queue.length, pos: 0, shuffled, tally: new Map() }
-  }, [concepts, tree])
+  }, [concepts])
 
-  // 범위가 정해지면(처음·범위 변경) 저장본을 읽는다
+  // 범위가 정해지면(처음·범위 변경) 저장본을 읽는다. 개념이 없으면(S19 빈 상태) 세션도 저장본도 만들지 않는다
   useEffect(() => {
-    if (!tree) return
+    if (!tree || !concepts.length) return
     // oxlint-disable-next-line react/set-state-in-effect -- 범위가 바뀔 때 localStorage(외부) 저장본으로 세션을 다시 연다
     setDone(false)
     const saved = key ? readProgress(store.get(key), concepts, Date.now()) : null

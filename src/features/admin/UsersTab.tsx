@@ -8,10 +8,8 @@ import { Icon } from '../../ui/Icon'
 import { TwoStep } from '../../ui/TwoStep'
 import { ProviderLogo } from '../account/providers'
 import { toast } from '../Toast'
-import { ACTION, date, guard, post, useGet, usePaged, when } from './shared'
-import { More } from './widgets'
-
-Object.assign(ACTION, { 'user.sessions_revoke': '사용자 세션 전부 폐기' })
+import { date, guard, post, useGet, usePaged, when } from './shared'
+import { Loading, More } from './widgets'
 
 type Update = (id: string, p: Partial<AdminUser> | null) => void
 type Status = 'ok' | 'suspended' | 'deleted' | 'admin'
@@ -46,7 +44,7 @@ export default function UsersTab({ meId }: { meId: string }) {
           ))}
         </tbody>
       </table>
-      {!loaded && <p className="muted" aria-busy="true">불러오는 중… <button type="button" className="link" onClick={() => setTick((t) => t + 1)}>다시 시도</button></p>}
+      {!loaded && <Loading onRetry={() => setTick((t) => t + 1)} />}
       {loaded && rows.length === 0 && <p className="muted">결과 없음{st && items.length > 0 && ' (이 페이지 안에서) '}{next && <button type="button" className="link" onClick={more}>더 불러오기</button>}</p>}
       <More next={next} more={more} />
     </>
@@ -106,7 +104,7 @@ function UserDetail({ u, update }: { u: AdminUser; update: Update }) {
   const copyId = () => void navigator.clipboard.writeText(u.id).then(() => toast('UUID 복사됨'), () => toast('복사 실패 · 닉네임에 마우스를 올리면 보여요'))
   const revoke = () => void post<{ count: number }>(`/api/admin/users/${u.id}/revoke-sessions`).then((r) => { toast(`${r.count}개 세션 폐기`); setD((x) => (x ? { ...x, sessions: 0 } : x)) }, guard)
   const undelete = () => void post(`/api/admin/users/${u.id}/undelete`).then(() => { update(u.id, { deleted_at: null }); toast('탈퇴 취소됨 · 트리 복원'); setTick((t) => t + 1) }, guard)
-  if (!d) return <p className="muted" aria-busy="true">불러오는 중… <button type="button" className="link" onClick={() => setTick((t) => t + 1)}>다시 시도</button></p>
+  if (!d) return <Loading onRetry={() => setTick((t) => t + 1)} />
   return (
     <div className="user-detail">
       <dl className="kv">

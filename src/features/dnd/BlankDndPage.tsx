@@ -1,39 +1,23 @@
 // D2 백지 퀴즈: 범위 루트만 놓인 캔버스에 트레이의 노드를 끌어 붙여 트리를 만든다
-import { Fragment, useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { Fragment, useMemo, useState, type CSSProperties } from 'react'
 import type { StudySource } from '../../core/source'
 import { logEvent } from '../../core/events'
-import { getRoot } from '../../core/repo'
 import type { ID, TreeNode } from '../../core/types'
-import { href } from '../../router'
 import { Icon } from '../../ui/Icon'
-import { I } from '../../ui/icons'
 import { checkCheck, rotateCcw } from '../../ui/icons.all'
 import { haptic } from '../feel'
 import { toast } from '../Toast'
-import { coarseHint, useStudySource } from '../flash/study'
-import TreeHeader from '../TreeHeader'
-import { attach, detach, gradeBlank, isUnder, placedTree, scopeOf, shuffle, type Links, type Score } from './dnd'
-import { Ghost, Progress, ResultMark, ScopeGate, ScopeSelect, ScoreLine, TreeCanvas } from './kit'
+import { attach, attemptOf, detach, gradeBlank, isUnder, placedTree, shuffle, type Links, type Score } from './dnd'
+import { Ghost, Progress, QuizShell, ResultMark, ScoreLine, TreeCanvas } from './kit'
 import { useDragDrop } from './useDragDrop'
 
 const MAX_NODES = 40 // U30: 루트 제외 노드가 이보다 많고 ?root= 가 없으면 범위부터 고른다
 
-export default function BlankDndPage({ treeId, rootId, source }: { treeId: string; rootId?: string; source?: StudySource }) {
-  const src = useStudySource(source, treeId)
-  const [all, setAll] = useState<TreeNode[] | null>(null)
-  useEffect(() => void src.nodes().then((ns) => { setAll(ns); coarseHint('dnd', '카드 탭 → 빈칸 탭', I.squareDashed) }), [src])
-  const rid = all && (all.some((n) => n.id === rootId) ? rootId! : getRoot(all).id)
-  const scope = all && rid ? scopeOf(all, rid) : null
-  const to = (id: ID) => (source ? href.shared(treeId, 'blank', id) : href.blank(treeId, id))
+export default function BlankDndPage(p: { treeId: string; rootId?: string; source?: StudySource }) {
   return (
-    <section>
-      <TreeHeader treeId={treeId} active="blank">
-        {all && rid && <ScopeSelect nodes={all} value={rid} to={to} />}
-      </TreeHeader>
-      {all && rid && scope && (rootId === undefined && scope.length - 1 > MAX_NODES
-        ? <ScopeGate nodes={all} rootId={rid} to={to} />
-        : <Quiz treeId={treeId} scope={scope} source={src} />)}
-    </section>
+    <QuizShell {...p} mode="blank" hint="카드 탭 → 붙일 자리 탭" big={(scope) => scope.length - 1 > MAX_NODES}>
+      {(scope, src) => <Quiz treeId={p.treeId} scope={scope} source={src} />}
+    </QuizShell>
   )
 }
 
@@ -44,6 +28,7 @@ function Quiz({ treeId, scope, source }: { treeId: ID; scope: TreeNode[]; source
   const [order, setOrder] = useState(() => shuffle(rest.map((n) => n.id)))
   const [links, setLinks] = useState<Links>(new Map())
   const [score, setScore] = useState<Score | null>(null)
+  const [startedAt] = useState(() => Date.now()) // attempts.startedAt = 퀴즈 마운트 시각
   const { drag, sel, handlers } = useDragDrop(
     (card, to) => setLinks((l) => (to === 'tray' ? detach(l, card) : attach(l, card, to, rootId))),
     !score,
@@ -70,6 +55,7 @@ function Quiz({ treeId, scope, source }: { treeId: ID; scope: TreeNode[]; source
         toast('저장하지 못했어요') // S3: 채점 전으로 되돌려 다시 누를 수 있게
         return setScore(null)
       }
+      await source.attempt?.(attemptOf(treeId, rootId, startedAt, s)) // 서버 지표(K2·회독·활성화율)의 원천
     }
     if (!source.ephemeral) await logEvent('dnd_attempt_completed', { mode: 'blank_dnd', rootId, total: s.total, correct: s.correct }, treeId)
   }

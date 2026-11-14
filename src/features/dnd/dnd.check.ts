@@ -1,6 +1,6 @@
 // npx tsx src/features/dnd/dnd.check.ts
 import type { TreeNode } from '../../core/types'
-import { attach, detach, gradeBlank, gradeDnd, leavesOf, moveCard, placedTree, scopeOf, shuffle, sideLayout, type Links } from './dnd'
+import { attach, attemptOf, detach, gradeBlank, gradeDnd, leavesOf, moveCard, placedTree, scopeOf, shuffle, sideLayout, type Links } from './dnd'
 
 // node:assert 대신 (앱 tsconfig 에 node 타입 없음)
 function assert(ok: unknown, msg = '점검 실패'): asserts ok {
@@ -99,6 +99,12 @@ assert(gs.ok.pm && gs.ok.qm && !gs.ok.px && !gs.ok.qy, 'U36 교환된 방법 아
 sw = new Map([...sw, ['px', 'qm'], ['qy', 'pm']])
 gs = gradeBlank(atk, sw)
 assert(gs.correct === 6, 'U36 교환해도 각 공격 아래 올바른 자식이면 만점')
+
+// R4-01 attempts: 채점 1회 → 서버 지표가 읽는 행(recall = edge = 정답률, 자동 채점 수 = total). id 는 소스(dexieSource)가 붙인다
+const at = attemptOf('t', 'R', 1000, gradeBlank(scope, L), 5000)
+assert.deepEqual(at, { treeId: 't', rootId: 'R', startedAt: 1000, completedAt: 5000, nodeRecall: 4 / 7, edgeAccuracy: 4 / 7, autoGradedCount: 7, selfGradedCount: 0, overriddenCount: 0 })
+assert.equal(attemptOf('t', 'R', 0, gradeBlank(scope, full)).nodeRecall, 6 / 7)
+assert(!('id' in at), 'id 없음')
 
 // sideLayout: 깊이 = 열, 폭 안에 들어감, 칸 겹침 없음, 최소 카드 폭 유지
 const side = sideLayout(scope, 'R', 360)

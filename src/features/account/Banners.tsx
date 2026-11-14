@@ -2,6 +2,7 @@
 // 공지 닫기는 공지 id 별로 세션 동안만(sessionStorage). App.tsx 가 상단 바 아래에 렌더한다.
 import { useEffect, useState } from 'react'
 import { api, type LegalMe } from '../../core/api'
+import { when } from '../../core/fmt'
 import { useMaintenance, useMe, useMeReady } from '../../core/me'
 import { I } from '../../ui/icons'
 import { Icon } from '../../ui/Icon'
@@ -9,8 +10,6 @@ import './nav-user.css'
 
 const K = 'notice:dismissed'
 const read = (): string[] => { try { return JSON.parse(sessionStorage.getItem(K) ?? '[]') as string[] } catch { return [] } }
-const p2 = (n: number) => String(n).padStart(2, '0')
-const fmt = (t: number) => { const d = new Date(t); return `${d.getMonth() + 1}/${d.getDate()} ${p2(d.getHours())}:${p2(d.getMinutes())}` }
 
 export default function Banners() {
   const me = useMe()
@@ -23,7 +22,7 @@ export default function Banners() {
   const sched = legal?.maintenance_scheduled
   const items = [
     ...(legal?.notices ?? []).map((n) => ({ id: n.id, text: n.text, url: n.url })),
-    ...(sched ? [{ id: `maint-${sched.from}`, text: `점검 예정 ${fmt(sched.from)}${sched.until ? ` ~ ${fmt(sched.until)}` : ''} · 그동안 저장·동기화가 멈춥니다`, url: undefined }] : []),
+    ...(sched ? [{ id: `maint-${sched.from}`, text: `점검 예정 ${when(sched.from)}${sched.until ? ` ~ ${when(sched.until)}` : ''} · 그동안 저장·동기화가 멈춥니다`, url: undefined }] : []),
   ].filter((n) => !gone.includes(n.id))
   const dismiss = (id: string) => { const next = [...gone, id]; try { sessionStorage.setItem(K, JSON.stringify(next)) } catch { /* 무시 */ } setGone(next) }
   return (

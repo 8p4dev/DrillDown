@@ -125,7 +125,7 @@ export default function App() {
         <Suspense fallback={<div className="route-loading" aria-busy="true" />}>
           {r.name === 'trees' && <TreeListPage />}
           {r.name === 'edit' && <EditorPage key={r.treeId} treeId={r.treeId} rootId={r.rootId} />}
-          {r.name === 'flash' && <FlashPage key={r.treeId} treeId={r.treeId} rootId={r.rootId} />}
+          {r.name === 'flash' && <FlashPage key={r.treeId + r.rootId} treeId={r.treeId} rootId={r.rootId} />}
           {r.name === 'dnd' && <DndPage key={r.treeId + r.rootId} treeId={r.treeId} rootId={r.rootId} />}
           {r.name === 'blank' && <BlankDndPage key={r.treeId + r.rootId} treeId={r.treeId} rootId={r.rootId} />}
           {r.name === 'login' && <LoginPage e={r.e} r={r.r} returnTo={r.returnTo} />}

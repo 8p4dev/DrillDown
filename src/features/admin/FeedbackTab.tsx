@@ -1,14 +1,12 @@
 // 피드백 탭 — 피드백·버그 수집함 목록(열림·처리됨·전체)·처리/되돌리기·운영자 메모(보낸 사람에게 보임) — T4 #43. 서버 server/account/product.ts
 import { useState } from 'react'
-import { api, type Feedback, type FeedbackCategory } from '../../core/api'
+import { api, FEEDBACK_CATEGORY, type Feedback } from '../../core/api'
 import { I } from '../../ui/icons'
 import { Icon } from '../../ui/Icon'
 import { toast } from '../Toast'
-import { ACTION, guard, useGet, when } from './shared'
+import { guard, useGet, when } from './shared'
 import { Loading } from './widgets'
 
-Object.assign(ACTION, { 'feedback.resolve': '피드백 처리', 'feedback.reopen': '피드백 다시 열기', 'feedback.note': '피드백 메모' })
-const FEEDBACK_CATEGORY: Record<FeedbackCategory, string> = { bug: '버그', idea: '제안', content: '콘텐츠 오류', other: '기타' } // FeedbackSheet 와 같은 표(컴포넌트 파일에서 상수 export 금지 lint)
 const STATUS: [string, string][] = [['open', '열림'], ['resolved', '처리됨'], ['all', '전체']]
 
 export default function FeedbackTab() {

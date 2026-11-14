@@ -1,17 +1,13 @@
 // 공개 트리 탭 — 목록·숨김 2종(보류 30일 = 임시조치 / 확정)·해제·확정, 신고 큐(트리별 묶음), 소명 큐, 삭제 트리 복구. 03 §3.4 공개 트리 행, T2 #27(hidden_until D-N, 상단 요약).
 // 게시중단·정보주체 요청 큐는 RequestsTab. 보류 숨김은 30일 뒤 legalDaily 가 해제하므로 D-7 안에 확정/해제를 결정한다.
 import { useRef, useState } from 'react'
-import type { AdminTree, Appeal, Report } from '../../core/api'
+import { REASON, type AdminTree, type Appeal, type Report } from '../../core/api'
 import { eye, eyeOff, undo2 } from '../../ui/icons.all'
 import { Icon } from '../../ui/Icon'
 import { TwoStep } from '../../ui/TwoStep'
 import { toast } from '../Toast'
-import { date, guard, post, REASON, useGet, usePaged, when } from './shared'
-import { Loading, More, TreeLink } from './widgets'
-
-const DAY = 86_400_000
-const dday = (t: number) => Math.max(0, Math.ceil((t - Date.now()) / DAY))
-const Dday = ({ at }: { at: number }) => { const d = dday(at); return <span className="dday" data-soon={d <= 7} title={`${when(at)} 만료 → 자동 해제`}>D-{d}</span> }
+import { date, dday, guard, post, useGet, usePaged, when } from './shared'
+import { Dday, Loading, More, TreeLink } from './widgets'
 
 export default function TreesTab() {
   const { items: trees, loaded, next, more, patch } = usePaged<AdminTree>('/api/admin/trees')
@@ -43,11 +39,9 @@ export default function TreesTab() {
     }, guard)
   // 보류 30일: 신고는 열린 채 두고 트리만 임시 숨김 — 기한 안에 숨김(확정) 또는 기각(+해제)으로 마무리
   const hold = (treeId: string) =>
-    void post<{ tree: AdminTree }>(`/api/admin/trees/${treeId}/hold`).then((x) => {
-      put(x.tree)
-      setReports((p) => (p ? { items: p.items.map((r) => (r.tree.id === treeId ? { ...r, tree: { ...r.tree, hidden_by_admin_at: x.tree.hidden_by_admin_at } } : r)) } : p))
-      toast('임시 숨김 30일')
-    }, guard)
+    void post<{ tree: AdminTree }>(`/api/admin/trees/${treeId}/hold`).then((x) => { put(x.tree); toast('임시 숨김 30일') }, guard)
+  // 신고 묶음의 "숨김 중" 은 trees(행 동작·소명으로 바뀜)에서 파생 — reports 응답의 tree 는 로드 시점 값
+  const hiddenAt = (t: Report['tree']) => live.find((x) => x.id === t.id)?.hidden_by_admin_at ?? t.hidden_by_admin_at
   // 복구된 트리는 비공개일 수 있어 공개 표에 섞지 않는다 — 목록에서 빼고, 공개면 다음 로드에 나타난다
   const restore = (t: AdminTree) =>
     void post<{ tree: AdminTree }>(`/api/admin/trees/${t.id}/restore`).then(() => { patch((xs) => xs.filter((x) => x.id !== t.id)); toast('복구됨') }, guard)
@@ -68,10 +62,11 @@ export default function TreesTab() {
         <ul className="reports">
           {groups.map((rs) => {
             const t = rs[0].tree
+            const hidden = hiddenAt(t)
             return (
               <li key={t.id}>
                 <span className="grow">
-                  <strong>{t.title}</strong> <TreeLink slug={t.slug} />{t.hidden_by_admin_at && <> · <Icon d={eyeOff} /> 숨김 중</>}
+                  <strong>{t.title}</strong> <TreeLink slug={t.slug} />{hidden && <> · <Icon d={eyeOff} /> 숨김 중</>}
                   {rs.map((r) => (
                     <span key={r.id} className="sub">
                       {when(r.created_at)} · {REASON[r.reason]}{r.note && ` — ${r.note}`}{' '}
@@ -79,8 +74,8 @@ export default function TreesTab() {
                     </span>
                   ))}
                 </span>
-                {!t.hidden_by_admin_at && <button type="button" aria-label={`${t.title} 임시 숨김 30일`} title="판단 보류 — 30일 뒤 자동 해제" onClick={() => hold(t.id)}>보류 30일</button>}
-                <button type="button" aria-label={`${t.title} 숨김 확정`} onClick={() => resolve(rs[0], 'hidden')}><Icon d={eyeOff} /> 숨김</button>
+                {!hidden && <TwoStep label="보류 30일" confirmLabel="정말 보류" verb="임시 숨김 30일" onConfirm={() => hold(t.id)} />}
+                <TwoStep label={<><Icon d={eyeOff} /> 숨김</>} confirmLabel="정말 숨김" verb="확정 숨김" onConfirm={() => resolve(rs[0], 'hidden')} />
               </li>
             )
           })}
@@ -95,7 +90,7 @@ export default function TreesTab() {
                 <strong>{a.tree.title}</strong> <TreeLink slug={a.tree.slug} /> · {a.owner}
                 <span className="sub">{when(a.created_at)} — {a.text}</span>
               </span>
-              <button type="button" aria-label={`${a.tree.title} 소명 수용`} onClick={() => decide(a, 'accepted')}><Icon d={eye} /> 숨김 해제</button>
+              <TwoStep label={<><Icon d={eye} /> 숨김 해제</>} confirmLabel="정말 해제" verb="숨김 해제" onConfirm={() => decide(a, 'accepted')} />
               <button type="button" aria-label={`${a.tree.title} 소명 기각`} onClick={() => decide(a, 'rejected')}>기각</button>
             </li>
           ))}
@@ -129,7 +124,7 @@ function TreeRow({ t, put }: { t: AdminTree; put: (t: Partial<AdminTree> & { id:
   return (
     <tr>
       <td data-l="제목" className="name" title={hidden ? `${when(t.hidden_by_admin_at!)} ${t.hidden_until ? '임시' : '확정'} 숨김` : undefined}>
-        {hidden && <Icon d={eyeOff} />} {t.title} <TreeLink slug={t.slug} />{hidden && t.hidden_until && <Dday at={t.hidden_until} />}
+        {hidden && <Icon d={eyeOff} />} {t.title} <TreeLink slug={t.slug} />{hidden && t.hidden_until && <Dday at={t.hidden_until} soon={7} clamp title={`${when(t.hidden_until)} 만료 → 자동 해제`} />}
       </td>
       <td data-l="소유자">{t.owner.nickname}</td>
       <td data-l="노드" className="tnum">{t.node_count}</td>

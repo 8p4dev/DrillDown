@@ -13,6 +13,9 @@ import { Sheet } from '../../ui/Sheet'
 import './share-list.css'
 
 const ACK = 'publicNoticeAck'
+// 저장소가 막힌 브라우저(사생활 모드 일부·기업 정책)에서도 "공개" 가 터지지 않게
+const acked = () => { try { return !!localStorage.getItem(ACK) } catch { return false } }
+const setAcked = () => { try { localStorage.setItem(ACK, '1') } catch { /* 저장 없이 진행 */ } }
 const NOTICE = '공개하면 누구나 열람·복제할 수 있습니다. 타인의 교재·강의 목차를 그대로 올리면 신고로 숨김 처리될 수 있습니다.'
 const SEGS: { v: Visibility; label: string; icon: string }[] = [
   { v: 'private', label: '비공개', icon: I.lock },
@@ -84,11 +87,11 @@ export default function ShareSheet({ tree: initial, onClose, onChange }: { tree:
   const apply = (next: Visibility) => run(() => setVisibility(tree.id, next))
   const change = (next: Visibility) => {
     if (next === v) return
-    if (next === 'public' && !localStorage.getItem(ACK)) return setNotice(true)
+    if (next === 'public' && !acked()) return setNotice(true)
     void apply(next)
   }
   const ack = () => {
-    localStorage.setItem(ACK, '1')
+    setAcked()
     setNotice(false)
     void apply('public')
   }

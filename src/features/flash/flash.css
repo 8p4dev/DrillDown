@@ -77,8 +77,6 @@
 /* 평가 버튼(01 §3.3 버튼 ok/danger 행): surface 면 + 색 글자·테두리, 호버·눌림은 채움 + --on-fill */
 .flash-rate { display: flex; gap: .4rem; }
 .flash-rate button { flex: 1; }
-.flash-kid.ref { opacity: .6; } /* R3-P15: 복습에서 기한 아닌 형제 = 맥락만 */
-.flash-ref { padding: .35rem .6rem; font-size: var(--fs-sm); }
 .flash-retry { margin: .5rem 0 0; font-size: var(--fs-sm); text-align: center; }
 .flash-rate button.known { color: var(--ok); border-color: var(--ok); }
 .flash-rate button.unknown { color: var(--danger); border-color: var(--danger); }
@@ -133,9 +131,7 @@
 .mm-node.lit rect { stroke: var(--text); stroke-width: 2; stroke-dasharray: none; }
 .mm-node.current rect { stroke-width: 3; }
 .mm-node.go { cursor: pointer; }
-.mm-node.go:focus-visible rect { stroke: var(--text); stroke-width: 2; }
 @media (hover: hover) { .mm-node.go:hover rect { stroke: var(--text); stroke-width: 2; } }
-.mm-node:focus { outline: none; }
 
 /* ---- 모바일 (§3.1 브레이크포인트) ---- */
 @media (max-width: 760px) {

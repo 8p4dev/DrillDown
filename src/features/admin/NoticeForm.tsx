@@ -58,12 +58,14 @@ export default function NoticeForm({ settings, onSaved }: { settings: Settings; 
         <TwoStep label={m.enabled ? '점검 끄기' : '점검 켜기'} confirmLabel={m.enabled ? '정말 끄기' : '정말 켜기'} verb={m.enabled ? '점검 종료' : '점검 시작'}
           onConfirm={() => save({ maintenance: m.enabled ? { manual: false, from: null, until: null } : { manual: true, from: m.from, until: m.until } }, m.enabled ? '점검 모드 꺼짐' : '점검 모드 켜짐 · 사용자 동기화가 멈춥니다')} />
       </div>
-      <form className="maint-row" onSubmit={(e) => { e.preventDefault(); save({ maintenance: { manual: m.manual, from: fromLocal(sched.from), until: fromLocal(sched.until) } }, '점검 예약 저장됨') }}>
-        <label>예약 시작 <input type="datetime-local" aria-label="점검 시작" required value={sched.from} onChange={(e) => setSched((s) => ({ ...s, from: e.target.value }))} /></label>
+      {/* 예약도 지정 시각에 전 사용자 503 이라 2단계. 시작 시각이 없으면 비활성 */}
+      <div className="maint-row">
+        <label>예약 시작 <input type="datetime-local" aria-label="점검 시작" value={sched.from} onChange={(e) => setSched((s) => ({ ...s, from: e.target.value }))} /></label>
         <label>종료 <input type="datetime-local" aria-label="점검 종료" value={sched.until} min={sched.from || undefined} onChange={(e) => setSched((s) => ({ ...s, until: e.target.value }))} /></label>
-        <button type="submit">예약 저장</button>
+        <TwoStep label="예약 저장" confirmLabel="정말 예약" verb="점검 예약" disabled={!sched.from}
+          onConfirm={() => save({ maintenance: { manual: m.manual, from: fromLocal(sched.from), until: fromLocal(sched.until) } }, `점검 예약 저장됨 · ${when(fromLocal(sched.from)!)} 시작`)} />
         {m.from != null && <button type="button" onClick={() => save({ maintenance: { manual: m.manual, from: null, until: null } }, '점검 예약 취소')}>예약 취소</button>}
-      </form>
+      </div>
       <form className="maint-row" onSubmit={(e) => { e.preventDefault(); save({ auto_hide_reports: auto }, '자동 숨김 기준 저장됨') }}>
         <label>열린 신고 <input type="number" aria-label="자동 숨김 기준" min={0} max={20} value={auto} onChange={(e) => setAuto(Math.max(0, Math.min(20, Math.floor(Number(e.target.value)) || 0)))} /> 건이면 자동 임시 숨김 30일 (0 = 끔)</label>
         <button type="submit" disabled={auto === settings.auto_hide_reports}>저장</button>

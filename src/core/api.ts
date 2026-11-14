@@ -164,6 +164,7 @@ export interface ProductFlags { gallery: boolean; report: boolean; rating: boole
 /** GET/PUT /api/admin/product/settings — flags + 갤러리 상단 고정 slug(≤20) */
 export interface ProductSettings { flags: ProductFlags; featured_slugs: string[] }
 export type FeedbackCategory = 'bug' | 'idea' | 'content' | 'other'
+export const FEEDBACK_CATEGORY: Record<FeedbackCategory, string> = { bug: '버그', idea: '제안', content: '콘텐츠 오류', other: '기타' }
 /** 피드백 1건(관리자 GET /api/admin/feedback). user = 닉네임(비로그인·탈퇴 null) */
 export interface Feedback {
   id: ID
@@ -286,6 +287,8 @@ export interface OpsStats {
 }
 /** stats.product (server/account/product.ts) — 가벼운 것만. 학습·성장 지표는 GET /api/admin/product/metrics */
 export interface ProductStats { feedback_open: number }
+/** GET /api/admin/ops/jobs — 작업 실행 중 폴링용(stats 보다 가볍다). 계약 C(orchestration_review_fix.md §4) */
+export interface OpsJobs { running: OpsStats['jobs']; backup: AdminStats['backup']; daily: AdminStats['daily'] }
 
 export interface AdminUser {
   id: ID
@@ -323,6 +326,7 @@ export interface AdminTree {
 }
 
 export type ReportReason = 'copyright' | 'spam' | 'abuse' | 'other'
+export const REASON: Record<ReportReason, string> = { copyright: '저작권', spam: '스팸', abuse: '욕설·혐오', other: '기타' }
 export interface Report {
   id: ID
   tree: { id: ID; title: string; slug: string | null; hidden_by_admin_at: number | null }
@@ -379,6 +383,8 @@ export interface SharedTree {
   updated_at: number
   /** 별점(계약 C3): avg = 평균(소수 1자리, 없으면 null), count = 평가 수, mine = 내 점수(비로그인·미평가 null), canRate = 로그인 + 본인 트리 아님 */
   rating: Rating
+  /** 운영 스위치(계약 B). 없으면 켜진 것으로 본다 */
+  flags?: { report: boolean; rating: boolean }
   nodes: import('./types').TreeNode[]
 }
 
