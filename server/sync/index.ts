@@ -3,6 +3,7 @@ import type { Context, Hono } from 'hono'
 import type { Visibility } from '../../src/core/types.ts'
 import { tx } from '../db.ts'
 import { body, clientIp, fail, GRACE_MS, hit, limit, now, requireUser, type AppEnv } from '../http.ts'
+import { count } from '../metrics.ts'
 import { LIMITS, parsePush, treeOut, nodeOut, type NodeRow, type TreeRow } from './map.ts'
 import { restoreTree } from './owner.ts'
 import { pullSince } from './pull.ts'
@@ -24,9 +25,13 @@ const treeId = (c: Context<AppEnv>) => {
 
 /** /api/sync /api/trees* /api/t/:slug(GET·copy·rating) /api/gallery */
 export function registerSync(app: Hono<AppEnv>) {
+  // 동기화 건강 카운터(메모리): push/pull 수와 400·403·410 등 상태별 수. 관리자 대시보드 "재시작 이후"
+  app.use('/api/sync', async (c, next) => { await next(); count(`sync.${c.req.method === 'POST' ? 'push' : 'pull'}${c.res.status >= 400 ? `.${c.res.status}` : ''}`) })
   app.post('/api/sync', requireUser, limit('sync_push', 300, MIN), async (c) => {
     const p = parsePush(await body(c, LIMITS.bytes))
-    return c.json(applyPush(c.get('db'), uid(c), p, now()))
+    const r = applyPush(c.get('db'), uid(c), p, now())
+    count('sync.superseded', r.superseded.trees.length + r.superseded.nodes.length + r.superseded.srs.length); count('sync.dropped', r.dropped.length + r.id_taken.length)
+    return c.json(r)
   })
   app.get('/api/sync', requireUser, limit('sync_pull', 300, MIN), (c) => {
     const s = c.req.query('since') ?? '0'

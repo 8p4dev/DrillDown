@@ -44,7 +44,7 @@ export function optText(v: unknown, max: number, field: string, allowNewline = f
 const lim = (q: string | undefined) => Math.min(50, Math.max(1, Math.floor(Number(q)) || 50))
 const readJson = <T>(file: string, dflt: T): T => { try { return JSON.parse(readFileSync(join(env.dataDir, file), 'utf8')) as T } catch { return dflt } }
 
-const USER_COLS = 'id, provider, nickname, role, created_at, last_seen_at, suspended_at, deleted_at'
+const USER_COLS = 'id, provider, provider_sub, nickname, role, created_at, last_seen_at, suspended_at, deleted_at' // provider_sub 는 관리자 전용(admins.json 대조, T3 #33)
 const adminUser = (db: DB, u: Omit<AdminUser, 'tree_count'>): AdminUser => ({ ...u, tree_count: treeCountOf(db, u.id) })
 function userOr404(db: DB, id: string) {
   const u = UUID.test(id) ? (db.prepare(`SELECT ${USER_COLS} FROM users WHERE id = ?`).get(id) as Omit<AdminUser, 'tree_count'> | undefined) : undefined
@@ -342,11 +342,25 @@ export function registerAdmin(app: Hono<AppEnv>) {
     return c.json({ settings: next })
   })
 
+  // 감사 로그: 필터(action 접두·target_id·기간) + CSV(≤5,000행, T3 #35). audit_ts·audit_target 인덱스 사용
   app.get('/api/admin/audit', (c) => {
-    const cur = Number(c.req.query('cursor'))
-    const n = lim(c.req.query('limit'))
-    const rows = c.get('db').prepare(`SELECT a.*, u.nickname actor FROM audit_log a LEFT JOIN users u ON u.id = a.actor_id ${cur > 0 ? 'WHERE a.id < ?' : ''} ORDER BY a.id DESC LIMIT ?`)
-      .all(...(cur > 0 ? [cur, n + 1] : [n + 1])) as (Omit<AuditRow, 'meta'> & { meta: string | null })[]
+    const q = c.req.query()
+    const csv = q.format === 'csv'
+    const where: string[] = [], p: (string | number)[] = []
+    const cur = Number(q.cursor); if (cur > 0) { where.push('a.id < ?'); p.push(cur) }
+    const action = optText(q.action, 40, 'action'); if (action) { where.push("a.action LIKE ? ESCAPE '\\'"); p.push(action.replace(/[\\%_]/g, (m) => '\\' + m) + '%') }
+    const target = optText(q.target_id, 64, 'target_id'); if (target) { where.push('a.target_id = ?'); p.push(target) }
+    const from = Number(q.from), to = Number(q.to)
+    if (from > 0) { where.push('a.ts >= ?'); p.push(from) }
+    if (to > 0) { where.push('a.ts < ?'); p.push(to) }
+    const n = csv ? 5000 : lim(q.limit)
+    const rows = c.get('db').prepare(`SELECT a.*, u.nickname actor FROM audit_log a LEFT JOIN users u ON u.id = a.actor_id ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY a.id DESC LIMIT ?`)
+      .all(...p, n + 1) as (Omit<AuditRow, 'meta'> & { meta: string | null })[]
+    if (csv) {
+      const cell = (v: unknown) => { const s = String(v ?? ''); return `"${(/^[=+\-@]/.test(s) ? `'${s}` : s).replace(/"/g, '""')}"` } // 수식 주입 방지
+      const lines = rows.slice(0, n).map((r) => [new Date(r.ts).toISOString(), r.actor ?? r.actor_id ?? '', r.action, r.target_type ?? '', r.target_id ?? '', r.meta ?? ''].map(cell).join(','))
+      return c.text(['ts,actor,action,target_type,target_id,meta', ...lines].join('\n'), 200, { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': 'attachment; filename="audit.csv"' })
+    }
     const items = rows.slice(0, n).map((r) => ({ ...r, meta: r.meta ? JSON.parse(r.meta) : null }))
     return c.json({ items, next: rows.length > n ? String(items[n - 1].id) : null })
   })

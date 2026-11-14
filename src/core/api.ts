@@ -135,14 +135,32 @@ export interface AdminStats {
   product: ProductStats
 }
 
-/** stats.ops (server/account/ops.ts) — DB·WAL 크기, 세션 수, 카운터, 버전, OAuth 상태 등 */
-export interface OpsStats {}
+/** stats.ops (server/account/ops.ts) — DB·WAL 크기, 세션 수, 카운터, 버전, OAuth 상태 등. 카운터는 전부 "재시작 이후"(메모리) */
+export interface OpsStats {
+  /** backups = data/backups/app-YYYYMMDD.db 목록(최신순, 다운로드 없음) */
+  db: { file: number; wal: number; page_size: number; page_count: number; freelist: number; backups_bytes: number; backups: { name: string; bytes: number; at: number }[] }
+  /** systemd MemoryMax (바이트) — RSS 비율 표시용 */
+  rss_max: number
+  sessions: { total: number; expired: number; admin: number }
+  /** '429:<키>' · 'sync.push' · 'sync.pull' · 'sync.pull.410' 등 상태별 · 'sync.superseded' · 'sync.dropped' · 'oauth.<provider>.<state|token|userinfo>' */
+  counters: Record<string, number>
+  client_errors: { count: number; recent: { ts: number; message: string; version: string }[] }
+  /** git = HEAD 12자, asset = dist/index.html 의 index-<hash>.js, restart_needed = dist·server 가 시작 뒤 바뀜 */
+  build: { git: string | null; asset: string | null; started_at: number; restart_needed: boolean }
+  /** 수동 실행 중(자식 프로세스) */
+  jobs: { backup: boolean; daily: boolean }
+  oauth: Record<'google' | 'kakao', { id: boolean; secret: boolean; last_seen_at: number | null }>
+  /** 감사 로그 system.restore 최신 ts(복원 리허설) */
+  restore_at: number | null
+}
 /** stats.product (server/account/product.ts) — 학습·성장 지표, 신고 SLA 등 */
 export interface ProductStats {}
 
 export interface AdminUser {
   id: ID
   provider: Provider
+  /** 관리자 전용 — admins.json 의 'provider:sub' 대조용 */
+  provider_sub: string
   nickname: string
   role: Role
   created_at: number

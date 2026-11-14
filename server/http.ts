@@ -2,6 +2,7 @@
 // 에러 봉투 { error: { code, message, field? } } snake_case (00 §4), 메모리 토큰 버킷 레이트 리밋(03 §3.6), 인증 가드.
 import type { Context, MiddlewareHandler } from 'hono'
 import type { DB } from './db.ts'
+import { count } from './metrics.ts'
 
 /** 세션 미들웨어(SA)가 c.set('user') 로 넣는 값. 없으면 null(anon) */
 export interface SessionUser {
@@ -57,6 +58,7 @@ export function hit(c: Context, key: string, max: number, windowMs: number) {
   let b = buckets.get(key)
   if (!b || b.reset < now) buckets.set(key, (b = { n: 0, reset: now + windowMs }))
   if (++b.n > max) {
+    count(`429:${key.split(':')[0]}`) // 키 이름별 429 (관리자 대시보드, 메모리만)
     c.header('Retry-After', String(Math.ceil((b.reset - now) / 1000)))
     fail(429, 'rate_limited', '요청이 너무 많습니다. 잠시 뒤 다시 시도해 주세요')
   }
