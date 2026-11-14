@@ -151,6 +151,7 @@ export default function SharedPage({ slug, mode, rootId }: { slug: string; mode:
   const [report, setReport] = useState(false)
   const [reason, setReason] = useState<ReportReason>('copyright')
   const [note, setNote] = useState('')
+  const [receipt, setReceipt] = useState<string | null>(null) // 신고 접수번호 → #/report/<id> (T2 #26)
   const moreRef = useRef<HTMLDivElement>(null)
   const [dup, setDup] = useState<Tree | null>(null)
 
@@ -185,15 +186,16 @@ export default function SharedPage({ slug, mode, rootId }: { slug: string; mode:
   }
   const sendReport = async (e: React.FormEvent) => {
     e.preventDefault()
+    let id: string
     try {
-      await api(`/api/t/${slug}/report`, { body: { reason, note: note.trim() || undefined } })
+      id = (await api<{ id: string }>(`/api/t/${slug}/report`, { body: { reason, note: note.trim() || undefined } })).id
     } catch (err) {
       return toast(err instanceof ApiError ? err.message : '신고하지 못했습니다')
     }
-    setReport(false)
     setNote('')
-    toast('신고 접수됨')
+    setReceipt(id) // 시트는 열어 두고 접수번호·상태 링크를 보여 준다
   }
+  const closeReport = () => { setReport(false); setReceipt(null) }
   // 별점(계약 C3): 로그인 + 남의 트리면 PUT. 비로그인은 로그인 안내, 내 트리는 버튼 비활성
   const rate = async (stars: number) => {
     if (!me) return toast('로그인하면 별점을 남길 수 있습니다', { label: '로그인', run: () => location.assign('/' + href.login(location.pathname + location.search)) })
@@ -336,11 +338,25 @@ export default function SharedPage({ slug, mode, rootId }: { slug: string; mode:
         </div>
       </Sheet>
 
-      <Sheet open={report} onClose={() => setReport(false)} label="신고">
+      <Sheet open={report} onClose={closeReport} label="신고">
+        {receipt ? (
+          <div className="share-sheet share-report">
+            <header className="sheet-head">
+              <h2>신고 접수됨</h2>
+              <button type="button" className="ghost sheet-x" aria-label="닫기" data-tip="닫기" onClick={closeReport}><Icon d={x} /></button>
+            </header>
+            <p>접수번호 <strong className="tnum" style={{ userSelect: 'all', overflowWrap: 'anywhere' }}>{receipt}</strong></p>
+            <p className="muted">이 번호로 처리 결과를 볼 수 있습니다. 연락처는 받지 않으니 적어 두세요.</p>
+            <div className="actions">
+              <a href={'/' + href.report(receipt)}>처리 상태 보기</a>
+              <button type="button" className="primary" onClick={closeReport}>닫기</button>
+            </div>
+          </div>
+        ) : (
         <form className="share-sheet share-report" onSubmit={sendReport}>
           <header className="sheet-head">
             <h2>신고</h2>
-            <button type="button" className="ghost sheet-x" aria-label="닫기" data-tip="닫기" onClick={() => setReport(false)}><Icon d={x} /></button>
+            <button type="button" className="ghost sheet-x" aria-label="닫기" data-tip="닫기" onClick={closeReport}><Icon d={x} /></button>
           </header>
           <fieldset>
             <legend className="muted">사유</legend>
@@ -353,6 +369,7 @@ export default function SharedPage({ slug, mode, rootId }: { slug: string; mode:
             <button type="submit" className="primary">신고</button>
           </div>
         </form>
+        )}
       </Sheet>
     </section>
   )

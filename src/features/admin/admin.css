@@ -81,3 +81,29 @@
 .admin .ops { display: flex; flex-direction: column; gap: .6rem; }
 .admin .ops ol { margin: 0; padding-left: 1.25rem; font-size: var(--fs-sm); display: flex; flex-direction: column; gap: .2rem; }
 .admin .ops select { min-height: var(--tap); border-radius: var(--radius); }
+
+/* ---- 법규·통지(워커 B): 공지 목록·점검 예약·요청 큐·임시조치 D-N ---- */
+.admin .notices { display: flex; flex-direction: column; gap: .5rem; }
+.admin .notice-row { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; padding: .5rem .75rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); font-size: var(--fs-sm); color: var(--text-2); }
+.admin .notice-row .admin-search { flex: 1 1 100%; max-width: none; }
+.admin .notice-row input[type='url'] { flex: 1 1 220px; min-width: 0; }
+.admin .notice-row label, .admin .maint-row label, .admin .dsr-form label { display: inline-flex; align-items: center; gap: .3rem; }
+.admin .notice-row input, .admin .notice-row select, .admin .maint-row input, .admin .dsr-form input, .admin .dsr-form select { min-height: var(--tap); border-radius: var(--radius); }
+.admin .maint-row input[type='number'] { width: 4.5em; }
+.admin .notice-actions { display: flex; gap: .5rem; }
+.admin .notice-actions button, .admin .dsr-form button { display: inline-flex; align-items: center; gap: .35rem; }
+.admin .dsr-form { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+.admin .dsr-form .admin-search { flex: 1 1 220px; }
+.admin .hold-summary .over { color: var(--danger); }
+.dday { display: inline-block; margin-left: .35rem; padding: 0 .35rem; font-size: var(--fs-xs); font-weight: 600; border: 1px solid var(--border-strong); border-radius: var(--radius); font-variant-numeric: tabular-nums; color: var(--text-2); vertical-align: 1px; }
+.dday[data-soon='true'] { color: var(--danger); border-color: var(--danger); }
+.dday[data-over='true'] { color: var(--on-fill); background: var(--danger); border-color: var(--danger); }
+.reports .claim { white-space: pre-wrap; color: var(--text-2); }
+.reports li[data-state='resumed'], .reports li[data-state='rejected'], .reports li[data-state='confirmed'], .reports li[data-state='litigation'], .admin tr[data-state='done'], .admin tr[data-state='rejected'] { color: var(--muted); }
+.admin td.act .hide-opts { display: inline-flex; align-items: center; gap: .35rem; }
+.admin td.act .mode { min-height: 32px; border-radius: var(--radius); font-size: var(--fs-sm); padding: .25rem .4rem; }
+@media (max-width: 760px) {
+  .admin td.act .hide-opts { flex-basis: 100%; flex-wrap: wrap; }
+  .admin td[data-l='메모'] { grid-column: 1 / -1; }
+  .reports.takedowns li { flex-wrap: wrap; } .reports.takedowns .grow { flex-basis: 100%; } /* 버튼 3개가 본문을 누르지 않게 아래 줄로 */
+}
