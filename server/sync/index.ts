@@ -1,6 +1,7 @@
 // 저장·동기화·공유 서버 라우트 (04 §3.6 API 표). 판정은 push/pull/share/owner 의 순수 함수, 여기는 인증·리밋·상태 코드만
 import type { Context, Hono } from 'hono'
 import type { Visibility } from '../../src/core/types.ts'
+import { countGalleryHit, productSettings, requireFlag } from '../account/product.ts'
 import { tx } from '../db.ts'
 import { body, clientIp, fail, GRACE_MS, hit, limit, now, requireUser, type AppEnv } from '../http.ts'
 import { count } from '../metrics.ts'
@@ -12,6 +13,9 @@ import { nextSeq } from './seq.ts'
 import { gallery, lookupShare, ownTree, rateTree, reissueSlug, renderShare, setVisibility, sharedTree } from './share.ts'
 
 const MIN = 60_000
+const CRAWLER = /facebookexternalhit|kakaotalk-scrap|Slackbot|Twitterbot/i
+/** #42 공유 링크 조회 수 — 요청 수(크롤러 UA 제외, IP 비저장이라 유니크 불가). 요청당 유일한 SQLite 쓰기 */
+const countView = (c: Context<AppEnv>, treeId: string) => { if (!CRAWLER.test(c.req.header('user-agent') ?? '')) c.get('db').prepare('UPDATE trees SET view_count = view_count + 1 WHERE id = ?').run(treeId) }
 /** 404·410·403·200 응답 시간을 맞춘다(존재 여부 누설 방지, 04 §3.3) */
 const FLOOR_MS = 40
 const pad = async (t0: number) => { const d = FLOOR_MS - (performance.now() - t0); if (d > 0) await new Promise((r) => setTimeout(r, d)) }
@@ -73,6 +77,7 @@ export function registerSync(app: Hono<AppEnv>) {
     const { visibility } = await body<{ visibility?: unknown }>(c)
     if (visibility !== 'private' && visibility !== 'unlisted' && visibility !== 'public') fail(400, 'invalid', '공개 범위가 올바르지 않습니다', 'visibility')
     const db = c.get('db')
+    if (visibility !== 'private') requireFlag(db, 'publish') // #44 공개 전환 스위치
     const id = treeId(c)
     return c.json(tx(db, () => setVisibility(db, uid(c), id, visibility as Visibility)))
   })
@@ -90,6 +95,7 @@ export function registerSync(app: Hono<AppEnv>) {
     const db = c.get('db')
     const s = lookupShare(db, c.req.param('slug'), c.get('user'))
     const out = s.ok ? sharedTree(db, s.t, c.get('user')) : null
+    if (s.ok) countView(c, s.t.id)
     await pad(t0)
     if (!s.ok) fail(s.status, s.code, s.code === 'deleted' ? '삭제된 트리입니다' : s.code === 'hidden' ? '운영 정책으로 숨김 처리된 트리입니다' : '없는 링크입니다')
     return c.json(out)
@@ -107,21 +113,22 @@ export function registerSync(app: Hono<AppEnv>) {
     const { stars } = await body<{ stars?: unknown }>(c)
     if (!Number.isInteger(stars) || (stars as number) < 1 || (stars as number) > 5) fail(400, 'bad_request', '별점은 1~5 사이 정수여야 합니다', 'stars')
     const db = c.get('db')
+    requireFlag(db, 'rating') // #44
     const s = lookupShare(db, c.req.param('slug'), c.get('user'))
     if (!s.ok) fail(s.status, s.code, s.code === 'deleted' ? '삭제된 트리입니다' : s.code === 'hidden' ? '운영 정책으로 숨김 처리된 트리입니다' : '없는 링크입니다')
     else return c.json(rateTree(db, uid(c), s.t, stars as number))
   })
   app.get('/api/gallery', (c) => {
     hit(c, `gallery:${clientIp(c)}`, 30, MIN)
+    requireFlag(c.get('db'), 'gallery', 404) // #44 갤러리 끄면 404(존재 숨김)
+    countGalleryHit()
     const sort = c.req.query('sort') ?? 'recent'
     const page = c.req.query('page') ?? '1'
     if (sort !== 'recent' && sort !== 'copies') fail(400, 'invalid', '정렬이 올바르지 않습니다', 'sort')
     if (!/^\d{1,4}$/.test(page) || Number(page) < 1) fail(400, 'invalid', '페이지가 올바르지 않습니다', 'page')
-    return c.json(gallery(c.get('db'), sort as 'recent' | 'copies', Number(page), now(), c.req.query('q') ?? ''))
+    return c.json(gallery(c.get('db'), sort as 'recent' | 'copies', Number(page), now(), c.req.query('q') ?? '', productSettings(c.get('db')).featured_slugs))
   })
 }
-
-const CRAWLER = /facebookexternalhit|kakaotalk-scrap|Slackbot|Twitterbot/i
 
 /** GET /t/:slug → 셸 HTML 에 OG 주입. 404/410/403 도 같은 셸(OG 없음)·상태 코드만 */
 export function registerSharePages(app: Hono<AppEnv>, shell: () => string) {
@@ -134,6 +141,7 @@ export function registerSharePages(app: Hono<AppEnv>, shell: () => string) {
       c.header('Cache-Control', 'no-store')
       return c.html(shell(), s.status)
     }
+    countView(c, s.t.id)
     c.header('Cache-Control', 'public, max-age=60, stale-while-revalidate=600')
     return c.html(renderShare(shell(), { slug: s.t.slug!, title: s.t.title, node_count: s.t.node_count, visibility: s.t.visibility }))
   })

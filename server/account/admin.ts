@@ -9,7 +9,7 @@ import { env } from '../env.ts'
 import { errors } from '../metrics.ts'
 import { registerLegal } from './legal.ts'
 import { opsStats, registerOps } from './ops.ts'
-import { productStats, registerProduct } from './product.ts'
+import { productStats, registerProduct, requireFlag } from './product.ts'
 import { body, clientIp, DAY, fail, hit, limit, requireAdmin, requireUser, type AppEnv } from '../http.ts'
 import { listTreesForAdmin, purgeUser, restoreTree, setHidden, softDeleteTreesOfUser, treeCountOf, treeIdBySlug, treeStats, treesOfUser } from '../sync/owner.ts'
 
@@ -116,6 +116,7 @@ function registerReport(app: Hono<AppEnv>) {
   app.post('/api/t/:slug/report', async (c) => {
     const u = c.get('user')
     hit(c, u ? `report:u:${u.id}` : `report:ip:${clientIp(c)}`, u ? 20 : 5, 3_600_000)
+    requireFlag(c.get('db'), 'report') // #44 신고 스위치(워커 C) — 라우트가 여기 있어 1줄만
     const b = await body<{ reason?: unknown; note?: unknown }>(c)
     if (!['copyright', 'spam', 'abuse', 'other'].includes(b.reason as string)) fail(400, 'invalid', '신고 사유를 고르세요', 'reason')
     const note = optText(b.note, 300, 'note', true) ?? null
