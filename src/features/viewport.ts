@@ -1,6 +1,5 @@
 // 모바일 키보드·시각 뷰포트 — 계약 docs/specs/02_layout_mobile.md §3.3 (LM 소유)
 // kb = 키보드 높이(px). :root 에 --kb·--vv-h 를 쓰고 data-kb 를 토글한다. 읽는 선택자는 ≤6개(02 §3.7), 노드 카드에서는 읽지 않는다.
-import { useSyncExternalStore } from 'react'
 
 export type Viewport = { kb: number; height: number; open: boolean }
 
@@ -51,10 +50,6 @@ export function startViewport() {
 export function subscribeViewport(cb: (v: Viewport) => void): () => void {
   subs.add(cb)
   return () => void subs.delete(cb)
-}
-const subscribe = (f: () => void) => subscribeViewport(f)
-export function useVisualViewport(): Viewport {
-  return useSyncExternalStore(subscribe, () => state)
 }
 
 const isScroller = (el: Element) => {

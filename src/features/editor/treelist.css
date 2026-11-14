@@ -1,7 +1,6 @@
 /* 목록 화면 — 01 §4 목록 행, 02 §3.1 목록 와이어. 색은 토큰만, 그림자 없음, 반경 2px/0 */
 .trees-head { display: flex; align-items: center; gap: .5rem; margin-bottom: 1rem; }
 .trees-head h1 { margin: 0; flex: 1; min-width: 0; }
-.trees-head > button { flex: none; width: 2.4rem; height: 2.4rem; padding: 0; display: inline-grid; place-items: center; color: var(--muted); }
 .trees-form { display: flex; gap: .5rem; padding: .6rem; margin-bottom: 1.25rem; }
 .trees .trees-form input { flex: 1; min-width: 0; border-color: transparent; background: transparent; }
 .trees .trees-form input:focus { box-shadow: none; border-color: transparent; }
@@ -40,7 +39,10 @@
 
 .tree-top { z-index: 2; display: flex; align-items: flex-start; gap: .65rem; }
 .tree-top .avatar { flex: none; pointer-events: none; display: grid; place-items: center; width: 2.25rem; height: 2.25rem; font-weight: 700; user-select: none; } /* 색·톤은 DS .avatar[data-tone]. 눌림은 뒤의 편집 링크로 통과 */
-.tree-title { flex: 1; min-width: 0; padding: .3rem 0; font-size: var(--fs-lg); line-height: 1.35; font-weight: 650; letter-spacing: -.015em; overflow-wrap: anywhere; cursor: pointer; }
+.tree-title { /* U20 제목 2줄 말줄임 */
+  flex: 1; min-width: 0; margin-block: .3rem; font-size: var(--fs-lg); line-height: 1.35; font-weight: 650; letter-spacing: -.015em; overflow-wrap: anywhere; cursor: pointer;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden;
+}
 .tree-cards .tree-rename { flex: 1; min-width: 0; padding: .2rem .4rem; font-size: var(--fs-lg); font-weight: 650; }
 .tree-top .vis-badge { flex: none; align-self: center; }
 
@@ -79,7 +81,6 @@
 
 /* 터치 목표 44px: 좁은 화면이거나 터치 기기면 */
 @media (max-width: 760px), (pointer: coarse) {
-  .trees-head > button { width: 44px; height: 44px; }
   .trees-form button, .trees .trees-form input { min-height: 44px; }
   .tree-menu { margin: -.25rem -.7rem -.25rem auto; }
   .tree-menu summary { width: 44px; height: 44px; }
@@ -96,8 +97,7 @@
 .trees-full { margin: -.75rem 0 1.25rem; color: var(--muted); font-size: var(--fs-sm); }
 .trees-head > .trees-trash { flex: none; width: 2.4rem; height: 2.4rem; display: inline-grid; place-items: center; color: var(--muted); }
 
-/* U42 검색, U44 카드 메타, U20 제목 2줄 말줄임 */
+/* U42 검색, U44 카드 메타 */
 .trees .trees-search { width: 100%; box-sizing: border-box; margin-bottom: 1rem; }
 .trees-none { color: var(--muted); font-size: var(--fs-sm); }
 .tree-meta { margin: .1rem 0 .5rem 2.9rem; color: var(--muted); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.tree-title { padding-block: 0; margin-block: .3rem; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }

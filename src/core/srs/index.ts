@@ -10,14 +10,14 @@ const scheduler = await DefaultScheduler({ enableFuzz: true, weights: migrateFSR
 type Card = ReturnType<typeof scheduler.newCard>
 
 /** 서버에서 받은 행은 card 의 날짜가 JSON 문자열이다 → ts-fsrs 에 넘기기 전에 Date 로 되돌린다 */
-export function asCard(c: unknown): Card {
+function asCard(c: unknown): Card {
   const o = { ...(c as Record<string, unknown>) }
   for (const k in o) if (/At$|^due$|^last_review$/.test(k) && typeof o[k] === 'string') o[k] = new Date(o[k] as string)
   return o as unknown as Card
 }
 
 /** 색 바램 임계값(예상 기억률 R). lightgreen 0.8 은 가정값(FSRS-7 곡선이 완만해 0.7 이면 첫 복습 카드가 ~250일간 연두) */
-export const FADE = { green: 0.9, lightgreen: 0.8 }
+const FADE = { green: 0.9, lightgreen: 0.8 }
 
 // ── 순수 함수 ──────────────────────────────────────────────
 
@@ -62,7 +62,7 @@ export function retrievability(s: NodeSrs, now: Date): number {
   return scheduler.model.forgettingCurve(card, scheduler.chrono.difference(card.lastReviewAt, now))
 }
 
-export type NodeColor = 'green' | 'lightgreen' | 'yellow' | 'red' | 'none'
+export type NodeColor = 'green' | 'lightgreen' | 'red' | 'none'
 export interface ColorInfo { color: NodeColor; misplaced: boolean }
 
 export function nodeColor(s: NodeSrs | undefined, now: Date): ColorInfo {
@@ -108,7 +108,7 @@ export function missHeat(s: NodeSrs | undefined): number {
  * 채점 1회 기록. 노드가 지워졌으면(다른 기기 삭제가 pull 된 뒤) 쓰지 않고 null.
  * base: "다시 평가" 때 첫 평가 전 기록(null = 없었음)을 넘기면 저장된 값 대신 그것을 기준으로 다시 계산해 덮어쓴다(S2)
  */
-export async function recordGrade(nodeId: ID, treeId: ID, src: GradeSource, structure: Structure, now = new Date(), base?: NodeSrs | null): Promise<NodeSrs | null> {
+async function recordGrade(nodeId: ID, treeId: ID, src: GradeSource, structure: Structure, now = new Date(), base?: NodeSrs | null): Promise<NodeSrs | null> {
   return db.transaction('rw', [db.srs, db.nodes, db.outbox, db.meta], async () => {
     if (!(await db.nodes.get(nodeId))) return null
     const prev = base === undefined ? await db.srs.get(nodeId) : (base ?? undefined)

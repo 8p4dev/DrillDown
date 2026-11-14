@@ -1,17 +1,15 @@
 // 동기화 엔진 — 04 §3.1 push/pull·LWW·톰스톤·고아, §3.8 병합 M1~M6, §3.10 상태. sync.ts 가 onLogin 때만 동적 import 한다.
 import { api, ApiError } from '../api'
-import { db, newId, setKick, track, type MetaRow, type OutboxRow } from '../db'
+import { db, newId, setKick, track, type MetaRow, type OutboxRow, type Row } from '../db'
 import { TRASH_MS } from '../repo'
 import { setSyncState, type MergeChoice, type MergePlan } from '../sync'
 import { CAP, type BlankAttempt, type ID, type NodeSrs, type Tree, type TreeNode } from '../types'
 import { toast } from '../../features/Toast'
 
-type RTree = Tree & { hiddenByAdmin?: boolean }
 type Del = { deletedAt?: number | null }
-interface Batch { trees: (RTree & Del)[]; nodes: (TreeNode & Del)[]; srs: (NodeSrs & Del)[] }
+interface Batch { trees: (Tree & Del)[]; nodes: (TreeNode & Del)[]; srs: (NodeSrs & Del)[] }
 interface PushRes { seq: number; applied: ID[]; superseded: Batch; dropped: ID[]; id_taken: ID[]; created?: ID[] }
 interface PullRes extends Batch { seq: number; more: boolean }
-type Row = Omit<OutboxRow, 'seq' | 'at'>
 /** pull 1회 동안 들고 다니는 outbox 사본(R5-P10). top = 이미 읽은 최대 seq */
 interface Pend { pend: Map<string, OutboxRow>; top: number }
 
@@ -126,8 +124,11 @@ async function fail(e: unknown) {
     if (e.status === 503) retry = setTimeout(() => void sync(), (e.retryAfter ?? 30) * 1000) // 점검 모드 (RV L17)
     return
   }
+  // 계약 A: 세션 사용자가 push 본문 userId 와 다르다(다른 탭에서 다른 계정 로그인) → 엔진을 멈추고 me 를 다시 읽어 onLogin 흐름으로
+  const mismatch = e instanceof ApiError && e.status === 409 && e.code === 'user_mismatch'
+  if (mismatch) stop()
   const reason = !(e instanceof ApiError) ? '동기화 오류'
-    : e.status === 401 ? '다시 로그인해 주세요'
+    : e.status === 401 || mismatch ? '다시 로그인해 주세요'
     : e.code === 'tree_limit' ? '트리가 너무 많습니다(200개)'
     : e.code === 'payload_too_large' ? '트리가 너무 큽니다(5,000노드)'
     : e.message
@@ -135,7 +136,7 @@ async function fail(e: unknown) {
   await db.meta.put({ key: 'lastSyncError', value: reason })
   setSyncState({ kind: 'error', reason, pending })
   // 401: 세션이 끝났을 수 있다 → me 재확인 (CA refreshMe)
-  if (e instanceof ApiError && e.status === 401) void import('../me').then((m) => (m as { refreshMe?: () => unknown }).refreshMe?.())
+  if ((e instanceof ApiError && e.status === 401) || mismatch) void import('../me').then((m) => m.refreshMe())
 }
 
 // ── push ────────────────────────────────────────────────────
@@ -155,11 +156,12 @@ async function pushAll() {
 async function pushOnce(slice: OutboxRow[]): Promise<number> {
   const ids = (k: OutboxRow['kind']) => slice.filter((r) => r.kind === k && r.op === 'put').map((r) => r.id)
   const [ts, ns, ss, as] = await Promise.all([db.trees.bulkGet(ids('tree')), db.nodes.bulkGet(ids('node')), db.srs.bulkGet(ids('srs')), db.attempts.bulkGet(ids('attempt'))])
-  const cur = new Map<string, RTree | TreeNode | NodeSrs | BlankAttempt>()
+  const cur = new Map<string, Tree | TreeNode | NodeSrs | BlankAttempt>()
   for (const x of [...ts, ...ns, ...as].filter(isDef)) cur.set(x.id, x)
   for (const s of ss.filter(isDef)) cur.set('srs' + s.nodeId, s)
 
-  const body = { trees: [] as Tree[], nodes: [] as TreeNode[], srs: [] as NodeSrs[], attempts: [] as BlankAttempt[], deleted: { trees: [] as { id: ID; deletedAt: number }[], nodes: [] as { id: ID; treeId: ID; deletedAt: number }[] } }
+  // userId: 계약 A — 서버가 세션 사용자와 비교해 다르면 409 user_mismatch(다른 탭의 다른 계정 로그인으로 쿠키가 바뀐 경우)
+  const body = { userId: await getMeta('userId'), trees: [] as Tree[], nodes: [] as TreeNode[], srs: [] as NodeSrs[], attempts: [] as BlankAttempt[], deleted: { trees: [] as { id: ID; deletedAt: number }[], nodes: [] as { id: ID; treeId: ID; deletedAt: number }[] } }
   const sent: OutboxRow[] = []
   const pos: Record<string, OutboxRow[]> = {} // 'nodes' → 보낸 순서의 outbox 행 — 400 field(nodes[3].title) 역추적용
   const at = (k: string, r: OutboxRow) => (pos[k] ??= []).push(r)
@@ -168,8 +170,9 @@ async function pushOnce(slice: OutboxRow[]): Promise<number> {
     const v = cur.get(r.kind === 'srs' ? 'srs' + r.id : r.id)
     let item: object | undefined
     if (r.kind === 'tree') {
-      const t = v as RTree | undefined
-      if (r.op === 'del' || t?.deletedAt) item = { id: r.id, deletedAt: t?.deletedAt ?? r.at }
+      const t = v as Tree | undefined
+      // deletedAt 은 track 시각(= 지금 지웠다): "내 버전 유지" 로 다시 지운 휴지통 트리가 옛 deletedAt 으로 서버 LWW 에 또 지지 않게 (r2 L1)
+      if (r.op === 'del' || t?.deletedAt) item = { id: r.id, deletedAt: r.at }
       else if (t) {
         const { deletedAt: _d, hiddenByAdmin: _h, ...rest } = t
         item = rest
@@ -200,7 +203,7 @@ async function pushOnce(slice: OutboxRow[]): Promise<number> {
   } catch (e) {
     // C4 tree_limit: 새 트리는 격리가 아니라 보류(outbox 에 남김). 어느 트리가 새것인지 모르므로 tree put 행만 이분 탐색
     if (e instanceof ApiError && e.code === 'tree_limit') {
-      const tp = sent.filter((r) => r.kind === 'tree' && r.op === 'put' && cur.has(r.id) && !(cur.get(r.id) as RTree).deletedAt)
+      const tp = sent.filter((r) => r.kind === 'tree' && r.op === 'put' && cur.has(r.id) && !(cur.get(r.id) as Tree).deletedAt)
       if (!tp.length) throw e
       if (tp.length === 1) return held.add(tp[0].treeId), sent.length
       const half = Math.ceil(tp.length / 2)
@@ -227,16 +230,23 @@ async function pushOnce(slice: OutboxRow[]): Promise<number> {
     const now = await db.outbox.bulkGet(sent.map((r) => r.seq!))
     await db.outbox.bulkDelete(sent.filter((r, i) => !taken.has(r.id) && now[i]?.at === r.at).map((r) => r.seq!))
   })
-  const sup = res.superseded ?? { trees: [], nodes: [], srs: [] }
+  // r2 M1: 서버는 updatedAt 이 같은 행(응답 유실 재시도·두 탭 중복 push 의 메아리)도 superseded 로 돌려준다 → 실제로 다른 행만 센다
+  const stamp = (x: { updatedAt: number } & Del) => x.deletedAt ?? x.updatedAt
+  const fresh = (local: ({ updatedAt: number } & Del) | undefined, remote: { updatedAt: number } & Del) => !local || stamp(local) !== stamp(remote)
+  const sup: Batch = {
+    trees: (res.superseded?.trees ?? []).filter((t) => fresh(cur.get(t.id) as Tree | undefined, t)),
+    nodes: (res.superseded?.nodes ?? []).filter((x) => fresh(cur.get(x.id) as TreeNode | undefined, x)),
+    srs: (res.superseded?.srs ?? []).filter((s) => fresh(cur.get('srs' + s.nodeId) as NodeSrs | undefined, s)),
+  }
   const n = sup.trees.length + sup.nodes.length + sup.srs.length
   if (n) {
     const losers: Batch = {
-      trees: sup.trees.map((t) => cur.get(t.id) as RTree).filter(isDef),
+      trees: sup.trees.map((t) => cur.get(t.id) as Tree).filter(isDef),
       nodes: sup.nodes.map((x) => cur.get(x.id) as TreeNode).filter(isDef),
       srs: sup.srs.map((s) => cur.get('srs' + s.nodeId) as NodeSrs).filter(isDef),
     }
+    // 고아 복구는 여기서 하지 않는다(r2 H1): 서버 부모 P 가 아직 pull 전이면 X 를 루트로 끌어내려 모든 기기의 구조를 되돌린다. pullFrom 마지막 페이지 뒤(D1)에서만
     const ch = await applyRemote(sup)
-    await rescueOrphans(ch)
     emit(ch)
     toast(`다른 기기 변경 반영됨 ${n}건`, { label: '내 버전 유지', run: () => void keepMine(losers) }, 8000)
   }
@@ -415,7 +425,7 @@ async function applyRemote(r: Batch, p?: Pend): Promise<Set<ID>> {
 
     for (const t of r.trees ?? []) {
       const { deletedAt, ...rest } = t
-      const local: RTree | undefined = await db.trees.get(t.id)
+      const local = await db.trees.get(t.id)
       const serverOwned = { visibility: t.visibility, slug: t.slug, hiddenByAdmin: t.hiddenByAdmin } // 서버가 진실 (04 §3.2)
       if (await localWins('tree' + t.id, local && (local.deletedAt ?? local.updatedAt), deletedAt ?? t.updatedAt)) {
         if (local) await db.trees.update(t.id, JSON.parse(JSON.stringify(serverOwned)))
@@ -429,7 +439,7 @@ async function applyRemote(r: Batch, p?: Pend): Promise<Set<ID>> {
         await db.trees.put({ ...local, ...rest, deletedAt })
       } else {
         if (local && !local.deletedAt && local.updatedAt === t.updatedAt && local.slug === t.slug && local.visibility === t.visibility && !!local.hiddenByAdmin === !!t.hiddenByAdmin) continue
-        const next: RTree = { ...local, ...rest }
+        const next: Tree = { ...local, ...rest }
         delete next.deletedAt
         await db.trees.put(next)
       }
@@ -476,7 +486,7 @@ async function applyRemote(r: Batch, p?: Pend): Promise<Set<ID>> {
   return changed
 }
 
-/** 고아(부모가 없는 노드) → 루트 자식으로, updatedAt=now, 다시 push (C8·C9). pull 전체가 끝난 뒤나 superseded 적용 직후에만 (D1) */
+/** 고아(부모가 없는 노드) → 루트 자식으로, updatedAt=now, 다시 push (C8·C9). pull 전체가 끝난 뒤에만 (D1) — 부모가 뒤 페이지·다음 pull 에 있을 수 있다 */
 async function rescueOrphans(changed: Set<ID>): Promise<Set<ID>> {
   const hit = new Set<ID>()
   await db.transaction('rw', ALL(), async () => {
@@ -545,6 +555,7 @@ export async function onLogin(userId: string): Promise<MergePlan> {
   const local = (await live()).length
   const server = await serverCount()
   if (cur) {
+    stop() // r2 H2: 이전 계정(cur)의 엔진이 새 계정 쿠키로 push·pull 을 이어 가지 않게(id_taken→reId 로 A 트리가 B 계정에 생긴다)
     pendingUser = userId // M3: 다른 계정 데이터 — 대화 결과(wipe_other·copy_other)를 기다린다
     return { local, server, otherAccount: String(cur) }
   }

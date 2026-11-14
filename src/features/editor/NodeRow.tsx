@@ -1,8 +1,8 @@
-import { memo, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { memo, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { CAP, type TreeNode } from '../../core/types'
 import { Icon } from '../../ui/Icon'
 import { I } from '../../ui/icons'
-import { chevronDown, x } from '../../ui/icons.all'
+import { chevronDown } from '../../ui/icons.all'
 import { ensureVisible } from '../viewport'
 import { parse, toHtml } from './content/format'
 
@@ -13,11 +13,6 @@ type Step = keyof typeof WIDTH_PX
 const WIDTH_PX_NARROW: Record<Step, number> = { 1: 120, 2: 190, 3: 280 }
 const nearestStep = (px: number, w: Record<Step, number>) =>
   ([1, 2, 3] as Step[]).reduce((a, b) => (Math.abs(w[b] - px) < Math.abs(w[a] - px) ? b : a))
-const narrowMq = matchMedia('(max-width: 760px)')
-const subscribeNarrow = (cb: () => void) => {
-  narrowMq.addEventListener('change', cb)
-  return () => narrowMq.removeEventListener('change', cb)
-}
 
 export interface NodeRowProps {
   node: TreeNode
@@ -31,6 +26,8 @@ export interface NodeRowProps {
   setSize: number
   /** 접혀서 숨은 하위 노드 수 (펼쳐져 있으면 0) */
   hiddenCount: number
+  /** 좁은 화면(≤760px) — 카드 폭 단계가 좁아진다. EditorPage 가 1회 구독해 내린다 */
+  narrow: boolean
   selected: boolean
   cut: boolean
   /** 오답 농도 0..1 (core/srs missHeat) — data-miss(E2E 계약) */
@@ -63,7 +60,7 @@ function NodeRow(p: NodeRowProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const editing = p.draft !== null
   const step: Step = p.node.width ?? 1
-  const widths = useSyncExternalStore(subscribeNarrow, () => narrowMq.matches) ? WIDTH_PX_NARROW : WIDTH_PX
+  const widths = p.narrow ? WIDTH_PX_NARROW : WIDTH_PX
   const [spawned] = useState(p.spawn) // 마운트 시점 값 고정: 정착 표시로 spawn 이 꺼져도 애니메이션이 끊기지 않게
   const [liveW, setLiveW] = useState<number | null>(null) // 너비 핸들 드래그 중 미리보기 폭
   const drag = useRef<{ x: number; side: 1 | -1; z: number } | null>(null) // z = 그래프 확대 배율
@@ -168,7 +165,7 @@ function NodeRow(p: NodeRowProps) {
       {handle(-1)}
       {handle(1)}
       {p.miss >= 1 && (
-        <span className="miss" aria-label={`오답 ${p.miss}회`}><Icon d={x} />{p.miss}</span>
+        <span className="miss" aria-label={`오답 ${p.miss}회`}><Icon d={I.x} />{p.miss}</span>
       )}
       {p.hasChildren && (
         <span

@@ -9,7 +9,7 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "typecheck": "tsc -b && tsc -p tsconfig.server.json",
-    "check": "tsx src/core/outline.check.ts && tsx src/core/srs/srs.check.ts && tsx src/features/editor/graph/layout.check.ts && tsx src/features/flash/flash.check.ts && tsx src/features/dnd/dnd.check.ts && tsx src/features/editor/content/content.check.ts && tsx src/core/repo.check.ts && tsx src/core/backup.check.ts && node server/check.ts",
+    "check": "tsx src/core/outline.check.ts && tsx src/core/srs/srs.check.ts && tsx src/features/editor/graph/layout.check.ts && tsx src/features/flash/flash.check.ts && tsx src/features/dnd/dnd.check.ts && tsx src/features/editor/content/content.check.ts && tsx src/core/repo.check.ts && tsx src/core/backup.check.ts && tsx src/core/sync/engine.check.ts && node server/check.ts",
     "e2e": "playwright test",
     "server": "node --env-file-if-exists=.env server/index.ts",
     "dev:server": "node --env-file-if-exists=.env --watch server/index.ts"
@@ -28,6 +28,7 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
+    "fake-indexeddb": "^6.2.8",
     "oxlint": "^1.89.0",
     "tsx": "^4.23.15",
     "typescript": "~7.0.2",

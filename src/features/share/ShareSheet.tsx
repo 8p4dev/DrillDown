@@ -104,7 +104,7 @@ export default function ShareSheet({ tree: initial, onClose, onChange }: { tree:
     setTimeout(() => setCopied(false), 1500)
   }
   const reissue = () => run(() => reissueSlug(tree.id))
-  const hidden = !!(tree as Tree & { hiddenByAdmin?: boolean }).hiddenByAdmin // pull 로 받은 서버 값
+  const hidden = !!tree.hiddenByAdmin // pull 로 받은 서버 값
 
   return (
     <Sheet open onClose={onClose} label="공유">

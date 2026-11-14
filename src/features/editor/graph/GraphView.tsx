@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { flushSync } from 'react-dom'
+import { childIndex } from '../../../core/path'
 import type { ID, TreeNode } from '../../../core/types'
 import { haptic } from '../../feel'
 import { isOpen, layout, type Box, type Dir, type Size } from './layout'
@@ -56,15 +57,9 @@ export default function GraphView(p: {
   // 끄는 카드와 그 하위. 자식 Map 한 번 → O(n) (childrenOf 반복은 O(n²), R5-P9)
   const moving = useMemo(() => {
     if (!dragId) return null
-    const kids = new Map<ID, ID[]>()
-    for (const n of p.nodes) {
-      if (!n.parentId) continue
-      const k = kids.get(n.parentId)
-      if (k) k.push(n.id)
-      else kids.set(n.parentId, [n.id])
-    }
+    const kids = childIndex(p.nodes)
     const out = new Set([dragId])
-    for (const id of out) for (const k of kids.get(id) ?? []) out.add(k) // Set 순회는 추가된 것까지 돈다
+    for (const id of out) for (const k of kids.get(id) ?? []) out.add(k.id) // Set 순회는 추가된 것까지 돈다
     return out
   }, [p.nodes, dragId])
   const still = (id: ID) => !known.has(id) || !!moving?.has(id)
@@ -96,6 +91,9 @@ export default function GraphView(p: {
   // 크기 변화가 없는 패스에서 새 카드를 정착으로 표시 → 위치가 같은 렌더에서 still 이 풀려 미끄러짐이 없다
   // oxlint-disable-next-line react-hooks/exhaustive-deps
   useLayoutEffect(() => {
+    // 첫 레이아웃 이펙트에서 만든다(r3 M1): useEffect 에서 만들면 첫 렌더의 카드는 ro 가 null 일 때 지나가 영원히 관찰되지 않는다.
+    // 페인트 전에 반영(flushSync): 입력칸 전환처럼 렌더와 같은 프레임에 크기가 바뀌어도 한 프레임 겹쳐 보이지 않게
+    ro.current ??= new ResizeObserver((es) => flushSync(() => measure(es.map((e) => e.target as HTMLElement))))
     const els = ref.current?.querySelectorAll<HTMLElement>('[data-node-id]') ?? []
     const next = new Map<ID, { el: HTMLElement; node: TreeNode | undefined }>()
     const dirty: HTMLElement[] = []
@@ -119,11 +117,7 @@ export default function GraphView(p: {
       if (r) p.onSettled?.(g.width, g.height, r.x + r.w / 2, r.y + r.h / 2)
     }
   })
-  useEffect(() => {
-    // 페인트 전에 반영(flushSync): 입력칸 전환처럼 렌더와 같은 프레임에 크기가 바뀌어도 한 프레임 겹쳐 보이지 않게
-    ro.current = new ResizeObserver((es) => flushSync(() => measure(es.map((e) => e.target as HTMLElement))))
-    return () => ro.current?.disconnect()
-  }, []) // oxlint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => ro.current?.disconnect(), [])
 
   // 두 손가락 핀치. capture 단계에서 먼저 받아, 시작되면 카드 드래그·패닝을 취소하고 손가락이 모두 떨어질 때까지 막는다
   const touches = useRef(new Map<number, { x: number; y: number }>())
