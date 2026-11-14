@@ -92,7 +92,7 @@ export function parseSrs(v: unknown, f: string): NodeSrs {
   return {
     nodeId: uuid(o.nodeId, `${f}.nodeId`), treeId: uuid(o.treeId, `${f}.treeId`), card: o.card, due: time(o.due, `${f}.due`),
     lastGradeSource: lgs as NodeSrs['lastGradeSource'], lastStructure: ls as NodeSrs['lastStructure'],
-    autoCorrectDays: days.map((d, i) => (typeof d === 'string' && /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(d) ? d : bad(`${f}.autoCorrectDays[${i}]`))),
+    autoCorrectDays: days.map((d, i) => (typeof d === 'string' && /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(d) && new Date(d + 'T00:00:00Z').toISOString().slice(0, 10) === d ? d : bad(`${f}.autoCorrectDays[${i}]`))), // 달력 검증(2월 30일 등, v1 회귀)
     pendingRecheck: !!o.pendingRecheck, ...(miss !== undefined ? { miss } : {}), updatedAt: time(o.updatedAt, `${f}.updatedAt`),
   }
 }

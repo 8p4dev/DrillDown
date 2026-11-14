@@ -84,7 +84,7 @@ const ymd = (i: number) => new Date(Date.UTC(2000, 0, 1) + i * DAY).toISOString(
 for (let k = 0; k < 20; k++) push(A, { srs: [srs(1, Array.from({ length: LIMITS.autoDays }, (_, i) => ymd(k * LIMITS.autoDays + i)))] })
 const stored = JSON.parse(get('SELECT auto_correct_days FROM srs WHERE node_id = ?', x)!.auto_correct_days as string) as string[]
 assert.equal(stored.length, LIMITS.autoDays); assert.equal(stored.at(-1), ymd(20 * LIMITS.autoDays - 1))
-for (const d of ['9999-99-99', '2026-13-01', '2026-00-10', '2026-01-32', '2026-1-01']) throws(() => P({ srs: [srs(1, [d])] }), 400, 'invalid')
+for (const d of ['9999-99-99', '2026-13-01', '2026-00-10', '2026-01-32', '2026-1-01', '2026-02-30', '2025-02-29']) throws(() => P({ srs: [srs(1, [d])] }), 400, 'invalid')
 // C14 노드 삭제 → srs 톰스톤, 이후 srs put 은 dropped
 push(A, { deleted: { nodes: [{ id: x, treeId: t1, deletedAt: 400 }] } })
 assert.equal(get('SELECT deleted_at FROM srs WHERE node_id = ?', x)!.deleted_at, 400)

@@ -19,7 +19,7 @@ import { dayOf, flushViews } from './account/product.ts'
 
 export async function createApp(db: DB) {
   // r1 M5 + s1 H1: AUTH_FAKE 를 켠 채 https origin 이거나 루프백 밖에 바인딩하면(폰 테스트용 HOST=0.0.0.0 + http) 누구나 관리자 — 기동을 거부한다
-  if (env.authFake && (env.secure || !['127.0.0.1', '::1', 'localhost'].includes(env.host))) throw new Error('AUTH_FAKE on https origin or non-loopback host')
+  if (env.authFake && (env.secure || !['127.0.0.1', '::1', 'localhost', '::ffff:127.0.0.1'].includes(env.host))) throw new Error('AUTH_FAKE on https origin or non-loopback host')
   // #49 가용성 대용: 기동 시 오늘 행 restarts +1 (r1 L1 — 첫 요청 미들웨어는 /api/me 보다 늦게 등록돼 세지 못했다)
   db.prepare('INSERT INTO daily_stats(day, restarts) VALUES(?, 1) ON CONFLICT(day) DO UPDATE SET restarts = restarts + 1').run(dayOf(Date.now()))
   // r1 L5: 공유 조회 수는 메모리에 모아 5분마다 반영(요청당 fsync 금지)

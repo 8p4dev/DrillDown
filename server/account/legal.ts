@@ -129,7 +129,11 @@ export function registerLegal(app: Hono<AppEnv>) {
       db.prepare('UPDATE takedowns SET state = ?, resolved_at = ? WHERE id = ?').run(a.to, now, id)
       // 지금 숨김이 "이 요청 때문"일 때만 해제 — 접수 뒤 관리자가 다른 사유로 다시 숨겼으면(최근 tree.hide 감사의 takedown_id 가 다름) 상태만 바꾸고 숨김은 둔다(s2-02)
       const lastHide = tid ? (db.prepare("SELECT meta FROM audit_log WHERE action = 'tree.hide' AND target_id = ? ORDER BY id DESC LIMIT 1").get(tid) as { meta: string | null } | undefined) : undefined
-      const unhide = (action === 'resume' || action === 'reject') && tid && k!.hidden_at && isHidden(db, tid) && (JSON.parse(lastHide?.meta ?? '{}') as { takedown_id?: string }).takedown_id === id
+      // 같은 트리에 숨김을 요구하는 다른 게시중단(열림·확정·소제기)이 있으면 그쪽 보호를 위해 숨김을 둔다(v1 회귀)
+      const otherOpen = tid && db.prepare("SELECT 1 FROM takedowns WHERE tree_id = ? AND id != ? AND state IN ('received','hidden','resume_notified','confirmed','litigation')").get(tid, id) // 열려 있거나 확정·소제기로 숨김을 요구하는 건
+      // 해제 조건: 현재 숨김이 게시중단 때문(최근 tree.hide 감사에 takedown_id — 이 건이든 먼저 접수돼 숨긴 다른 건이든)이고, 같은 트리에 열린 게시중단이 더 없을 때
+      const byTakedown = (JSON.parse(lastHide?.meta ?? '{}') as { takedown_id?: string }).takedown_id !== undefined
+      const unhide = (action === 'resume' || action === 'reject') && tid && isHidden(db, tid) && byTakedown && !otherOpen
       if (tid) resolveAppeals(db, tid, unhide ? 'accepted' : 'rejected', now)
       if (unhide) { setHidden(db, tid, false, now); audit(db, me(c), 'tree.unhide', 'tree', tid, { takedown_id: id }) }
       if (action === 'confirm' && tid) db.prepare('UPDATE trees SET hidden_until = NULL WHERE id = ?').run(tid) // 임시조치 → 확정(만료 없음)

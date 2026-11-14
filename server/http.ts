@@ -45,6 +45,7 @@ export const requireAdmin: MiddlewareHandler<AppEnv> = async (c, next) => {
 }
 
 /** 클라이언트 IP — Tunnel 뒤라 CF-Connecting-IP 만 신뢰(XFF 는 직접 접속 경로에서 위조돼 레이트 리밋을 무력화한다, s1 M1). 저장·로그 금지(03 §3.7) */
+// 터널 뒤에서만 신뢰할 수 있다(Cloudflare 가 덮어씀). 서버에 직접 닿는 경로(루프백 바인딩이면 없음)에서는 위조 가능 — 운영 전제(v1 #3, 수용)
 export const clientIp = (c: Context) => c.req.header('cf-connecting-ip') ?? 'local'
 
 // ---- 레이트 리밋: 메모리 고정 창. 재시작하면 초기화(허용, 03 §3.6) ----

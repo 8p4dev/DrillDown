@@ -365,7 +365,10 @@ assert.deepEqual([stt.kind, stt.state, 'claimant_contact' in stt, 'contact' in s
 r = await req('/api/admin/takedowns', { cookie: adm })
 const tds = (await json<{ items: { id: string; state: string; claimant_contact: string; tree: { id: string } | null; appealed_at: number | null }[] }>(r)).items
 assert.equal(tds.length, 3); assert.equal(tds.find((k) => k.id === tdId)!.claimant_contact, 'holder@example.com'); assert.equal(tds.find((k) => k.id === tdId)!.tree!.id, 't-td')
-assert.equal((await req(`/api/admin/takedowns/${tdId}`, { body: { action: 'resume' }, cookie: adm })).status, 200) // hidden → resume 허용
+// 같은 트리의 두 번째 게시중단이 열려 있으면 resume 해도 숨김이 유지된다(v1 회귀 규칙) — 통보 흐름 검사를 위해 먼저 그 건을 기각
+assert.equal((await req(`/api/admin/takedowns/${tdId}`, { body: { action: 'resume' }, cookie: adm })).status, 200)
+assert.ok(hidden('t-td').h! > 0) // 2건째가 열려 있어 아직 숨김
+for (const o of db.prepare("SELECT id FROM takedowns WHERE tree_id = 't-td' AND id != ?").all(tdId) as { id: string }[]) await req(`/api/admin/takedowns/${o.id}`, { body: { action: 'reject' }, cookie: adm })
 db.prepare("UPDATE trees SET hidden_by_admin_at = ?, hidden_until = ? WHERE id = 't-td'").run(T0, T0 + 30 * DAY) // 게시중단 숨김 상태로 되돌려 통보 흐름 검사(관리자 /hide 는 "다른 사유" 숨김이라 resume 이 풀지 않는다, s2-02)
 db.prepare("UPDATE takedowns SET state = 'hidden', resolved_at = NULL WHERE id = ?").run(tdId)
 assert.equal((await req('/api/trees/t-td/appeal', { body: { text: '제가 쓴 요약입니다' }, cookie: c2 })).status, 201) // 소유자 재개 요구 = 소명
@@ -382,7 +385,7 @@ r = await req(`/api/admin/takedowns/${tdId}`, { body: { action: 'resume' }, cook
 assert.equal((await json<{ takedown: { state: string; resolved_at: number } }>(r)).takedown.state, 'resumed')
 assert.equal(hidden('t-td').h, null)
 assert.equal(db.prepare("SELECT 1 FROM appeals WHERE tree_id = 't-td' AND resolved_at IS NULL").get(), undefined)
-assert.deepEqual((await json<{ items: unknown[] }>(await req('/api/admin/takedowns', { cookie: adm }))).items.length, 2)
+assert.deepEqual((await json<{ items: unknown[] }>(await req('/api/admin/takedowns', { cookie: adm }))).items.length, 1) // 열린 건: 트리 없는 접수만(2건째는 위에서 기각)
 for (const a of ['takedown.notify', 'tree.unhide']) assert.ok(db.prepare("SELECT 1 FROM audit_log WHERE action = ? AND target_id = 't-td'").get(a), a)
 // 트리 없는 접수는 기각, 처리 90일 뒤 연락처 포함 행 삭제
 const rcv = tds.find((k) => k.tree === null)!
@@ -416,11 +419,18 @@ assert.ok(hidden('t-h1d').h! > 0 && hidden('t-h1d').u === null) // 관리자 확
 const ke = (await json<{ id: string }>(await req('/api/takedown', { body: { ...td, url: 'Hfiv5tree11' }, ip: 'td-e' }))).id
 assert.equal((await req(`/api/admin/takedowns/${ke}`, { body: { action: 'reject' }, cookie: adm })).status, 200)
 assert.deepEqual(hidden('t-h1e'), { h: null, u: null })
+// v1 회귀: 같은 트리 게시중단 2건(복수 권리자) — 숨긴 1건을 기각해도 2건째가 열려 있으면 숨김 유지, 2건째도 기각하면 해제
+const kf1 = (await json<{ id: string }>(await req('/api/takedown', { body: { ...td, url: 'Hfiv5tree11' }, ip: 'td-f1' }))).id
+const kf2 = (await json<{ id: string }>(await req('/api/takedown', { body: { ...td, url: 'Hfiv5tree11' }, ip: 'td-f2' }))).id
+assert.equal((await req(`/api/admin/takedowns/${kf1}`, { body: { action: 'reject' }, cookie: adm })).status, 200)
+assert.ok(hidden('t-h1e').h! > 0) // 2건째가 열려 있어 아직 숨김
+assert.equal((await req(`/api/admin/takedowns/${kf2}`, { body: { action: 'reject' }, cookie: adm })).status, 200)
+assert.deepEqual(hidden('t-h1e'), { h: null, u: null })
 await req('/api/takedown', { body: { ...td, url: 'Hthr5tree11' }, ip: 'td-c' })
 legalDaily(db, T0 + 31 * DAY)
 assert.deepEqual(hidden('t-h1c'), { h: null, u: null }) // 큐를 안 보면 30일 뒤 자동 복원
 assert.ok(hidden('t-h1b').h! > 0)
-db.prepare("DELETE FROM trees WHERE id IN ('t-h1a','t-h1b','t-h1c','t-h1d','t-h1e')").run()
+db.prepare("DELETE FROM trees WHERE id IN ('t-h1a','t-h1b','t-h1c','t-h1d','t-h1e')").run(); db.prepare('DELETE FROM takedowns').run()
 
 // 정보주체 요청(#25): 수동 입력, due = +10일, 완료 → audit dsr.<kind>, 90일 뒤 삭제
 assert.equal((await req('/api/admin/requests', { body: { kind: 'bogus' }, cookie: adm })).status, 400)

@@ -43,3 +43,27 @@
 ## 4. 테스트 공백(보고서 종합)
 
 AUTH_FAKE http+비루프백 기동 거부 · XFF 무시 · auto_correct_days 총량 · 게시중단 reject 가 독립 숨김을 유지 · attempts 범위·소유권 · 세션 상한 · 백업 파일 모드 0600 · PrivacyPage ITEMS ↔ 저장 테이블 1:1 · `toHtml`/`esc` 가 `<`·`>` 를 남기지 않음 · OG 셸 `<title>`·`content=` 두 컨텍스트 · 백업 `__proto__` 회귀 · Playwright 악성 트리 다이얼로그 0 상시.
+
+## 5. 수정 결과와 재검토 (같은 날 저녁)
+
+수정 워커 2명(X1 서버 daabe1c · X2 문서/클라이언트/테스트 170678d, 계획 `docs/plans/orchestration_security_fix.md`)이 통합표 #1~#12 와 OG 회귀 단언을 전부 반영했고, 재검토 워커 2명(V1 서버 재공격 `v1_server.md` · V2 클라이언트/문서/테스트 `v2_client_docs.md`)이 원래 재현 방식으로 다시 공격했다.
+
+| # | 수정 | 재검토 |
+|---|---|---|
+| 1 | 가드 = https 또는 비루프백 바인딩이면 기동 거부(`::ffff:127.0.0.1` 포함), 세 유닛 `Environment=AUTH_FAKE=0`, `.env.example` 0 | ✔ 막힘(HOST 0.0.0.0·::·https 전부 거부, 루프백 http 허용) |
+| 2 | 병합 뒤 총량 상한 `LIMITS.autoDays`(최신 유지) + 달력 검증(2/30·윤년) | ✔ superseded 20회 뒤 길이 = 상한 |
+| 3 | XFF 폴백 삭제 | ✔ XFF·X-Real-IP 회전 막힘. ✘ 잔여: 서버에 **직접** 닿으면 `cf-connecting-ip` 위조로 우회 — 운영 전제(루프백 바인딩 + Tunnel)에서는 불가. 수용, `http.ts` 주석으로 명시 |
+| 4 | 해제 = 현재 숨김이 게시중단 때문(감사 `takedown_id`) **이고** 같은 트리에 숨김을 요구하는 다른 게시중단(열림·확정·소제기)이 없을 때만 | ✔ 관리자 독립 숨김 유지. 재검토가 찾은 교차 2건 회귀(1건 기각 시 2건째 무시)도 고쳐 단언 추가 |
+| 5 | 백업 폴더 700(기존 폴더도 chmod)·파일 600·pre-migrate 600, 처리방침 ②④⑩ 정정 | ✔ 코드 경로(Windows 라 리눅스 실모드는 배포 후 확인 필요) |
+| 6 | 미처리 게시중단·요청 180일·고아 삭제, 처리방침 항목 3개 추가 | ✔ 처리 중 건은 유지 |
+| 7 | attempts 0..1 범위·음수 카운트 400, 남의 트리 dropped | ✔ |
+| 8 | 사용자당 세션 최신 20개 | ✔ (다기기 20대 초과 사용자는 가장 오래된 세션이 로그아웃 — 수용) |
+| 9 | CSP(기동 시 `dist/index.html` 인라인 스크립트 해시, CRLF 정규화, HSTS 는 https 만) | ✔ Edge 전 화면 위반 0, 양성 대조(해시 없는 인라인·onclick·http img)는 막힘. 운영 주의: `dist` 교체 뒤 재시작 필수(런북 §3) |
+| 12 | 본문 있는 비JSON 상태 변경 415 | ✔ 본문 없는 POST/DELETE·keepalive JSON 은 통과 |
+| OG | `<title>`·`content=` 둘 다 수치 엔티티 | ✔ |
+
+재검토가 추가로 바로잡은 것(4836a97·이후 커밋): 빈 `HOST=` 가 모든 인터페이스에 바인딩되던 문제(`e.HOST || '127.0.0.1'`), 처리방침 ⑧ `theme` 쿠키 문구(실제는 localStorage), 런북 HOST·보존 주기·CSP 재시작 안내, `content.check` 허용 태그를 정확 매칭으로(접두 lookahead 가 `<div onclick=` 을 통과시킴), `security.spec` 에 CSP 거부 콘솔 감지(CSP 아래서는 dialog 가 안 떠 이스케이프 회귀를 못 잡음).
+
+검증: typecheck · lint · `npm run check`(보안 단언 약 30건 추가) · build · E2E 26개(기존 25 + `security.spec`) 통과. 단언 3종을 일부러 깨뜨려 실패하는 것도 확인했다(V2).
+
+남은 운영 숙제: Pi 배포 뒤 `ls -l /var/lib/drilldown/backups`(700/600) 확인, `.env` 에서 `AUTH_FAKE` 줄 제거·`PUBLIC_ORIGIN` https 확인, 빌드를 다른 기기로 옮기기(런북 §1).
