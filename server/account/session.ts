@@ -10,6 +10,8 @@ const SLIDE = 30 * DAY
 const RENEW_BELOW = 15 * DAY
 export const ABS_USER = 180 * DAY
 export const ABS_ADMIN = DAY
+/** 관리자 비활동 상한(NIST 800-63B-4 AAL2 는 30분 권고, 운영자 편의로 60분). last_seen_at 은 요청마다 60초 간격 갱신 */
+export const IDLE_ADMIN = 60 * 60_000
 
 export const sha256 = (s: string) => createHash('sha256').update(s).digest('hex')
 export const rand = (n = 32) => randomBytes(n).toString('base64url')
@@ -47,7 +49,8 @@ export const sessionMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
     const r = db.prepare(`SELECT s.id, s.user_id, s.created_at, s.expires_at, s.last_seen_at, u.role, u.nickname, u.suspended_at, u.deleted_at
       FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.id = ?`).get(sha256(sid)) as Row | undefined
     const abs = r ? r.created_at + (r.role === 'admin' ? ABS_ADMIN : ABS_USER) : 0
-    if (!r || r.expires_at <= now || abs <= now || r.suspended_at || r.deleted_at) {
+    const idle = r?.role === 'admin' && now - r.last_seen_at > IDLE_ADMIN
+    if (!r || r.expires_at <= now || abs <= now || idle || r.suspended_at || r.deleted_at) {
       if (r) db.prepare('DELETE FROM sessions WHERE id = ?').run(r.id)
       clearSid(c)
     } else {

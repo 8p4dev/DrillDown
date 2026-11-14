@@ -3,7 +3,12 @@ import { useProviders } from '../../core/me'
 import { href } from '../../router'
 import './account.css'
 
-const EFFECTIVE = '2026-11-08'
+const EFFECTIVE = '2026-11-14'
+/** 변경 이력 — 표준지침 §21 변경 전·후 비교 공개. 최신이 위 */
+const HISTORY: [string, string][] = [
+  ['2026-11-14', '추가: 소명 글(처리 후 90일). 관리자 작업 기록에 사용자 정보 조회 기록 포함. 숨김·정지 사유를 당사자에게 앱 내·로그인 화면으로 알림'],
+  ['2026-11-08', '최초 시행'],
+]
 
 const ITEMS: [string, string, string][] = [
   ['제공자 고유 ID (Google·카카오)', '로그인 식별', '탈퇴 후 7일'],
@@ -13,7 +18,8 @@ const ITEMS: [string, string, string][] = [
   ['로그인 기기 (예: "Chrome · Android")', '로그인된 기기 목록', '로그아웃·세션 만료 시'],
   ['트리·노드·학습 기록', '동기화·공유', '탈퇴 후 7일'],
   ['신고 메모', '신고 처리', '처리 후 90일'],
-  ['관리자 작업 기록', '책임 추적', '1년'],
+  ['소명 글 (숨김된 트리의 소유자가 보낸 글)', '숨김 재검토', '처리 후 90일'],
+  ['관리자 작업·조회 기록', '책임 추적·접속기록 보관', '1년'],
   ['암호화 백업 (위 전부)', '장애 복구', '14일'],
 ]
 
@@ -56,7 +62,11 @@ export default function PrivacyPage() {
       <p>없습니다.</p>
 
       <h2>⑩ 안전성 확보조치</h2>
-      <p>암호화 전송(HTTPS), 세션은 해시로만 저장, 백업 암호화, 관리자 접근 통제·작업 기록.</p>
+      <p>암호화 전송(HTTPS), 세션은 해시로만 저장, 백업 암호화, 관리자 접근 통제·작업 기록(변경·조회 모두, 수정·삭제 불가).</p>
+
+      <h2>⑪ 변경 이력</h2>
+      <ul className="muted">{HISTORY.map(([d, t]) => <li key={d}><strong>{d}</strong> — {t}</li>)}</ul>
+      <p className="stat">신고·게시중단·소명 절차는 <a href={href.terms()}>이용약관</a>에 있습니다.</p>
     </section>
   )
 }

@@ -176,7 +176,7 @@ r = await req(`/api/admin/users/${carol[0].id}/suspend`, { body: { reason: '스�
 assert.ok((await json<{ user: { suspended_at: number } }>(r)).user.suspended_at > 0)
 assert.equal((await me(u)).status, 401)
 r = await req('/api/auth/fake/start?as=user&name=carol')
-assert.equal(r.headers.get('location'), '/#/login?e=suspended')
+assert.equal(r.headers.get('location'), `/#/login?e=suspended&r=${encodeURIComponent('스팸')}`) // 정지 사유를 로그인 화면으로
 await req(`/api/admin/users/${carol[0].id}/unsuspend`, { body: {}, cookie: adm })
 assert.equal((await me(await login('user', 'carol'))).status, 200)
 
@@ -234,7 +234,43 @@ for (let i = 0; i < 15; i++) assert.equal((await req('/api/auth/kakao/unlink-web
 for (let i = 0; i < 10; i++) await req('/api/auth/kakao/unlink-webhook?user_id=99999', { headers: { authorization: 'KakaoAK wrong!' }, ip: 'kakao-bad' })
 assert.equal((await req('/api/auth/kakao/unlink-webhook?user_id=99999', { headers: { authorization: 'KakaoAK wrong!' }, ip: 'kakao-bad' })).status, 429)
 
-// ---- 세션 슬라이딩·관리자 24h 절대 상한 ----
+// ---- 숨김 사유 통지 → 소명 → 수용 (약관 4·6, 저작권법 §103 ②③) ----
+const c2 = await login('user', 'carol')
+ins.run('t-app', carol[0].id, '소명 대상', Date.now(), Date.now(), null)
+db.prepare("UPDATE trees SET slug = 'app-slug' WHERE id = 't-app'").run()
+assert.equal((await req('/api/trees/t-app/appeal', { body: { text: '아직 숨김 아님' }, cookie: c2 })).status, 409)
+await req('/api/admin/trees/t-app/hide', { body: { reason: '교재 전사' }, cookie: adm })
+let m2 = await json<{ hidden_trees: { id: string; reason: string | null; appealed_at: number | null }[] }>(await me(c2))
+assert.deepEqual(m2.hidden_trees.map((t) => [t.id, t.reason, t.appealed_at]), [['t-app', '교재 전사', null]])
+assert.equal((await req('/api/trees/t-app/appeal', { body: { text: '' }, cookie: c2 })).status, 400)
+assert.equal((await req('/api/trees/t-app/appeal', { body: { text: '제 강의 노트입니다' }, cookie: c2 })).status, 201)
+assert.equal((await req('/api/trees/t-app/appeal', { body: { text: '또' }, cookie: c2 })).status, 409) // 열린 소명 1건
+assert.equal((await req('/api/trees/t-app/appeal', { body: { text: '남의 트리' }, cookie: d1 })).status, 404) // 소유자만
+m2 = await json(await me(c2))
+assert.ok(m2.hidden_trees[0].appealed_at! > 0)
+r = await req('/api/admin/appeals', { cookie: adm })
+const aps = (await json<{ items: { id: string; text: string; owner: string; tree: { slug: string } }[] }>(r)).items
+assert.equal(aps.length, 1); assert.equal(aps[0].text, '제 강의 노트입니다'); assert.equal(aps[0].owner, 'carol'); assert.equal(aps[0].tree.slug, 'app-slug')
+r = await req(`/api/admin/appeals/${aps[0].id}/resolve`, { body: { resolution: 'accepted' }, cookie: adm })
+assert.equal(r.status, 200)
+assert.equal((db.prepare("SELECT hidden_by_admin_at h FROM trees WHERE id = 't-app'").get() as { h: number | null }).h, null)
+assert.deepEqual((await json<{ items: unknown[] }>(await req('/api/admin/appeals', { cookie: adm }))).items, [])
+assert.deepEqual((await json<{ hidden_trees: unknown[] }>(await me(c2))).hidden_trees, [])
+for (const a of ['tree.appeal', 'tree.unhide', 'user.search', 'user.view']) assert.ok(db.prepare('SELECT 1 FROM audit_log WHERE action = ?').get(a), a) // 조회 감사 포함
+
+// ---- 운영 기록·감사 로그 불변(트리거) ----
+assert.equal((await req('/api/admin/ops/note', { body: { kind: 'bad', text: 'x' }, cookie: adm })).status, 400)
+assert.equal((await req('/api/admin/ops/note', { body: { kind: 'incident', text: '훈련' }, cookie: adm })).status, 204)
+assert.ok(db.prepare("SELECT 1 FROM audit_log WHERE action = 'system.incident' AND meta LIKE '%훈련%'").get())
+assert.throws(() => db.prepare("UPDATE audit_log SET action = 'x' WHERE id = (SELECT MAX(id) FROM audit_log)").run(), /append-only/)
+assert.throws(() => db.prepare('DELETE FROM audit_log WHERE id = (SELECT MAX(id) FROM audit_log)').run(), /append-only/)
+db.prepare("INSERT INTO audit_log(ts,action) VALUES(?, 'old')").run(Date.now() - 400 * DAY)
+assert.equal(Number(db.prepare("DELETE FROM audit_log WHERE action = 'old'").run().changes), 1) // 1년 지난 행은 지워진다(일일 작업)
+
+// ---- 세션 슬라이딩·관리자 24h 절대 상한·비활동 60분 ----
+const adm3 = await login('admin', 'root')
+db.prepare('UPDATE sessions SET last_seen_at = ? WHERE id = ?').run(Date.now() - 61 * 60_000, createHash('sha256').update(adm3.slice(4)).digest('hex'))
+assert.equal((await req('/api/admin/stats', { cookie: adm3 })).status, 404)
 const dsid = createHash('sha256').update(d1.slice(4)).digest('hex')
 db.prepare('UPDATE sessions SET expires_at = ?, last_seen_at = 0 WHERE id = ?').run(Date.now() + 10 * DAY, dsid)
 r = await me(d1)
@@ -255,6 +291,14 @@ assert.ok(db.prepare("SELECT 1 FROM audit_log WHERE action = 'user.purge' AND ta
 assert.ok(db.prepare('SELECT 1 FROM users WHERE id = ?').get(bobId)) // 복구된 사용자는 남는다
 assert.equal(JSON.parse(readFileSync(join(tmp, 'daily.json'), 'utf8')).at, dr.at)
 assert.ok(existsSync(join(tmp, 'daily.json')))
+
+// ---- 사건 대응: 전 세션 폐기(관리자 본인 포함) ----
+const adm4 = await login('admin', 'root')
+r = await req('/api/admin/ops/revoke-sessions', { body: {}, cookie: adm4 })
+assert.ok((await json<{ count: number }>(r)).count >= 1)
+assert.equal((await me(adm4)).status, 401)
+assert.equal((db.prepare('SELECT COUNT(*) n FROM sessions').get() as { n: number }).n, 0)
+assert.ok(db.prepare("SELECT 1 FROM audit_log WHERE action = 'system.sessions_revoke_all'").get())
 
 setOAuthFetch(fetch)
 Object.assign(env as unknown as Record<string, unknown>, saved)

@@ -12,7 +12,7 @@ import './account.css'
 const ERR: Record<string, string> = { denied: '로그인이 취소되었어요', suspended: '정지된 계정이에요', state: '다시 시도해 주세요' }
 const UNSET = '운영자 설정 필요'
 
-export default function LoginPage({ e, returnTo }: { e?: string; returnTo?: string }) {
+export default function LoginPage({ e, r, returnTo }: { e?: string; r?: string; returnTo?: string }) {
   const inapp = isInApp()
   const prov = useProviders()
   useEffect(() => { if (e && ERR[e]) toast(ERR[e]) }, [e])
@@ -37,9 +37,15 @@ export default function LoginPage({ e, returnTo }: { e?: string; returnTo?: stri
             {isIOS() ? <span className="muted"> · 우측 하단 ⋯ → Safari로 열기</span> : <> · <a href={chromeIntentHref()}>Chrome으로 열기</a></>}
           </p>
         )}
+        {e === 'suspended' && (
+          <p className="login-inapp" role="alert">
+            정지된 계정이에요{r && <> · 사유: {r}</>}
+            <span className="muted"> · 이의가 있으면 {prov?.privacy_contact || '운영자'}에게 알려 주세요 (<a href={href.terms()}>약관</a>)</span>
+          </p>
+        )}
         <a className="login-skip" href={href.trees()}>로그인 없이 계속 ›</a>
         <p className="login-foot muted">
-          <a href={href.privacy()}>개인정보 처리방침</a>
+          <a href={href.privacy()}>개인정보 처리방침</a> · <a href={href.terms()}>이용약관</a>
           {prov?.fake && (
             <span className="login-demo">
               개발용 로그인:{' '}

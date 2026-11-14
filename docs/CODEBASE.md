@@ -979,6 +979,13 @@ API 목록, 환경 변수, 매일 도는 작업은 [9장](#9-서버-참고표-ap
 | GET `/api/admin/reports`, POST `/reports/<id>/resolve` | 신고 목록(트리 slug·숨김 상태 포함)과 처리. `hidden` 은 같은 트리의 열린 신고를 전부 처리한다 |
 | GET / PUT `/api/admin/settings` | 공지와 점검 모드 |
 | GET `/api/admin/audit` | 감사 로그 (관리자가 한 일의 기록). 행위자 닉네임을 조인해 `actor` 로 준다 |
+| GET `/api/admin/appeals`, POST `/appeals/<id>/resolve` | 소명 큐와 처리(`accepted` = 숨김 해제, `rejected`). 숨김 해제(`/unhide`)도 열린 소명을 수용 처리한다 |
+| POST `/api/admin/ops/revoke-sessions` | 전 세션 폐기(관리자 본인 포함, 사건 대응) |
+| POST `/api/admin/ops/note` | 운영 기록(`incident`·`restore`·`note`) → 감사 로그 `system.*` |
+
+관리자 전용이 아닌 것: POST `/api/trees/<id>/appeal` — 운영 숨김된 트리의 소유자가 소명을 보낸다(트리당 열린 소명 1건, 하루 5건). 사유·소명 상태는 GET `/api/me` 의 `hidden_trees` 로 내려가고 공유 시트가 보여 준다. 정지된 사용자는 로그인 리디렉션 `#/login?e=suspended&r=<사유>` 로 사유를 본다.
+
+감사 로그는 마이그레이션 004 의 트리거로 UPDATE 가 막히고 DELETE 는 1년 지난 행만 된다. 관리자가 사용자를 검색·조회한 것도 `user.search`(건수만)·`user.view` 로 남는다. 관리자 세션은 24시간 절대 상한에 더해 60분 비활동이면 끝난다(`session.ts` IDLE_ADMIN).
 
 ### 환경 변수
 

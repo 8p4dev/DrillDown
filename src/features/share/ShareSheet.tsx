@@ -1,8 +1,8 @@
 // 공개 범위 시트 — 04 §3.10 "공개 범위 컨트롤": 세그먼트 3(비공개/링크/공개), 링크 줄(복사·열기·재발급), 공개 안내, 첫 공개 고지 1회.
 // 호출: TreeListPage(LM) ⋯ 메뉴 "공유…" → <ShareSheet tree={t} onClose={...} onChange={reload} />. 비로그인은 로그인 안내 1줄.
 import { useEffect, useState, useSyncExternalStore } from 'react'
-import { ApiError } from '../../core/api'
-import { useMe } from '../../core/me'
+import { api, ApiError } from '../../core/api'
+import { refreshMe, useMe } from '../../core/me'
 import { getTreeNodes, reissueSlug, setVisibility } from '../../core/repo'
 import type { Tree, Visibility } from '../../core/types'
 import { href } from '../../router'
@@ -19,6 +19,32 @@ const SEGS: { v: Visibility; label: string; icon: string }[] = [
   { v: 'unlisted', label: '링크', icon: I.link },
   { v: 'public', label: '공개', icon: I.globe },
 ]
+
+/** 운영 숨김 사유(관리자 메모) + 소명 폼 — 03 §3.4 통지, 약관 4·6. 사유·소명 상태는 /api/me 의 hidden_trees */
+function HiddenNotice({ treeId }: { treeId: string }) {
+  const me = useMe()
+  const h = me?.hidden_trees.find((t) => t.id === treeId)
+  const [text, setText] = useState('')
+  const [busy, setBusy] = useState(false)
+  const send = () => {
+    setBusy(true)
+    api(`/api/trees/${treeId}/appeal`, { method: 'POST', body: { text: text.trim() } })
+      .then(() => { toast('소명을 보냈어요 · 검토 뒤 이 자리에 결과가 보입니다'); setText(''); return refreshMe() }, (e) => toast(e instanceof ApiError ? e.message : '보내지 못했어요'))
+      .finally(() => setBusy(false))
+  }
+  return (
+    <div className="share-notice" role="note">
+      <p>운영 정책으로 숨김 — 링크가 열리지 않습니다{h?.reason && <><br />사유: {h.reason}</>}</p>
+      {h?.appealed_at ? <p className="muted">소명 보냄 · 검토 중</p> : (
+        <>
+          <textarea aria-label="소명" placeholder="소명 (500자, 연락처·개인정보는 적지 마세요)" maxLength={500} rows={3} value={text} onChange={(e) => setText(e.target.value)} />
+          <button type="button" className="primary" disabled={busy || !text.trim()} onClick={send}>소명 보내기</button>
+        </>
+      )}
+      <p className="muted">절차는 <a href={href.terms()}>이용약관</a> 4·6항</p>
+    </div>
+  )
+}
 
 const subOnline = (f: () => void) => {
   addEventListener('online', f)
@@ -98,7 +124,7 @@ export default function ShareSheet({ tree: initial, onClose, onChange }: { tree:
                 </button>
               ))}
             </div>
-            {hidden && <div className="share-notice" role="note"><p>운영 정책으로 숨김 — 링크가 열리지 않습니다</p></div>}
+            {hidden && <HiddenNotice treeId={tree.id} />}
             {!online && <p className="muted">오프라인</p>}
             {online && err && <p className="muted" role="alert">{err}</p>}
             {online && !canPublic && <p className="muted">공개하려면 제목과 노드 3개 이상이 필요합니다</p>}

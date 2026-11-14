@@ -21,6 +21,7 @@ const load = {
   shared: () => import('./features/share/SharedPage'),
   gallery: () => import('./features/share/GalleryPage'),
   privacy: () => import('./features/account/PrivacyPage'),
+  terms: () => import('./features/account/TermsPage'),
 }
 const loadAdmin = () => import('./features/admin/AdminPage')
 const TreeListPage = lazy(load.trees)
@@ -34,8 +35,9 @@ const AdminPage = lazy(loadAdmin)
 const SharedPage = lazy(load.shared)
 const GalleryPage = lazy(load.gallery)
 const PrivacyPage = lazy(load.privacy)
+const TermsPage = lazy(load.terms)
 
-const TITLES: Record<string, string> = { trees: '내 트리', login: '로그인', account: '계정', admin: '관리', gallery: '공개 트리', privacy: '개인정보 처리방침', edit: '편집', flash: '플래시카드', dnd: '빈칸', blank: '백지' }
+const TITLES: Record<string, string> = { trees: '내 트리', login: '로그인', account: '계정', admin: '관리', gallery: '공개 트리', privacy: '개인정보 처리방침', terms: '이용약관', edit: '편집', flash: '플래시카드', dnd: '빈칸', blank: '백지' }
 /** 탭 제목(U52): '<트리 이름> · 편집 — Drill Down'. 공유 보기는 서버가 넣은 제목을 둔다 */
 async function titleOf(r: Route): Promise<string | null> {
   if (r.name === 'shared') return null
@@ -122,11 +124,12 @@ export default function App() {
           {r.name === 'flash' && <FlashPage key={r.treeId} treeId={r.treeId} rootId={r.rootId} />}
           {r.name === 'dnd' && <DndPage key={r.treeId + r.rootId} treeId={r.treeId} rootId={r.rootId} />}
           {r.name === 'blank' && <BlankDndPage key={r.treeId + r.rootId} treeId={r.treeId} rootId={r.rootId} />}
-          {r.name === 'login' && <LoginPage e={r.e} returnTo={r.returnTo} />}
+          {r.name === 'login' && <LoginPage e={r.e} r={r.r} returnTo={r.returnTo} />}
           {r.name === 'account' && <AccountPage />}
           {r.name === 'admin' && <AdminPage tab={r.tab} />}
           {r.name === 'gallery' && <GalleryPage />}
           {r.name === 'privacy' && <PrivacyPage />}
+          {r.name === 'terms' && <TermsPage />}
           {r.name === 'shared' && <SharedPage key={r.slug} slug={r.slug} mode={r.mode} rootId={r.rootId} />}
           <Prefetch />
         </Suspense>

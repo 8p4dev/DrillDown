@@ -30,6 +30,7 @@ export function runDaily(db: DB, now = Date.now()): DailyResult {
     // 4·5. 감사 로그 1년, 처리된 신고 90일
     db.prepare('DELETE FROM audit_log WHERE ts < ?').run(now - 365 * DAY)
     db.prepare('DELETE FROM reports WHERE resolved_at < ?').run(now - 90 * DAY)
+    db.prepare('DELETE FROM appeals WHERE resolved_at < ?').run(now - 90 * DAY)
     // 6.
     db.exec('PRAGMA wal_checkpoint(TRUNCATE); PRAGMA optimize;')
   } catch (e) {

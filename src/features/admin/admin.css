@@ -76,3 +76,8 @@
   .admin td.act .reason { flex-basis: 100%; width: auto; scroll-margin-bottom: calc(var(--kb) + 1rem); }
   .admin .audit td[data-l='메모'] { grid-column: 1 / -1; }
 }
+
+/* 사건 대응 */
+.admin .ops { display: flex; flex-direction: column; gap: .6rem; }
+.admin .ops ol { margin: 0; padding-left: 1.25rem; font-size: var(--fs-sm); display: flex; flex-direction: column; gap: .2rem; }
+.admin .ops select { min-height: var(--tap); border-radius: var(--radius); }

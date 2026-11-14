@@ -13,6 +13,18 @@ const userOf = (db: DB, id: string): User => {
   return { ...u, use_provider_avatar: !!u.use_provider_avatar }
 }
 
+/** 운영 숨김 당사자에게 사유·소명 상태를 전달(저작권법 §103 ②·망법 §44조의2 ② 통지). 사유는 가장 최근 tree.hide 감사 메모 */
+function hiddenTreesOf(db: DB, ownerId: string): Me['hidden_trees'] {
+  const rows = db.prepare('SELECT id, title, hidden_by_admin_at FROM trees WHERE owner_id = ? AND deleted_at IS NULL AND hidden_by_admin_at IS NOT NULL').all(ownerId) as { id: string; title: string; hidden_by_admin_at: number }[]
+  const why = db.prepare("SELECT meta FROM audit_log WHERE action = 'tree.hide' AND target_id = ? ORDER BY id DESC LIMIT 1")
+  const open = db.prepare('SELECT created_at FROM appeals WHERE tree_id = ? AND resolved_at IS NULL ORDER BY created_at DESC LIMIT 1')
+  return rows.map((t) => {
+    const m = (why.get(t.id) as { meta: string | null } | undefined)?.meta
+    return { id: t.id, title: t.title, at: t.hidden_by_admin_at, reason: m ? ((JSON.parse(m) as { reason?: string }).reason ?? null) : null,
+      appealed_at: (open.get(t.id) as { created_at: number } | undefined)?.created_at ?? null }
+  })
+}
+
 export function registerMe(app: Hono<AppEnv>) {
   const uid = (c: Context<AppEnv>) => c.get('user')!.id
 
@@ -58,7 +70,7 @@ export function registerMe(app: Hono<AppEnv>) {
   app.get('/api/me', (c) => {
     const db = c.get('db')
     const s = getSettings(db)
-    const me: Me = { user: userOf(db, uid(c)), notice: s.notice.enabled && s.notice.text ? { text: s.notice.text } : null, maintenance: s.maintenance.enabled }
+    const me: Me = { user: userOf(db, uid(c)), notice: s.notice.enabled && s.notice.text ? { text: s.notice.text } : null, maintenance: s.maintenance.enabled, hidden_trees: hiddenTreesOf(db, uid(c)) }
     return c.json(me)
   })
 

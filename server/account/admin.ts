@@ -3,11 +3,11 @@ import { randomUUID } from 'node:crypto'
 import { readFileSync, statfsSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Context, Hono } from 'hono'
-import type { AdminStats, AdminUser, AuditRow, Report, Settings } from '../../src/core/api.ts'
+import type { AdminStats, AdminUser, Appeal, AuditRow, Report, Settings } from '../../src/core/api.ts'
 import { tx, type DB } from '../db.ts'
 import { env } from '../env.ts'
 import { errors } from '../metrics.ts'
-import { body, clientIp, DAY, fail, hit, limit, requireAdmin, type AppEnv } from '../http.ts'
+import { body, clientIp, DAY, fail, hit, limit, requireAdmin, requireUser, type AppEnv } from '../http.ts'
 import { listTreesForAdmin, purgeUser, restoreTree, setHidden, softDeleteTreesOfUser, treeCountOf, treeIdBySlug, treeStats, treesOfUser } from '../sync/owner.ts'
 
 // ---- 공용: 감사 로그·설정·검증 ----
@@ -91,6 +91,9 @@ export function stats(db: DB, now = Date.now()): AdminStats {
   }
 }
 
+const resolveAppeals = (db: DB, treeId: string, resolution: 'accepted' | 'rejected') =>
+  db.prepare('UPDATE appeals SET resolved_at = ?, resolution = ? WHERE tree_id = ? AND resolved_at IS NULL').run(Date.now(), resolution, treeId)
+
 /** 탈퇴(본인·관리자·카카오 웹훅 공통): 7일 유예 시작 */
 export function softDeleteUser(db: DB, id: string, now: number) {
   db.prepare('UPDATE users SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL').run(now, id)
@@ -124,9 +127,30 @@ function registerReport(app: Hono<AppEnv>) {
   })
 }
 
+// ---- 소명 (운영 숨김 당사자 = 소유자, 로그인 필요). 트리당 열린 소명 1건, 하루 5건 ----
+function registerAppeal(app: Hono<AppEnv>) {
+  app.post('/api/trees/:id/appeal', requireUser, async (c) => {
+    const db = c.get('db'), u = c.get('user')!
+    hit(c, `appeal:${u.id}`, 5, DAY)
+    const id = treeIdOr404(c.req.param('id'))
+    const text = optText((await body<{ text?: unknown }>(c)).text, 500, 'text', true) ?? fail(400, 'invalid', '소명 내용을 적어 주세요', 'text')
+    const t = db.prepare('SELECT hidden_by_admin_at FROM trees WHERE id = ? AND owner_id = ? AND deleted_at IS NULL').get(id, u.id) as { hidden_by_admin_at: number | null } | undefined
+    if (!t) fail(404, 'not_found', '트리가 없습니다')
+    if (!t!.hidden_by_admin_at) fail(409, 'not_hidden', '숨김 상태가 아닙니다')
+    if (db.prepare('SELECT 1 FROM appeals WHERE tree_id = ? AND resolved_at IS NULL').get(id)) fail(409, 'appeal_open', '이미 보낸 소명을 검토 중입니다')
+    const now = Date.now(), aid = randomUUID()
+    tx(db, () => {
+      db.prepare('INSERT INTO appeals(id,tree_id,user_id,text,created_at) VALUES(?,?,?,?,?)').run(aid, id, u.id, text, now)
+      audit(db, u.id, 'tree.appeal', 'tree', id, { appeal_id: aid }) // 본문은 appeals 에만(감사 로그엔 개인정보·자유 텍스트 금지)
+    })
+    return c.json({ id: aid, created_at: now }, 201)
+  })
+}
+
 // ---- /api/admin/* ----
 export function registerAdmin(app: Hono<AppEnv>) {
   registerReport(app)
+  registerAppeal(app)
   app.use('/api/admin/*', requireAdmin, limit('admin', 120, 60_000))
   const me = (c: Context<AppEnv>) => c.get('user')!.id
 
@@ -148,6 +172,7 @@ export function registerAdmin(app: Hono<AppEnv>) {
       .all(...p, n + 1) as Omit<AdminUser, 'tree_count'>[]
     const more = rows.length > n
     const items = rows.slice(0, n).map((u) => adminUser(db, u))
+    if (q) audit(db, me(c), 'user.search', 'user', null, { hits: items.length }) // 개인정보 접속기록(안전성 확보조치 기준 §8) — 검색어는 남기지 않는다
     return c.json({ items, next: more ? `${items[n - 1].created_at}_${items[n - 1].id}` : null })
   })
 
@@ -155,6 +180,7 @@ export function registerAdmin(app: Hono<AppEnv>) {
     const db = c.get('db')
     const u = userOr404(db, c.req.param('id'))
     const sessions = (db.prepare('SELECT COUNT(*) n FROM sessions WHERE user_id = ?').get(u.id) as { n: number }).n
+    audit(db, me(c), 'user.view', 'user', u.id)
     return c.json({ ...adminUser(db, u), sessions, trees: treesOfUser(db, u.id) })
   })
 
@@ -205,6 +231,7 @@ export function registerAdmin(app: Hono<AppEnv>) {
       const tree = tx(db, () => {
         const t = setHidden(db, id, act === 'hide', Date.now())
         if (t) audit(db, me(c), `tree.${act}`, 'tree', id, reason ? { reason } : undefined)
+        if (t && act === 'unhide') resolveAppeals(db, id, 'accepted')
         return t
       })
       return tree ? c.json({ tree }) : fail(404, 'not_found', '트리가 없습니다')
@@ -254,6 +281,49 @@ export function registerAdmin(app: Hono<AppEnv>) {
       }
     })
     return c.json({ report: report(db.prepare(`${REPORT_SQL} WHERE r.id = ?`).get(id) as RRow) })
+  })
+
+  // ---- 소명 큐 ----
+  const APPEAL_SQL = `SELECT a.id, a.tree_id, COALESCE(t.title, '') title, t.slug, t.hidden_by_admin_at, COALESCE(u.nickname, '') owner, a.text, a.created_at, a.resolved_at, a.resolution
+    FROM appeals a LEFT JOIN trees t ON t.id = a.tree_id LEFT JOIN users u ON u.id = a.user_id`
+  type ARow = Omit<Appeal, 'tree'> & { tree_id: string; title: string; slug: string | null; hidden_by_admin_at: number | null }
+  const appeal = ({ tree_id, title, slug, hidden_by_admin_at, ...a }: ARow): Appeal => ({ ...a, tree: { id: tree_id, title, slug, hidden_by_admin_at } })
+  app.get('/api/admin/appeals', (c) => {
+    const s = c.req.query('status') ?? 'open'
+    const where = s === 'all' ? '' : s === 'resolved' ? 'WHERE a.resolved_at IS NOT NULL' : 'WHERE a.resolved_at IS NULL'
+    return c.json({ items: (c.get('db').prepare(`${APPEAL_SQL} ${where} ORDER BY a.created_at DESC LIMIT 200`).all() as ARow[]).map(appeal) })
+  })
+  app.post('/api/admin/appeals/:id/resolve', async (c) => {
+    const db = c.get('db')
+    const id = c.req.param('id')
+    const res = (await body<{ resolution?: unknown }>(c)).resolution
+    if (res !== 'accepted' && res !== 'rejected') fail(400, 'invalid', '처리 방법을 고르세요', 'resolution')
+    const a = UUID.test(id) ? (db.prepare(`${APPEAL_SQL} WHERE a.id = ?`).get(id) as ARow | undefined) : undefined
+    if (!a) fail(404, 'not_found', '소명이 없습니다')
+    tx(db, () => {
+      if (res === 'accepted') { setHidden(db, a!.tree_id, false, Date.now()); audit(db, me(c), 'tree.unhide', 'tree', a!.tree_id, { appeal_id: id }) }
+      else audit(db, me(c), 'appeal.reject', 'tree', a!.tree_id, { appeal_id: id })
+      resolveAppeals(db, a!.tree_id, res as 'accepted' | 'rejected')
+    })
+    return c.json({ appeal: appeal(db.prepare(`${APPEAL_SQL} WHERE a.id = ?`).get(id) as ARow) })
+  })
+
+  // ---- 운영 동작 (사건 대응, 런북 §5): 전 세션 폐기 · 운영 기록 ----
+  app.post('/api/admin/ops/revoke-sessions', (c) => {
+    const db = c.get('db')
+    const count = tx(db, () => {
+      const n = Number(db.prepare('DELETE FROM sessions').run().changes)
+      audit(db, me(c), 'system.sessions_revoke_all', 'settings', null, { count: n })
+      return n
+    })
+    return c.json({ count }) // 관리자 본인도 로그아웃된다(의도)
+  })
+  app.post('/api/admin/ops/note', async (c) => {
+    const b = await body<{ kind?: unknown; text?: unknown }>(c)
+    if (b.kind !== 'incident' && b.kind !== 'restore' && b.kind !== 'note') fail(400, 'invalid', '기록 종류를 고르세요', 'kind')
+    const text = optText(b.text, 200, 'text') ?? fail(400, 'invalid', '내용을 적어 주세요', 'text')
+    audit(c.get('db'), me(c), `system.${b.kind as string}`, 'settings', null, { text })
+    return c.body(null, 204)
   })
 
   app.get('/api/admin/settings', (c) => c.json({ settings: getSettings(c.get('db')) }))

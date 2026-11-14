@@ -2,7 +2,7 @@
 // 데이터는 전부 /api/admin/*(03 §3.6). 목록은 cursor "더 보기". 비관리자·API 404 는 #/ 로. 파괴 동작(정지·삭제·숨김·점검)은 TwoStep + 사유 입력(I14, 포커스 중 타이머 정지).
 // 입력칸 클래스는 .admin-search — 에디터의 전역 .search{position:absolute} 와 겹치면 안 된다(docs/research/admin/w1_gap.md B1).
 import { useEffect, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react'
-import { api, ApiError, type AdminStats, type AdminTree, type AdminUser, type AuditRow, type Page, type Report, type ReportReason, type Settings } from '../../core/api'
+import { api, ApiError, type AdminStats, type AdminTree, type AdminUser, type Appeal, type AuditRow, type Page, type Report, type ReportReason, type Settings } from '../../core/api'
 import { refreshMe, useMe, useMeReady } from '../../core/me'
 import { href, type AdminTab } from '../../router'
 import { I } from '../../ui/icons'
@@ -197,6 +197,15 @@ function UserRow({ u, self, update }: { u: AdminUser; self: boolean; update: Upd
 function Trees() {
   const { items: trees, loaded, next, more, patch } = usePaged<AdminTree>('/api/admin/trees')
   const [reports, setReports] = useGet<{ items: Report[] }>('/api/admin/reports?status=open')
+  const [appeals, setAppeals] = useGet<{ items: Appeal[] }>('/api/admin/appeals?status=open')
+  const openAppeals = appeals?.items ?? []
+  // 소명 처리: 수용 = 숨김 해제(서버가 같은 트리 소명 전부 처리), 기각 = 당사자 공유 화면에 표시
+  const decide = (a: Appeal, resolution: 'accepted' | 'rejected') =>
+    void post<{ appeal: Appeal }>(`/api/admin/appeals/${a.id}/resolve`, { resolution }).then(() => {
+      setAppeals((p) => (p ? { items: p.items.filter((x) => x.tree.id !== a.tree.id) } : p))
+      if (resolution === 'accepted') patch((xs) => xs.map((t) => (t.id === a.tree.id ? { ...t, hidden_by_admin_at: null } : t)))
+      toast(resolution === 'accepted' ? '숨김 해제' : '소명 기각')
+    }, guard)
   const live = trees.filter((t) => !t.deleted_at)
   const open = (reports?.items ?? []).filter((r) => !r.resolved_at)
   // 같은 트리의 신고를 한 묶음으로 — 서버도 숨김 때 그 트리의 열린 신고를 전부 처리한다(admin.ts resolve)
@@ -245,6 +254,21 @@ function Trees() {
           })}
         </ul>
       )}
+      <h2>소명 {openAppeals.length}건</h2>
+      {!appeals ? <Loading /> : openAppeals.length === 0 ? <p className="muted">검토할 소명 없음</p> : (
+        <ul className="reports">
+          {openAppeals.map((a) => (
+            <li key={a.id}>
+              <span className="grow">
+                <strong>{a.tree.title}</strong> {treeLink(a.tree.slug)} · {a.owner}
+                <span className="sub">{when(a.created_at)} — {a.text}</span>
+              </span>
+              <button type="button" aria-label={`${a.tree.title} 소명 수용`} onClick={() => decide(a, 'accepted')}><Icon d={eye} /> 숨김 해제</button>
+              <button type="button" aria-label={`${a.tree.title} 소명 기각`} onClick={() => decide(a, 'rejected')}>기각</button>
+            </li>
+          ))}
+        </ul>
+      )}
       <h2>삭제된 트리 (7일)</h2>
       {deleted.length === 0 ? <p className="muted">없음</p> : (
         <ul className="reports">
@@ -291,10 +315,14 @@ const ACTION: Record<string, string> = {
   'user.suspend': '사용자 정지', 'user.unsuspend': '정지 해제', 'user.delete': '사용자 삭제(7일 유예)', 'user.purge': '사용자 삭제(즉시)', 'user.restore': '탈퇴 취소',
   'user.delete_requested': '탈퇴 요청(본인)', 'tree.hide': '트리 숨김', 'tree.unhide': '숨김 해제', 'tree.restore': '트리 복구', 'report.dismiss': '신고 기각',
   'settings.notice': '공지 변경', 'settings.maintenance': '점검 모드 변경', 'admin.login': '관리자 로그인',
+  'user.search': '사용자 검색', 'user.view': '사용자 상세 조회', 'tree.appeal': '소명 접수(소유자)', 'appeal.reject': '소명 기각',
+  'system.sessions_revoke_all': '전 세션 폐기', 'system.incident': '사건 기록', 'system.restore': '복원 기록', 'system.note': '운영 메모',
 }
+const NOTE_KIND: [string, string][] = [['incident', '사건'], ['restore', '복원'], ['note', '메모']]
 const TARGET: Record<string, string> = { user: '사용자', tree: '트리', report: '신고', settings: '설정' }
 const metaText = (m: Record<string, unknown> | null) =>
-  !m ? '' : typeof m.reason === 'string' ? `사유: ${m.reason}` : 'after' in m ? `→ ${JSON.stringify(m.after)}` : JSON.stringify(m).slice(0, 80)
+  !m ? '' : typeof m.reason === 'string' ? `사유: ${m.reason}` : typeof m.text === 'string' ? m.text : 'after' in m ? `→ ${JSON.stringify(m.after)}`
+    : typeof m.appeal_id === 'string' ? `소명 ${m.appeal_id.slice(0, 8)}` : typeof m.report_id === 'string' ? `신고 ${m.report_id.slice(0, 8)}` : JSON.stringify(m).slice(0, 80)
 function System() {
   const [tick, setTick] = useState(0)
   const [res, setRes] = useGet<{ settings: Settings }>('/api/admin/settings')
@@ -308,6 +336,13 @@ function SystemForm({ settings, audit: { items, next, more }, onSaved }: {
 }) {
   const [text, setText] = useState(settings.notice.text)
   const [enabled, setEnabled] = useState(settings.notice.enabled)
+  const [kind, setKind] = useState('incident')
+  const [note, setNote] = useState('')
+  const record = () =>
+    void post('/api/admin/ops/note', { kind, text: note.trim() }).then(() => { setNote(''); onSaved(settings); toast('기록됨') }, guard)
+  // 전 세션 폐기: 관리자 본인도 빠지므로 끝나면 로그인 화면으로
+  const revokeAll = () =>
+    void post<{ count: number }>('/api/admin/ops/revoke-sessions').then((r) => { toast(`${r.count}개 세션 폐기 · 다시 로그인하세요`); return refreshMe() }).then(() => { location.hash = href.login(href.admin('system')) }, guard)
   const save = (s: Settings, msg?: string) =>
     void api<{ settings: Settings }>('/api/admin/settings', { method: 'PUT', body: s }).then((r) => { onSaved(r.settings); if (msg) toast(msg) }, guard)
   const maint = settings.maintenance.enabled
@@ -328,6 +363,26 @@ function SystemForm({ settings, audit: { items, next, more }, onSaved }: {
         <TwoStep label={maint ? '점검 끄기' : '점검 켜기'} confirmLabel={maint ? '정말 끄기' : '정말 켜기'} verb={maint ? '점검 종료' : '점검 시작'}
           onConfirm={() => save({ ...settings, maintenance: { enabled: !maint } }, maint ? '점검 모드 꺼짐' : '점검 모드 켜짐 · 사용자 동기화가 멈춥니다')} />
       </div>
+      {/* 사건 대응(런북 §5, 유출 72시간): 화면에서 되는 두 가지 + 기록. 나머지(cloudflared 중지·시크릿 재발급)는 SSH·외부 콘솔 */}
+      <h2>사건 대응</h2>
+      <div className="ops">
+        <ol className="muted">
+          <li>점검 모드 켜기(위) → 외부 접근은 Cloudflare 대시보드에서 Tunnel 비활성</li>
+          <li>전 세션 폐기 → OAuth 시크릿·Kakao Admin 키·B2 키 재발급(SSH, 런북 §5)</li>
+          <li>영향 범위·시각을 사건 기록으로 남기고 72시간 안에 개인정보보호위원회 신고·당사자 통지(상단 공지)</li>
+        </ol>
+        <div className="maint-row">
+          <TwoStep label="전 세션 폐기" confirmLabel="정말 폐기" verb="전 세션 폐기" onConfirm={revokeAll} />
+          <span>모든 사용자(관리자 포함)가 로그아웃됩니다</span>
+        </div>
+        <form className="notice-form" onSubmit={(e) => { e.preventDefault(); if (note.trim()) record() }}>
+          <select aria-label="기록 종류" value={kind} onChange={(e) => setKind(e.target.value)}>{NOTE_KIND.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
+          <label className="admin-search">
+            <Icon d={I.circleAlert} /><input aria-label="기록 내용" placeholder="기록 (200자, 개인정보 금지)" maxLength={200} value={note} onChange={(e) => setNote(e.target.value)} />
+          </label>
+          <button type="submit" disabled={!note.trim()}>기록</button>
+        </form>
+      </div>
       <h2>감사 로그</h2>
       <table className="audit">
         <thead><tr><th>시각</th><th>행위자</th><th>동작</th><th>대상</th><th>메모</th></tr></thead>
@@ -338,7 +393,7 @@ function SystemForm({ settings, audit: { items, next, more }, onSaved }: {
               <td data-l="행위자">{a.actor ?? (a.actor_id ? a.actor_id.slice(0, 8) : '시스템')}</td>
               <td data-l="동작">{ACTION[a.action] ?? a.action}</td>
               <td data-l="대상" className="tnum" title={a.target_id ?? undefined}>
-                {a.target_type ? `${TARGET[a.target_type]} ${a.target_type === 'settings' ? a.target_id : a.target_id?.slice(0, 8) ?? ''}` : '—'}
+                {a.target_type ? `${TARGET[a.target_type]} ${a.target_type === 'settings' ? a.target_id ?? '' : a.target_id?.slice(0, 8) ?? ''}` : '—'}
               </td>
               <td data-l="메모" className="muted">{metaText(a.meta)}</td>
             </tr>

@@ -7,11 +7,12 @@ export type AdminTab = 'dashboard' | 'users' | 'trees' | 'system'
 export type Route =
   | { name: 'trees' }
   | { name: Mode; treeId: string; rootId?: string }
-  | { name: 'login'; e?: string; returnTo?: string } // e = denied | suspended | state (03 §3.6)
+  | { name: 'login'; e?: string; r?: string; returnTo?: string } // e = denied | suspended | state (03 §3.6), r = 정지 사유
   | { name: 'account' }
   | { name: 'admin'; tab: AdminTab }
   | { name: 'gallery' }
   | { name: 'privacy' }
+  | { name: 'terms' }
   | { name: 'shared'; slug: string; mode: 'view' | Exclude<Mode, 'edit'>; rootId?: string }
 
 const MODES: Mode[] = ['flash', 'dnd', 'blank']
@@ -27,11 +28,12 @@ export function parseHash(hash: string): Route {
     const m = MODES.find((x) => x === p[2]) ?? 'edit'
     return { name: m, treeId: p[1], rootId }
   }
-  if (p[0] === 'login') return { name: 'login', e: qs.get('e') ?? undefined, returnTo: qs.get('return_to') ?? undefined }
+  if (p[0] === 'login') return { name: 'login', e: qs.get('e') ?? undefined, r: qs.get('r')?.slice(0, 200) || undefined, returnTo: qs.get('return_to') ?? undefined }
   if (p[0] === 'account') return { name: 'account' }
   if (p[0] === 'admin') return { name: 'admin', tab: ADMIN_TABS.find((t) => t === p[1]) ?? 'dashboard' }
   if (p[0] === 'gallery') return { name: 'gallery' }
   if (p[0] === 'privacy') return { name: 'privacy' }
+  if (p[0] === 'terms') return { name: 'terms' }
   return { name: 'trees' }
 }
 
@@ -69,6 +71,8 @@ export const href = {
   gallery: () => '#/gallery',
   /** 개인정보 처리방침 (03 §3.7) */
   privacy: () => '#/privacy',
+  /** 이용약관·신고 처리 절차 */
+  terms: () => '#/terms',
   /** 공유 보기. 모드 전환은 ?m= (해시를 쓰면 복사한 URL 에서 OG 가 빠진다, 04 §3.4.2) */
   shared: (slug: string, mode?: Exclude<Mode, 'edit'>, rootId?: string) =>
     `/t/${slug}${mode ? `?m=${mode}${rootId ? `&root=${rootId}` : ''}` : ''}`,

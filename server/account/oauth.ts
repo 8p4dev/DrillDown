@@ -62,7 +62,12 @@ export function signIn(c: Context<AppEnv>, a: { provider: OAuthProvider | 'fake'
   const now = Date.now()
   const find = () => db.prepare('SELECT id, use_provider_avatar, avatar_url, suspended_at, deleted_at FROM users WHERE provider = ? AND provider_sub = ?').get(a.provider, a.sub) as UserRow | undefined
   let u = find()
-  if (u?.suspended_at) return c.redirect('/#/login?e=suspended')
+  if (u?.suspended_at) {
+    // 정지 사유를 당사자에게(03 §3.6 e=suspended + r). 세션이 없으니 리디렉션 쿼리로만 전달할 수 있다
+    const m = db.prepare("SELECT meta FROM audit_log WHERE action = 'user.suspend' AND target_id = ? ORDER BY id DESC LIMIT 1").get(u.id) as { meta: string | null } | undefined
+    const reason = m?.meta ? (JSON.parse(m.meta) as { reason?: string }).reason : undefined
+    return c.redirect(`/#/login?e=suspended${reason ? `&r=${encodeURIComponent(reason)}` : ''}`)
+  }
   // 유예 7일이 지났는데 일일 작업이 아직이면 지금 purge 하고 새 사용자로
   if (u?.deleted_at && now - u.deleted_at >= GRACE_MS) {
     const id = u.id

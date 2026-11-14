@@ -221,7 +221,7 @@ export default function AccountPage() {
         <span className="stat">7일 안에 다시 로그인하면 취소됩니다</span>
         <TwoStep label="탈퇴" confirmLabel="정말 탈퇴" onConfirm={() => void quit()} />
       </section>
-      <a className="stat" href={href.privacy()}>개인정보 처리방침</a>
+      <span className="stat"><a href={href.privacy()}>개인정보 처리방침</a> · <a href={href.terms()}>이용약관</a></span>
     </section>
   )
 }

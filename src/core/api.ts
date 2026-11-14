@@ -94,6 +94,8 @@ export interface Me {
   user: User
   notice: { text: string } | null
   maintenance: boolean
+  /** 운영 숨김된 내 트리 — 사유(관리자 메모)·소명 상태. 소명은 POST /api/trees/:id/appeal */
+  hidden_trees: { id: ID; title: string; at: number; reason: string | null; appealed_at: number | null }[]
 }
 
 /** GET /api/me/sessions 항목 */
@@ -164,6 +166,17 @@ export interface Report {
   created_at: number
   resolved_at: number | null
   resolution: 'hidden' | 'dismissed' | null
+}
+
+/** 소명 (GET /api/admin/appeals) */
+export interface Appeal {
+  id: ID
+  tree: { id: ID; title: string; slug: string | null; hidden_by_admin_at: number | null }
+  owner: string
+  text: string
+  created_at: number
+  resolved_at: number | null
+  resolution: 'accepted' | 'rejected' | null
 }
 
 export interface Settings {
