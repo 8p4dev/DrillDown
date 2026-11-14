@@ -46,11 +46,14 @@ export default function GalleryPage() {
   const [done, setDone] = useState('')
   // 미리보기 시트: 열린 카드 + 개요 텍스트(null = 로딩) 또는 실패 문구
   const [preview, setPreview] = useState<{ item: GalleryItem; text: string | null; fail?: string } | null>(null)
+  // 관리자 추천 고정(T4 #45): 검색 없는 1쪽 상단에 온다 — 카드에 '추천' 표식
+  const [featured, setFeatured] = useState<string[]>([])
   // GET /api/gallery?sort=&page=&q= → { items, page, hasMore } 20건 (04 §3.6). 정렬·검색이 바뀌면 1쪽부터
   useEffect(() => {
     const ac = new AbortController()
-    api<{ items: GalleryItem[]; hasMore: boolean }>(`/api/gallery?sort=${sort}&page=${page}${q ? `&q=${encodeURIComponent(q)}` : ''}`, { signal: ac.signal }).then(
+    api<{ items: GalleryItem[]; hasMore: boolean; featured?: string[] }>(`/api/gallery?sort=${sort}&page=${page}${q ? `&q=${encodeURIComponent(q)}` : ''}`, { signal: ac.signal }).then(
       (r) => {
+        if (page === 1) setFeatured(r.featured ?? [])
         // OFFSET 페이지 사이에 새 공개가 끼면 같은 카드가 다시 온다 → slug 로 거른다(U61)
         setItems((prev) => (page === 1 ? r.items : [...(prev ?? []), ...r.items.filter((it) => !prev?.some((p) => p.slug === it.slug))]))
         setMore(r.hasMore)
@@ -119,6 +122,7 @@ export default function GalleryPage() {
               </span>
               <span className="gallery-foot">
                 <Icon d={I.globe} label="공개" className="muted" />
+                {featured.includes(it.slug) && <span className="gallery-rating"><Icon d={star} /> 추천</span>}
                 <button type="button" className="gallery-preview" aria-label="미리보기" onClick={() => openPreview(it)}>미리보기</button>
               </span>
             </li>

@@ -3,7 +3,7 @@
 // 비로그인은 휴지통·내보내기만 보인다(P0 #4·#5).
 // 아바타 파일 업로드는 없다(서버는 이미지 저장 안 함, 03 §3.3).
 import { useEffect, useRef, useState } from 'react'
-import { api, ApiError } from '../../core/api'
+import { api, ApiError, type MyFeedback } from '../../core/api'
 import { importBackup, parseBackup } from '../../core/backup'
 import { db } from '../../core/db'
 import { exportEvents } from '../../core/events'
@@ -18,6 +18,7 @@ import { Icon } from '../../ui/Icon'
 import { toast } from '../Toast'
 import { Avatar } from '../../ui/Avatar'
 import { TwoStep } from '../../ui/TwoStep'
+import FeedbackSheet from './FeedbackSheet'
 import { PROVIDER_LABEL, ProviderLogo } from './providers'
 import './account.css'
 
@@ -27,6 +28,8 @@ const rel = (t: number) => {
 }
 const daysLeft = (deletedAt: number) => Math.max(1, Math.ceil((deletedAt + TRASH_MS - Date.now()) / 86_400_000))
 const upload = '<path d="M12 3v12" /><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="m17 8-5-5-5 5" />'
+const FEEDBACK_CATEGORY = { bug: '버그', idea: '제안', content: '콘텐츠 오류', other: '기타' } as const
+const messageSquare = '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />'
 const okNick = (s: string) => s.length >= 1 && s.length <= 20 && !/[\p{Cc}]/u.test(s)
 const fail = (e: unknown) => toast(e instanceof ApiError && e.status === 0 ? '오프라인이에요' : '실패했어요 · 다시 시도해 주세요')
 
@@ -42,9 +45,15 @@ export default function AccountPage() {
   const [trash, setTrash] = useState<Tree[]>([])
   const done = useRef(false)
   const file = useRef<HTMLInputElement>(null)
+  // 피드백·버그(T4 #43): 보내기 시트 + 내 피드백(상태·운영자 메모). 비로그인은 보내기만
+  const [fb, setFb] = useState(false)
+  const [myFb, setMyFb] = useState<MyFeedback[]>([])
+  const loadFb = () => { if (loggedIn) api<{ items: MyFeedback[] }>('/api/me/feedback').then((r) => setMyFb(r.items), () => setMyFb([])) }
 
   const loggedIn = !!me
   useEffect(() => { if (loggedIn) loadSessions().catch(() => { /* 목록 비움 */ }) }, [loggedIn])
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- 로그인 상태가 바뀔 때만
+  useEffect(loadFb, [loggedIn])
   const reload = () => {
     void listTrees().then((ts) => setTreeCount(ts.length))
     void db.trees.toArray().then((ts) => setTrash(ts.filter((t) => t.deletedAt)))
@@ -114,6 +123,8 @@ export default function AccountPage() {
     </>
   )
   const exportBtn = <button type="button" className="icon-btn" onClick={() => void exportData()}><Icon d={I.download} /> 데이터 내보내기</button>
+  const feedbackBtn = <button type="button" className="icon-btn" onClick={() => setFb(true)}><Icon d={messageSquare} /> 피드백·버그 보내기</button>
+  const feedbackSheet = <FeedbackSheet open={fb} onClose={() => setFb(false)} onSent={loadFb} />
   if (!ready) return null
   if (!me) {
     return (
@@ -121,7 +132,8 @@ export default function AccountPage() {
         <h1>휴지통·내보내기</h1>
         <span className="stat">이 기기에만 저장돼 있어요 · <a href={href.login(href.account())}>로그인</a>하면 계정에 저장됩니다</span>
         {trashSection}
-        <div className="actions">{exportBtn}{importBtn}</div>
+        <div className="actions">{exportBtn}{importBtn}{feedbackBtn}</div>
+        {feedbackSheet}
       </section>
     )
   }
@@ -209,9 +221,24 @@ export default function AccountPage() {
 
       {trashSection}
 
+      <section aria-labelledby="my-feedback">
+        <h2 id="my-feedback">내 피드백</h2>
+        {myFb.length === 0 ? <span className="empty-line">보낸 피드백 없음</span> : (
+          <ul>
+            {myFb.map((f) => (
+              <li key={f.id}>
+                <span className="grow">{FEEDBACK_CATEGORY[f.category]} · {f.text}<br />
+                  <span className="muted">{rel(f.created_at)} · {f.resolved_at ? '처리됨' : '확인 중'}{f.note && ` · 운영자: ${f.note}`}</span></span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
       <div className="actions">
         {exportBtn}
         {importBtn}
+        {feedbackBtn}
         <button type="button" className="icon-btn" onClick={() => void signOut()}><Icon d={logOut} /> 로그아웃</button>
         {u.role === 'admin' && <a className="icon-btn" href={href.admin()}><Icon d={shield} /> 관리자</a>}
       </div>
@@ -222,6 +249,7 @@ export default function AccountPage() {
         <TwoStep label="탈퇴" confirmLabel="정말 탈퇴" onConfirm={() => void quit()} />
       </section>
       <span className="stat"><a href={href.privacy()}>개인정보 처리방침</a> · <a href={href.terms()}>이용약관</a></span>
+      {feedbackSheet}
     </section>
   )
 }

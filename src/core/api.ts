@@ -102,8 +102,86 @@ export interface Me {
 
 /** GET /api/me 의 법규·통지 부분(server/account/legal.ts 가 채운다) — 공지 목록 등 */
 export interface LegalMe {}
-/** GET /api/me 의 제품 부분(server/account/product.ts 가 채운다) — 운영 스위치(flags) 등 */
-export interface ProductMe {}
+/** GET /api/me 의 제품 부분(server/account/product.ts 가 채운다) — 운영 스위치 */
+export interface ProductMe { flags: ProductFlags }
+
+// ---- 제품 지표·피드백·스위치 (워커 C, server/account/product.ts) ----
+/** 운영 스위치(settings.flags). 기본 전부 true. 서버 라우트도 같은 값으로 거절: 갤러리 404 · 신고/별점/공개 전환 403 */
+export interface ProductFlags { gallery: boolean; report: boolean; rating: boolean; publish: boolean }
+/** GET/PUT /api/admin/product/settings — flags + 갤러리 상단 고정 slug(≤20) */
+export interface ProductSettings { flags: ProductFlags; featured_slugs: string[] }
+export type FeedbackCategory = 'bug' | 'idea' | 'content' | 'other'
+/** 피드백 1건(관리자 GET /api/admin/feedback). user = 닉네임(비로그인·탈퇴 null) */
+export interface Feedback {
+  id: ID
+  user: string | null
+  category: FeedbackCategory
+  text: string
+  tree_id: string | null
+  client: string
+  created_at: number
+  resolved_at: number | null
+  /** 운영자 메모 — 보낸 사람에게도 보인다(GET /api/me/feedback) */
+  note: string | null
+}
+export type MyFeedback = Omit<Feedback, 'user' | 'client'>
+/** daily_stats 1행(집계값만). share_views·copies·gallery_hits 는 누계 */
+export interface DailyStat {
+  day: string
+  dau: number; wau: number; mau: number; retrieval_active: number
+  new_users: number; new_trees: number; attempts: number
+  share_views: number; copies: number; gallery_hits: number; client_errors: number
+  open_reports: number; public_trees: number; restarts: number
+}
+/** GET /api/admin/product/metrics?days=30|90|0 — 학습·성장 지표(현재 스키마 SQL). rate 류는 분모 0 이면 null */
+export interface ProductMetrics {
+  days: number
+  since: number
+  /** 기간 내 백지 퀴즈 1회 이상 사용자·완료 수 */
+  active_users: number
+  attempts: number
+  /** K2: 활성 사용자 중 14일 내 같은 트리 백지 2회 이상 */
+  k2: { users: number; rate: number | null }
+  /** 회독별 재현율: 같은 (사용자, 트리) 의 1회차·3회차 node_recall 중앙값 */
+  recall: { r1: number | null; r3: number | null; n1: number; n3: number }
+  grading: { auto: number; self: number; overridden: number; self_rate: number | null; override_rate: number | null }
+  /** 구조 오답 = 1 − AVG(edge_accuracy) */
+  structure_error: number | null
+  /** FSRS-7 예측 기억률 R(지금 시점) — 기간 내 복습한 카드. users_below_90 = 사용자 평균 R < 0.9 */
+  fsrs: { cards: number; avg_r: number | null; users_below_90: number }
+  /** 활성화율: 가입 72h 내 백지 완료(가입 후 72h 지난 사용자만 분모) */
+  activation: { signups: number; activated: number; rate: number | null }
+  providers: Record<string, number>
+  reports: { open: number; oldest_open_h: number | null; resolved: number; within_7d_rate: number | null; by_reason: Record<ReportReason, number> }
+  inactive_1y: number
+  db: { bytes: number; per_user: number }
+  /** 어제까지의 행(오늘 행은 기동 restarts 만 있는 stub 이라 뺀다) */
+  daily: DailyStat[]
+  restarts_today: number
+  /** 사고 기록(audit system.incident) 최근 20 — 72h 신고 기한 카운트다운용 */
+  incidents: { ts: number; text: string }[]
+}
+/** GET /api/admin/product/trees — 공개 트리 큐레이션(시드=소유자 admin, 추천=featured_slugs, 복제 계보 원본 제목) */
+export interface ProductTree {
+  id: ID
+  title: string
+  slug: string
+  owner: string
+  seed: boolean
+  featured: boolean
+  view_count: number
+  copy_count: number
+  rating_avg: number | null
+  rating_count: number
+  open_reports: number
+  source_title: string | null
+  updated_at: number
+}
+/** GET /api/admin/product/reports — 소유자·신고자 단위 신고 집계(신고자 null = 비로그인·탈퇴) */
+export interface ReportAgg {
+  owners: { id: ID; nickname: string; trees: number; reports: number; open: number }[]
+  reporters: { id: ID | null; nickname: string | null; reports: number }[]
+}
 
 /** GET /api/me/sessions 항목 */
 export interface Session {
@@ -137,8 +215,8 @@ export interface AdminStats {
 
 /** stats.ops (server/account/ops.ts) — DB·WAL 크기, 세션 수, 카운터, 버전, OAuth 상태 등 */
 export interface OpsStats {}
-/** stats.product (server/account/product.ts) — 학습·성장 지표, 신고 SLA 등 */
-export interface ProductStats {}
+/** stats.product (server/account/product.ts) — 가벼운 것만. 학습·성장 지표는 GET /api/admin/product/metrics */
+export interface ProductStats { feedback_open: number }
 
 export interface AdminUser {
   id: ID

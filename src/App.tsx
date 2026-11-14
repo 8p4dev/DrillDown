@@ -110,11 +110,11 @@ export default function App() {
     <>
       <nav className="topnav">
         <a className="brand" href={href.trees()} aria-label="Drill Down"><span className="brand-mark" aria-hidden />Drill Down</a>
-        {/* 공유 보기에서 비로그인·로컬 트리 0개면 '내 트리' 숨김 (02 §3.1). '공개 트리'는 항상 */}
+        {/* 공유 보기에서 비로그인·로컬 트리 0개면 '내 트리' 숨김 (02 §3.1). '공개 트리'는 운영 스위치(flags.gallery, T4 #44)가 꺼지면 숨김 */}
         {!(inShared && !me && localTrees === 0) && <a aria-current={r.name === 'trees' ? 'page' : undefined} href={href.trees()}>내 트리</a>}
-        <a aria-current={r.name === 'gallery' ? 'page' : undefined} href={href.gallery()}>
+        {me?.product?.flags?.gallery !== false && <a aria-current={r.name === 'gallery' ? 'page' : undefined} href={href.gallery()}>
           <span className="nav-long">공개 트리</span><span className="nav-short">공개</span>
-        </a>
+        </a>}
         <span className="topnav-spacer" />
         <ThemeToggle />
         {r.name !== 'login' && <NavUser />}

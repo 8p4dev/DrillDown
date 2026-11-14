@@ -116,19 +116,26 @@ export function sharedTree(db: DB, t: ShareRow, viewer?: Viewer): SharedTree & {
 const galleryCache = new Map<string, { at: number; v: { items: GalleryItem[]; page: number; hasMore: boolean } }>()
 export const clearGalleryCache = () => galleryCache.clear()
 
-/** q = 제목 부분 검색(LIKE, 와일드카드 이스케이프, 50자 상한, 빈 값 무시) */
-export function gallery(db: DB, sort: 'recent' | 'copies', page: number, now: number, q = '') {
+type GRow = { slug: string; title: string; node_count: number; copy_count: number; updated_at: number; nickname: string; rating_avg: number | null; rating_cnt: number | null }
+const GALLERY_SQL = `SELECT t.slug, t.title, t.node_count, t.copy_count, t.updated_at, u.nickname, r.avg AS rating_avg, r.cnt AS rating_cnt FROM trees t JOIN users u ON u.id = t.owner_id
+    LEFT JOIN (SELECT tree_id, AVG(stars) AS avg, COUNT(*) AS cnt FROM ratings GROUP BY tree_id) r ON r.tree_id = t.id
+    WHERE t.visibility = 'public' AND t.deleted_at IS NULL AND t.hidden_by_admin_at IS NULL AND u.deleted_at IS NULL AND u.suspended_at IS NULL AND t.slug IS NOT NULL`
+const gItem = (r: GRow): GalleryItem => ({ slug: r.slug, title: r.title, nodeCount: r.node_count, copyCount: r.copy_count, ownerNickname: r.nickname, updatedAt: r.updated_at, ratingAvg: round1(r.rating_avg), ratingCount: r.rating_cnt ?? 0 })
+
+/** q = 제목 부분 검색(LIKE, 와일드카드 이스케이프, 50자 상한, 빈 값 무시). featured = 관리자 추천 slug — 검색 없는 1쪽 상단에 고정(공개 판정은 같음), 응답 featured 로 표식(#45) */
+export function gallery(db: DB, sort: 'recent' | 'copies', page: number, now: number, q = '', featured: string[] = []) {
   q = q.trim().slice(0, 50)
   const key = `${sort}:${page}:${q}`
   const hit = galleryCache.get(key)
   if (hit && now - hit.at < 60_000) return hit.v
-  const rows = db.prepare(`SELECT t.slug, t.title, t.node_count, t.copy_count, t.updated_at, u.nickname, r.avg AS rating_avg, r.cnt AS rating_cnt FROM trees t JOIN users u ON u.id = t.owner_id
-    LEFT JOIN (SELECT tree_id, AVG(stars) AS avg, COUNT(*) AS cnt FROM ratings GROUP BY tree_id) r ON r.tree_id = t.id
-    WHERE t.visibility = 'public' AND t.deleted_at IS NULL AND t.hidden_by_admin_at IS NULL AND u.deleted_at IS NULL AND u.suspended_at IS NULL AND t.slug IS NOT NULL${q ? " AND t.title LIKE ? ESCAPE '!'" : ''}
-    ORDER BY ${sort === 'copies' ? 't.copy_count DESC, ' : ''}t.updated_at DESC, t.id LIMIT 21 OFFSET ?`).all(...(q ? [`%${q.replace(/[!%_]/g, '!$&')}%`] : []), (page - 1) * 20) as { slug: string; title: string; node_count: number; copy_count: number; updated_at: number; nickname: string; rating_avg: number | null; rating_cnt: number | null }[]
+  const pin = !q && featured.length ? featured : []
+  const marks = pin.map(() => '?').join(',')
+  const top = page === 1 && pin.length ? (db.prepare(`${GALLERY_SQL} AND t.slug IN (${marks})`).all(...pin) as GRow[]).sort((a, b) => pin.indexOf(a.slug) - pin.indexOf(b.slug)) : []
+  const rows = db.prepare(`${GALLERY_SQL}${q ? " AND t.title LIKE ? ESCAPE '!'" : ''}${pin.length ? ` AND t.slug NOT IN (${marks})` : ''}
+    ORDER BY ${sort === 'copies' ? 't.copy_count DESC, ' : ''}t.updated_at DESC, t.id LIMIT 21 OFFSET ?`).all(...(q ? [`%${q.replace(/[!%_]/g, '!$&')}%`] : []), ...pin, (page - 1) * 20) as GRow[]
   const v = {
-    items: rows.slice(0, 20).map((r) => ({ slug: r.slug, title: r.title, nodeCount: r.node_count, copyCount: r.copy_count, ownerNickname: r.nickname, updatedAt: r.updated_at, ratingAvg: round1(r.rating_avg), ratingCount: r.rating_cnt ?? 0 })),
-    page, hasMore: rows.length > 20,
+    items: [...top, ...rows.slice(0, 20)].map(gItem),
+    page, hasMore: rows.length > 20, featured: top.map((r) => r.slug),
   }
   if (galleryCache.size > 500) galleryCache.clear()
   galleryCache.set(key, { at: now, v })
